@@ -1,12 +1,14 @@
+import argparse
+import logging
+import sys
+import time
+
+
 from perfi.db import db
 from perfi.events import EventStore
 from perfi.models import TxLedger, TxLogical
 from perfi.transaction.chain_to_ledger import update_entity_transactions
 from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
-import argparse
-import logging
-import sys
-import time
 
 
 logger = logging.getLogger(__name__)
@@ -21,9 +23,7 @@ def main():
         logger.setLevel(logging.DEBUG)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "entity", help="name of entity (default: peepo)", nargs="?", default="peepo"
-    )
+    parser.add_argument("entity", help="name of entity", nargs=1)
     parser.add_argument(
         "--clear",
         action="store_true",
