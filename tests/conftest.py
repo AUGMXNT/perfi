@@ -1,6 +1,6 @@
 import json
 
-from perfi.events import EventStore
+from perfi.constants.paths import DB_SCHEMA_PATH
 from perfi.db import DB
 import pytest
 import os
@@ -8,6 +8,7 @@ from pathlib import Path
 from _pytest.monkeypatch import MonkeyPatch
 
 from perfi.models import TxLogical, TxLedger
+from perfi.events import EventStore
 
 
 @pytest.fixture(scope="session")
@@ -19,12 +20,11 @@ def monkeysession(request):
 
 @pytest.fixture(scope="session", autouse=True)
 def test_db():
-    # test_db_file = 'core_test.db'
     test_db_file = ":memory:"
     tdb = DB(db_file=test_db_file, same_thread=False)
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    db_schema = Path(f"{dir_path}/../core.db.sql").read_text()
+    db_schema = Path(DB_SCHEMA_PATH).read_text()
     # HACK: schema may have a line about creating the sequence table. Ensure it doesn't exist or the schema import will fail.
     seq_line = "CREATE TABLE sqlite_sequence(name,seq);"
     db_schema = db_schema.replace(seq_line, "")
