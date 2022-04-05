@@ -7,8 +7,27 @@ license = "AGPL-3.0-or-later"
 
 [tool.poetry.dependencies]
 python = "^3.10"
+psutil = "^5.9.0"
+httpx = "^0.22.0"
+rootpath = "^0.1.1"
+arrow = "^1.2.2"
+jsonpickle = "^2.1.0"
+XlsxWriter = "^3.0.3"
+pydantic = "^1.9.0"
+fastapi = "^0.75.1"
+typer = "^0.4.1"
+tqdm = "^4.64.0"
+openpyxl = "^3.0.9"
+beautifulsoup4 = "^4.10.0"
+lxml = "^4.8.0"
+prettytable = "^3.2.0"
+rich = "^12.1.0"
+click = "^8.1.2"
 
 [tool.poetry.dev-dependencies]
+pytest = "^7.1.1"
+pre-commit = "^2.18.1"
+devtools = "^0.8.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
