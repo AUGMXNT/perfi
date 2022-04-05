@@ -1,3 +1,8 @@
+import argparse
+import logging
+import sys
+
+
 from perfi.db import db
 from perfi.ingest.exchange import (
     BitcoinTaxImporter,
@@ -6,10 +11,6 @@ from perfi.ingest.exchange import (
     GeminiImporter,
     KrakenImporter,
 )
-
-import argparse
-import logging
-import sys
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -97,7 +98,6 @@ def main():
             file,
             entity_address_for_imports=entity_address_for_imports,
             exchange_account_id=args.exchange_account_id,
-            db=db,
         )
 
     logger.debug("Done.")
