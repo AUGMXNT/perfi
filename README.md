@@ -28,9 +28,34 @@ cd perfi
 poetry install
 ```
 
-And how to run
+And how to run:
 ```
-poetry run python generate_all.py
+# Configure perfi w/ you API keys, etc.
+poetry run python bin/setup_perfi.py
+
+# Run perfi
+poetry run python bin/generate_all.py
+```
+
+This runs:
+```
+# Update Coingecko Price List
+poetry run python bin/update_coingecko_pricelist.py
+
+# Ingest Exchange Transactions
+poetry run python bin/ingest_exchange_txs.py
+
+# Ingest Onchain Transactions
+poetry run python bin/ingest_chain_txs.py
+
+# Generate tx/price asset mappings
+poetry run python bin/map_assets.py
+
+# Turn raw exchange/onchain txs into grouped ledger txs
+poetry run python bin/group_transactions.py
+
+# Generate Costbasis lots and disposals, output to spreadsheet
+poetry run python bin/generate_costbasis.py
 ```
 
 ## Caveats
