@@ -2,8 +2,8 @@ import uuid
 
 import pytest
 from starlette.testclient import TestClient
-from api import app, TxLogicalOut
-from models import (
+from perfi.api import app, TxLogicalOut
+from perfi.models import (
     AddressStore,
     Chain,
     EntityStore,

@@ -3,9 +3,9 @@ import json
 
 import arrow
 
-from chain_updatedb import MyEncoder
-from asset_tx_updatedb import main as asset_tx_updatedb__main
-from price import CoinPrice
+from perfi.ingest.chain import MyEncoder
+from perfi.asset import update_assets_from_txchain
+from perfi.price import CoinPrice
 
 
 def setup_entity(test_db, name, addresses):
@@ -212,5 +212,5 @@ class TxFactory:
         self.db.execute(sql, params)
 
 
-def update_all_chain_tx_asset_ids(test_db):
-    asset_tx_updatedb__main(test_db)
+def update_all_chain_tx_asset_ids(test_db=None):
+    update_assets_from_txchain()

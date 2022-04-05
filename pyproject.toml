@@ -23,6 +23,7 @@ lxml = "^4.8.0"
 prettytable = "^3.2.0"
 rich = "^12.1.0"
 click = "^8.1.2"
+sttable = "^0.0.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.1"

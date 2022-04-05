@@ -133,7 +133,7 @@ class BitcoinTaxImporter:
 
         return txns
 
-    def do_import(self, csv_file, entity_address_for_imports, exchange_account_id, db):
+    def do_import(self, csv_file, entity_address_for_imports, exchange_account_id):
         txns = self.raw_transactions_csv_to_chain_txns(
             csv_file,
             entity_address_for_imports=entity_address_for_imports,
@@ -143,7 +143,7 @@ class BitcoinTaxImporter:
         unifieds = {}
         for tx in txns:
             unifieds[f"{tx['chain']}:{tx['hash']}"] = tx
-        save_to_db(unifieds, db)
+        save_to_db(unifieds)
 
 
 class KrakenImporter:
@@ -341,7 +341,7 @@ class KrakenImporter:
 
         return txns
 
-    def do_import(self, csv_file, entity_address_for_imports, exchange_account_id, db):
+    def do_import(self, csv_file, entity_address_for_imports, exchange_account_id):
         txns = self.ledgers_csv_to_chain_txns(
             csv_file,
             entity_address_for_imports=entity_address_for_imports,
@@ -351,7 +351,7 @@ class KrakenImporter:
         unifieds = {}
         for tx in txns:
             unifieds[f"{tx['chain']}:{tx['hash']}"] = tx
-        save_to_db(unifieds, db)
+        save_to_db(unifieds)
 
 
 class GeminiImporter:
@@ -522,7 +522,6 @@ class GeminiImporter:
         xls_file=None,
         entity_address_for_imports=None,
         exchange_account_id=None,
-        db=None,
     ):
         txns = self.xls_to_chain_txns(
             xls_file=xls_file,
@@ -533,7 +532,7 @@ class GeminiImporter:
         unifieds = {}
         for tx in txns:
             unifieds[f"{tx['chain']}:{tx['hash']}"] = tx
-        save_to_db(unifieds, db)
+        save_to_db(unifieds)
 
 
 class CoinbaseImporter:
@@ -769,7 +768,7 @@ class CoinbaseImporter:
 
         return txns
 
-    def do_import(self, csv_file, entity_address_for_imports, exchange_account_id, db):
+    def do_import(self, csv_file, entity_address_for_imports, exchange_account_id):
         txns = self.raw_transactions_csv_to_chain_txns(
             csv_file,
             entity_address_for_imports=entity_address_for_imports,
@@ -779,7 +778,7 @@ class CoinbaseImporter:
         unifieds = {}
         for tx in txns:
             unifieds[f"{tx['chain']}:{tx['hash']}"] = tx
-        save_to_db(unifieds, db)
+        save_to_db(unifieds)
 
 
 # NOTE: the coinbasepro account statement importer is currently broken. we will continue to use CoinbaseProImporter
@@ -1016,7 +1015,7 @@ class BROKEN_CoinbaseProAccountStatementImporter:
         unifieds = {}
         for tx in txns:
             unifieds[f"{tx['chain']}:{tx['hash']}"] = tx
-        save_to_db(unifieds, db)
+        save_to_db(unifieds)
 
 
 class CoinbaseProImporter:
@@ -1097,7 +1096,7 @@ class CoinbaseProImporter:
 
         return txns
 
-    def do_import(self, csv_file, entity_address_for_imports, exchange_account_id, db):
+    def do_import(self, csv_file, entity_address_for_imports, exchange_account_id):
         txns = self.fills_csv_to_chain_txns(
             csv_file,
             entity_address_for_imports=entity_address_for_imports,
@@ -1107,4 +1106,4 @@ class CoinbaseProImporter:
         unifieds = {}
         for tx in txns:
             unifieds[f"{tx['chain']}:{tx['hash']}"] = tx
-        save_to_db(unifieds, db)
+        save_to_db(unifieds)

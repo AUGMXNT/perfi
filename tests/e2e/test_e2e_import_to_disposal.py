@@ -41,6 +41,8 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     monkeysession.setattr("tx_logical_grouper.db", test_db)
     monkeysession.setattr("costbasis.db", test_db)
     monkeysession.setattr("costbasis.price_feed", price_feed)
+    monkeysession.setattr("perfi.asset.db", test_db)
+
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -146,7 +148,7 @@ def date_to_timestamp(date_str):
 
 
 def common(test_db):
-    update_all_chain_tx_asset_ids(test_db)
+    update_all_chain_tx_asset_ids()
     chain_generate_ledgertxs__main(entity_override=entity_name)
     tlg = TransactionLogicalGrouper(entity_name)
     tlg.update_entity_transactions()

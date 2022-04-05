@@ -8,15 +8,15 @@ from tests.helpers import *
 
 from sttable import parse_str_table
 
-from exchange_importers import (
+from perfi.ingest.exchange import (
     CoinbaseImporter,
     GeminiImporter,
     CoinbaseProImporter,
     KrakenImporter,
 )
-from chain_generate_ledgertxs import main as chain_generate_ledgertxs__main
+from perfi.transaction.chain_to_ledger import update_entity_transactions
 
-from tx_logical_grouper import TxLedger
+from perfi.models import TxLedger
 
 kraken_sample_ledgers_tbl = """
 | txid                | refid                 | time                | type       | subtype | aclass   | asset | amount        | fee          | balance      |
@@ -78,8 +78,9 @@ entity_name = "__TEST_ENTITY__"
 @pytest.fixture(scope="module", autouse=True)
 def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     setup_entity(test_db, entity_name, [("avalanche", address)])
-    monkeysession.setattr("chain_updatedb.db", test_db)
-    monkeysession.setattr("chain_generate_ledgertxs.db", test_db)
+    monkeysession.setattr("perfi.transaction.chain_to_ledger.db", test_db)
+    monkeysession.setattr("perfi.asset.db", test_db)
+    monkeysession.setattr("perfi.ingest.chain.db", test_db)
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -182,9 +183,8 @@ class TestKrakenImporter:
             csv_file,
             entity_address_for_imports=address,
             exchange_account_id="SomeKrakenAccountId",
-            db=test_db,
         )
-        chain_generate_ledgertxs__main(entity_override=entity_name)
+        update_entity_transactions(entity_name)
         tx_ledgers = get_tx_ledgers(test_db, "import.kraken", address)
 
         assert len(tx_ledgers) == 1  # only 1 ledger for a non-swap case
@@ -192,7 +192,7 @@ class TestKrakenImporter:
         expected_deposit = TxLedger(
             chain="import.kraken",
             address=address,
-            hash="import.kraken_aaaaaaaaaaaaaaaaaaaaa",
+            hash="import.kraken_bbbbbbbbbbbbbbbbbbbbb",
             from_address="Kraken:SomeKrakenAccountId",
             to_address="Kraken:SomeKrakenAccountId",
             asset_tx_id="btc",
@@ -224,9 +224,8 @@ class TestKrakenImporter:
             csv_file,
             entity_address_for_imports=address,
             exchange_account_id="SomeKrakenAccountId",
-            db=test_db,
         )
-        chain_generate_ledgertxs__main(entity_override=entity_name)
+        update_entity_transactions(entity_name)
         tx_ledgers = get_tx_ledgers(test_db, "import.kraken", address)
 
         assert len(tx_ledgers) == 1  # only 1 ledger for a non-swap case
@@ -234,7 +233,7 @@ class TestKrakenImporter:
         expected_deposit = TxLedger(
             chain="import.kraken",
             address=address,
-            hash="import.kraken_aaaaaaaaaaaaaaaaaaaaa",
+            hash="import.kraken_bbbbbbbbbbbbbbbbbbbbb",
             from_address="Kraken:SomeKrakenAccountId",
             to_address="Kraken:SomeKrakenAccountId",
             asset_tx_id="FIAT:USD",
@@ -265,9 +264,8 @@ class TestKrakenImporter:
             csv_file,
             entity_address_for_imports=address,
             exchange_account_id="SomeKrakenAccountId",
-            db=test_db,
         )
-        chain_generate_ledgertxs__main(entity_override=entity_name)
+        update_entity_transactions(entity_name)
         tx_ledgers = get_tx_ledgers(test_db, "import.kraken", address)
 
         assert len(tx_ledgers) == 3  # 2 ledgers for a swap plus a fee
@@ -278,7 +276,7 @@ class TestKrakenImporter:
         expected_in = TxLedger(
             chain="import.kraken",
             address=address,
-            hash="import.kraken_T6K5Y3-XU64Z-XWSH3Z_trade_zec_btc",
+            hash="import.kraken_dcccccccccccccccccc_trade_zec_btc",
             from_address="Kraken:SomeKrakenAccountId",
             to_address="Kraken:SomeKrakenAccountId",
             asset_tx_id="btc",
@@ -295,7 +293,7 @@ class TestKrakenImporter:
         expected_out = TxLedger(
             chain="import.kraken",
             address=address,
-            hash="import.kraken_T6K5Y3-XU64Z-XWSH3Z_trade_zec_btc",
+            hash="import.kraken_dcccccccccccccccccc_trade_zec_btc",
             from_address="Kraken:SomeKrakenAccountId",
             to_address="Kraken:SomeKrakenAccountId",
             asset_tx_id="zec",
@@ -312,7 +310,7 @@ class TestKrakenImporter:
         expected_fee = TxLedger(
             chain="import.kraken",
             address=address,
-            hash="import.kraken_T6K5Y3-XU64Z-XWSH3Z_trade_zec_btc",
+            hash="import.kraken_dcccccccccccccccccc_trade_zec_btc",
             from_address="Kraken:SomeKrakenAccountId",
             to_address="Kraken:SomeKrakenAccountId",
             asset_tx_id="btc",
@@ -346,9 +344,8 @@ class TestCoinbaseImporter:
             csv_file,
             entity_address_for_imports=address,
             exchange_account_id="SomeCoinbaseAccountId",
-            db=test_db,
         )
-        chain_generate_ledgertxs__main(entity_override=entity_name)
+        update_entity_transactions(entity_name)
         tx_ledgers = get_tx_ledgers(test_db, "import.coinbase", address)
 
         assert len(tx_ledgers) == 1  # only 1 ledger for a non-swap case
@@ -388,9 +385,8 @@ class TestCoinbaseImporter:
             csv_file,
             entity_address_for_imports=address,
             exchange_account_id="SomeCoinbaseAccountId",
-            db=test_db,
         )
-        chain_generate_ledgertxs__main(entity_override=entity_name)
+        update_entity_transactions(entity_name)
         tx_ledgers = get_tx_ledgers(test_db, "import.coinbase", address)
 
         # Should have 2 TxLedgers for a Sell
@@ -450,9 +446,8 @@ class TestCoinbaseImporter:
             csv_file,
             entity_address_for_imports=address,
             exchange_account_id="SomeCoinbaseAccountId",
-            db=test_db,
         )
-        chain_generate_ledgertxs__main(entity_override=entity_name)
+        update_entity_transactions(entity_name)
         tx_ledgers = get_tx_ledgers(test_db, "import.coinbase", address)
 
         # Should have 2 TxLedgers for a Sell
@@ -513,9 +508,8 @@ class TestCoinbaseImporter:
             csv_file,
             entity_address_for_imports=address,
             exchange_account_id="SomeCoinbaseAccountId",
-            db=test_db,
         )
-        chain_generate_ledgertxs__main(entity_override=entity_name)
+        update_entity_transactions(entity_name)
         tx_ledgers = get_tx_ledgers(test_db, "import.coinbase", address)
 
         # Should have 2 TxLedgers
@@ -579,9 +573,8 @@ class TestCoinbaseProImporter:
             csv_file,
             entity_address_for_imports=address,
             exchange_account_id="SomeCoinbaseProAccountId",
-            db=test_db,
         )
-        chain_generate_ledgertxs__main(entity_override=entity_name)
+        update_entity_transactions(entity_name)
         tx_ledgers = get_tx_ledgers(test_db, "import.coinbase_pro", address)
 
         assert len(tx_ledgers) == 3  # 1 out, 1 in, 1 fee
@@ -672,7 +665,7 @@ class BROKEN_TestCoinbaseProAccountStatementImporter:
             exchange_account_id="SomeCoinbaseProAccountId",
             db=test_db,
         )
-        chain_generate_ledgertxs__main(entity_override=entity_name)
+        update_entity_transactions(entity_name)
         tx_ledgers = get_tx_ledgers(test_db, "import.coinbase_pro", address)
 
         assert (
@@ -835,9 +828,8 @@ class TestGeminiImporter:
             xlsx_file,
             entity_address_for_imports=address,
             exchange_account_id="SomeGeminiAccountId",
-            db=test_db,
         )
-        chain_generate_ledgertxs__main(entity_override=entity_name)
+        update_entity_transactions(entity_name)
         tx_ledgers = get_tx_ledgers(test_db, "import.gemini", address)
 
         # Should have 3 TxLedgers for a Buy
@@ -916,9 +908,8 @@ class TestGeminiImporter:
             xlsx_file,
             entity_address_for_imports=address,
             exchange_account_id="SomeGeminiAccountId",
-            db=test_db,
         )
-        chain_generate_ledgertxs__main(entity_override=entity_name)
+        update_entity_transactions(entity_name)
         tx_ledgers = get_tx_ledgers(test_db, "import.gemini", address)
 
         # Should have 1 TxLedgers for a Credit
@@ -959,9 +950,8 @@ class TestGeminiImporter:
             xlsx_file,
             entity_address_for_imports=address,
             exchange_account_id="SomeGeminiAccountId",
-            db=test_db,
         )
-        chain_generate_ledgertxs__main(entity_override=entity_name)
+        update_entity_transactions(entity_name)
         tx_ledgers = get_tx_ledgers(test_db, "import.gemini", address)
 
         # Should have 1 TxLedgers for a Debit
@@ -971,9 +961,9 @@ class TestGeminiImporter:
         expected_out = TxLedger(
             chain="import.gemini",
             address=address,
-            hash="import.gemini_7d56f9e9fb1546f907cec92209b46188c43b30dea41694f81b7b67263d493faa",
+            hash="import.gemini_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             from_address="Gemini:SomeGeminiAccountId",
-            to_address="0xbbbbbbbbbbbbbbbbb",  # If we have the withdrawal destination we show it
+            to_address="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",  # If we have the withdrawal destination we show it
             asset_tx_id="dai",
             symbol="DAI",
             amount=Decimal("3584.150506"),

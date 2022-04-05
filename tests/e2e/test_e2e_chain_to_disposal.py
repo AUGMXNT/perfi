@@ -5,12 +5,12 @@ import pytest
 from pprint import pprint
 from pytest import approx
 
-from events import EventStore
+from perfi.events import EventStore
 from ..integration.test_tx_logicals import get_tx_logicals
 from tests.helpers import *
-from chain_generate_ledgertxs import main as chain_generate_ledgertxs__main
-from tx_logical_grouper import TransactionLogicalGrouper
-from models import (
+from perfi.transaction.chain_to_ledger import update_entity_transactions
+from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
+from perfi.models import (
     TxLedger,
     TxLogical,
     TX_LOGICAL_FLAG,
@@ -19,7 +19,7 @@ from models import (
     CostbasisDisposal,
 )
 
-from costbasis import regenerate_costbasis_lots
+from perfi.costbasis import regenerate_costbasis_lots
 
 chain = "avalanche"
 address = "__TEST_ADDRESS__"
@@ -36,10 +36,11 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     setup_entity(test_db, entity_name, [(chain, address)])
     asset_map = setup_asset_and_price_ids
     make = TxFactory(db=test_db, address=address, chain=chain, asset_map=asset_map)
-    monkeysession.setattr("chain_generate_ledgertxs.db", test_db)
-    monkeysession.setattr("tx_logical_grouper.db", test_db)
+    monkeysession.setattr("transaction.chain_to_ledger.db", test_db)
+    monkeysession.setattr("transaction.ledger_to_logical.db", test_db)
     monkeysession.setattr("costbasis.db", test_db)
     monkeysession.setattr("models.db", test_db)
+    monkeysession.setattr("perfi.asset.db", test_db)
     monkeysession.setattr("costbasis.price_feed", price_feed)
 
 
@@ -152,8 +153,8 @@ def get_tx_ledgers(db, chain, address):
 
 
 def common(test_db, event_store=None):
-    update_all_chain_tx_asset_ids(test_db)
-    chain_generate_ledgertxs__main(entity_override=entity_name)
+    update_all_chain_tx_asset_ids()
+    update_entity_transactions(entity_name)
     if event_store is None:
         event_store = EventStore(test_db, TxLogical, TxLedger)
     tlg = TransactionLogicalGrouper(entity_name, event_store)

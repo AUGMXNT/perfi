@@ -2,9 +2,9 @@ import jsonpickle
 import pytest
 from pprint import pprint
 from tests.helpers import *
-from chain_generate_ledgertxs import main as chain_generate_ledgertxs__main
-from tx_logical_grouper import TransactionLogicalGrouper
-from models import TxLogical, CostbasisLot, CostbasisDisposal, CostbasisIncome
+from perfi.transaction.chain_to_ledger import update_entity_transactions
+from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
+from perfi.models import TxLogical, CostbasisLot, CostbasisDisposal, CostbasisIncome
 
 
 chain = "avalanche"
@@ -65,7 +65,7 @@ class TestTxTyping:
         )
 
         update_all_chain_tx_asset_ids(test_db)
-        chain_generate_ledgertxs__main(entity_override=entity_name)
+        update_entity_transactions(entity_name)
         tlg = TransactionLogicalGrouper(entity_name, event_store)
         tlg.update_entity_transactions()
 

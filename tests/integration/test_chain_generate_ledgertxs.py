@@ -29,7 +29,7 @@ def before_each(test_db):
 
 def test_receiving_doesnt_generate_fee(monkeypatch, test_db):
     ethereum.tx(ins=["1 ETH"], timestamp=1, from_address="_FAKE_A")
-    update_all_chain_tx_asset_ids(test_db)
+    update_all_chain_tx_asset_ids()
 
     chain_generate_ledgertxs__main(entity_override=entity_name)
 
@@ -41,7 +41,7 @@ def test_receiving_doesnt_generate_fee(monkeypatch, test_db):
 
 def test_sending_generates_the_out_and_the_fee(monkeypatch, test_db):
     ethereum.tx(outs=["1 ETH"], timestamp=1, to_address="_FAKE_A")
-    update_all_chain_tx_asset_ids(test_db)
+    update_all_chain_tx_asset_ids()
 
     chain_generate_ledgertxs__main(entity_override=entity_name)
 
@@ -58,7 +58,7 @@ def test_swap_one_for_one_generates_3_ledger_txs(monkeypatch, test_db):
         timestamp=1,
         to_address="__MAKER_DAO",
     )
-    update_all_chain_tx_asset_ids(test_db)
+    update_all_chain_tx_asset_ids()
 
     chain_generate_ledgertxs__main(entity_override=entity_name)
 
