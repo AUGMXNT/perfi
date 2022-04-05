@@ -23,7 +23,7 @@ def main():
         logger.setLevel(logging.DEBUG)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("entity", help="name of entity", nargs=1)
+    parser.add_argument("entity", help="name of entity")
     parser.add_argument(
         "--clear",
         action="store_true",
