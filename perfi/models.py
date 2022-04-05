@@ -43,11 +43,12 @@ class TX_LOGICAL_FLAG(Enum):
     hidden_from_8949 = "hidden_from_8949"
 
 
+# This is more of a chain format from our address perspective...
 class Chain(Enum):
-    avalanche = "avalanche"
+    # avalanche = "avalanche"
     ethereum = "ethereum"
-    fantom = "fantom"
-    polygon = "polygon"
+    # fantom = "fantom"
+    # polygon = "polygon"
     import_coinbasepro = "import.coinbasepro"
     import_coinbase = "import.coinbasepro"
     import_kraken = "import.kraken"
