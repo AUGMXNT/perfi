@@ -128,17 +128,18 @@ class MyEncoder(json.JSONEncoder):
 
 def normalized_chain_value(chain):
     vals = dict(
-        eth="ethereum",
-        avax="avalanche",
-        xdai="xdai",
-        matic="polygon",
-        ftm="fantom",
         arb="arbitrum",
-        metis="metis",
-        op="optimism",
-        heco="heco",
+        avax="avalanche",
         bsc="binancesc",
         boba="boba",
+        eth="ethereum",
+        ftm="fantom",
+        heco="heco",
+        hmy="harmony",
+        matic="polygon",
+        metis="metis",
+        op="optimism",
+        xdai="xdai",
     )
     vals_with_normalized = vals.copy()
     for _, v in vals.items():
