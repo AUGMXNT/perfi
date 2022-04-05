@@ -1653,11 +1653,15 @@ class LotMatcher:
 
 
 class Form8949:
-    def __init__(self, entity):
+    def __init__(self, entity, args=None):
         self.entity = entity
 
         # Generate our 8949
-        self.filename = f"{self.entity}-8949.xlsx"
+        if args and args.output:
+            self.filename = args.output
+        else:
+            self.filename = f"{self.entity}-8949.xlsx"
+
         print(f"Saving File: {self.filename}")
         self.wb = xlsxwriter.Workbook(self.filename)
         self.header_format = self.wb.add_format(
@@ -1715,7 +1719,7 @@ class Form8949:
 
         self.lot_row = {}
 
-        if args.year:
+        if args and args.year:
             self.year = args.year
         else:
             self.year = arrow.now().year - 1
