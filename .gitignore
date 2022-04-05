@@ -1,6 +1,7 @@
 # perfi ignores
 *.db
 .idea/*
+XX*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
