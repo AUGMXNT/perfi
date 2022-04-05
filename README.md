@@ -59,8 +59,11 @@ poetry run python bin/map_assets.py
 # Turn raw exchange/onchain txs into grouped ledger txs
 poetry run python bin/group_transactions.py peepo
 
-# Generate Costbasis lots and disposals, output to spreadsheet
+# Generate Costbasis lots and disposals
 poetry run python bin/generate_costbasis.py peepo
+
+# Generate 8949 xlsx file
+poetry run python bin/generate_8949.py peepo
 ```
 
 `bin/cli.py` should let you do what you need for updating logical and ledger transactions (updatings prices, transactions types) and you can spelunk around the 8949 xlsx sheets.
