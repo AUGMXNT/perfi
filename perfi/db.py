@@ -1,0 +1,91 @@
+from .constants.paths import DB_PATH, DB_SCHEMA_PATH
+
+import atexit
+import os
+import psutil
+import sqlite3
+import sys
+from decimal import Decimal
+
+# Decimal adapting from https://stackoverflow.com/questions/6319409/how-to-convert-python-decimal-to-sqlite-numeric
+def adapt_decimal(d):
+    return str(d).encode("ascii")
+
+
+def convert_decimal(s):
+    return Decimal(s.decode("ascii"))
+
+
+sqlite3.register_adapter(Decimal, adapt_decimal)
+
+sqlite3.register_converter("decimal", convert_decimal)
+
+
+class DB:
+    def __init__(self, db_file=DB_PATH, same_thread=True):
+        self.db_file = db_file
+        self.fcon = sqlite3.connect(
+            db_file, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=same_thread
+        )
+        self.mcon = sqlite3.connect(
+            ":memory:",
+            detect_types=sqlite3.PARSE_DECLTYPES,
+            check_same_thread=same_thread,
+        )
+
+        self.fcon.row_factory = sqlite3.Row
+        self.mcon.row_factory = sqlite3.Row
+
+        self.con = self.fcon
+        self.cur = self.con.cursor()
+
+        self.cur.execute("pragma journal_mode=wal")
+        self.cur.execute("pragma synchronous=normal")
+        self.cur.execute("pragma temp_store=memory")
+
+        if db_file != ":memory:":
+            free_memory = psutil.virtual_memory().free
+            mmap_size = int(1.5 * os.stat(db_file).st_size)
+            if free_memory - (200 * 1024 * 1024) > mmap_size:
+                self.cur.execute(f"pragma mmap_size={mmap_size}")
+
+    def use_mem(self):
+        # print('using memory')
+        self.fcon.backup(self.mcon)
+        self.con = self.mcon
+        self.cur = self.mcon.cursor()
+        atexit.register(self.save_mem)
+
+    def save_mem(self):
+        # print(f'saving db to disk: {self.db_file}')
+        self.mcon.backup(self.fcon)
+
+    def query(self, query, params=()):
+        if type(params) == str:
+            params = (params,)
+        self.cur.execute(query, params)
+        return self.cur.fetchall()
+
+    def execute(self, query, params=()):
+        if type(params) == str:
+            params = (params,)
+        self.cur.execute(query, params)
+        self.con.commit()
+
+    def execute_many(self, query, params=()):
+        if type(params) == str:
+            params = (params,)
+        self.cur.executemany(query, params)
+        self.con.commit()
+
+    def create_db(self, schema_path):
+        with open(schema_path) as f:
+            schema_sql = f.read()
+            self.cur.executescript(schema_sql)
+
+
+# Singleton for perfi db
+db = DB()
+db_is_empty = len(db.query("select * from sqlite_master")) == 0
+if db_is_empty:
+    db.create_db(DB_SCHEMA_PATH)
