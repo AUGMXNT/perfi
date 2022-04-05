@@ -7,20 +7,19 @@ from pprint import pprint
 import arrow
 from pytest import approx
 
-from exchange_importers import (
+from perfi.ingest.exchange import (
     CoinbaseProImporter,
-    CoinbaseImporter,
     BROKEN_CoinbaseProAccountStatementImporter,
 )
 from tests.integration.test_imports_from_exchanges import table_to_csv
 from tests.helpers import *
-from chain_generate_ledgertxs import main as chain_generate_ledgertxs__main
-from tx_logical_grouper import TransactionLogicalGrouper
+from perfi.transaction.chain_to_ledger import update_entity_transactions
+from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
 
-from models import CostbasisIncome, CostbasisLot, CostbasisDisposal
-from costbasis import regenerate_costbasis_lots
+from perfi.models import CostbasisIncome, CostbasisLot, CostbasisDisposal
+from perfi.costbasis import regenerate_costbasis_lots
 
-from price import CoinPrice
+from perfi.price import CoinPrice
 
 chain = "avalanche"
 address = "__TEST_ADDRESS__"
@@ -31,7 +30,7 @@ make: TxFactory = TxFactory()
 price_feed = MockPriceFeed()
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     global make
     setup_entity(test_db, entity_name, [(chain, address)])
@@ -44,21 +43,6 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     monkeysession.setattr("perfi.asset.db", test_db)
 
 
-
-@pytest.fixture(scope="function", autouse=True)
-def before_each(test_db):
-    tables_to_clear = [
-        "tx_chain",
-        "tx_ledger",
-        "tx_logical",
-        "costbasis_lot",
-        "costbasis_disposal",
-        "costbasis_mapped_asset",
-        "costbasis_income",
-    ]
-    for t in tables_to_clear:
-        test_db.execute(f"DELETE FROM {t}")
-    yield
 
 
 def get_costbasis_lots(test_db, entity, address=None):
@@ -149,7 +133,7 @@ def date_to_timestamp(date_str):
 
 def common(test_db):
     update_all_chain_tx_asset_ids()
-    chain_generate_ledgertxs__main(entity_override=entity_name)
+    update_entity_transactions(entity_name)
     tlg = TransactionLogicalGrouper(entity_name)
     tlg.update_entity_transactions()
     regenerate_costbasis_lots(entity_name, quiet=True)

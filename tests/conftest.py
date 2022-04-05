@@ -18,10 +18,10 @@ def monkeysession(request):
     mpatch.undo()
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def test_db():
     test_db_file = ":memory:"
-    tdb = DB(db_file=test_db_file, same_thread=False)
+    tdb = DB(db_file=test_db_file, same_thread=False, foo='foo')
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
     db_schema = Path(DB_SCHEMA_PATH).read_text()
@@ -40,7 +40,7 @@ def test_db():
         pass
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def setup_asset_and_price_ids(test_db):
     sql = """REPLACE INTO asset_price
          (id, source, symbol, name, raw_data)

@@ -75,20 +75,13 @@ address = "__TEST_ADDRESS__"
 entity_name = "__TEST_ENTITY__"
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     setup_entity(test_db, entity_name, [("avalanche", address)])
     monkeysession.setattr("perfi.transaction.chain_to_ledger.db", test_db)
     monkeysession.setattr("perfi.asset.db", test_db)
     monkeysession.setattr("perfi.ingest.chain.db", test_db)
 
-
-@pytest.fixture(scope="function", autouse=True)
-def before_each(test_db):
-    tables_to_clear = ["tx_chain", "tx_ledger"]
-    for t in tables_to_clear:
-        test_db.execute(f"DELETE FROM {t}")
-    yield
 
 
 def get_tx_chains(db, chain, address):

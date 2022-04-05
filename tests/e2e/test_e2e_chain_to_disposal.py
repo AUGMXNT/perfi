@@ -30,34 +30,20 @@ make: TxFactory = TxFactory()
 price_feed = MockPriceFeed()
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     global make
     setup_entity(test_db, entity_name, [(chain, address)])
     asset_map = setup_asset_and_price_ids
     make = TxFactory(db=test_db, address=address, chain=chain, asset_map=asset_map)
-    monkeysession.setattr("transaction.chain_to_ledger.db", test_db)
-    monkeysession.setattr("transaction.ledger_to_logical.db", test_db)
-    monkeysession.setattr("costbasis.db", test_db)
-    monkeysession.setattr("models.db", test_db)
+    monkeysession.setattr("perfi.transaction.chain_to_ledger.db", test_db)
+    monkeysession.setattr("perfi.transaction.ledger_to_logical.db", test_db)
+    monkeysession.setattr("perfi.costbasis.db", test_db)
+    monkeysession.setattr("perfi.models.db", test_db)
     monkeysession.setattr("perfi.asset.db", test_db)
-    monkeysession.setattr("costbasis.price_feed", price_feed)
+    monkeysession.setattr("perfi.costbasis.price_feed", price_feed)
 
 
-@pytest.fixture(scope="function", autouse=True)
-def before_each(test_db):
-    tables_to_clear = [
-        "tx_chain",
-        "tx_ledger",
-        "tx_logical",
-        "costbasis_lot",
-        "costbasis_disposal",
-        "costbasis_mapped_asset",
-        "costbasis_income",
-    ]
-    for t in tables_to_clear:
-        test_db.execute(f"DELETE FROM {t}")
-    yield
 
 
 def get_costbasis_lots(test_db, entity, address):

@@ -22,8 +22,9 @@ sqlite3.register_converter("decimal", convert_decimal)
 
 
 class DB:
-    def __init__(self, db_file=DB_PATH, same_thread=True):
+    def __init__(self, db_file=DB_PATH, same_thread=True, foo=None):
         self.db_file = db_file
+        self.foo = foo
         self.fcon = sqlite3.connect(
             db_file, detect_types=sqlite3.PARSE_DECLTYPES, check_same_thread=same_thread
         )

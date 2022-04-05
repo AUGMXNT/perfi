@@ -29,7 +29,7 @@ def main():
         filename=f"{LOG_DIR}/costbasis-{entity}.log",
     )
 
-    costbasis.regenerate_costbasis_lots(entity, args)
+    costbasis.regenerate_costbasis_lots(entity, args=args)
 
 
 if __name__ == "__main__":

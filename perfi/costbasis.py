@@ -45,7 +45,7 @@ def get_asset_price_record(asset_tx_id=None):
         return None
 
 
-def regenerate_costbasis_lots(entity, args, quiet=False):
+def regenerate_costbasis_lots(entity, args=None, quiet=False):
     if quiet:
         global DEBUG
         DEBUG = False

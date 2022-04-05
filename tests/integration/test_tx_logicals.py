@@ -23,30 +23,14 @@ def get_tx_logicals(test_db, address):
     return [TxLogical.from_id(id=r[0], entity_name=entity_name) for r in results]
 
 
-# ===================================================================
-# THESE BLOCKS SHOULD EXIST IN ALL TEST FILES THAT NEED DB ACCESS
-
-
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     global make
     setup_entity(test_db, entity_name, [(chain, address)])
     asset_map = setup_asset_and_price_ids
     make = TxFactory(db=test_db, address=address, chain=chain, asset_map=asset_map)
-    monkeysession.setattr("chain_generate_ledgertxs.db", test_db)
-    monkeysession.setattr("tx_logical_grouper.db", test_db)
-
-
-# IMPORTANT: Update below as appropriate for your stuff under test
-@pytest.fixture(scope="function", autouse=True)
-def delete_all_from_tables_before_each_test(test_db):
-    tables_to_clear = ["tx_chain", "tx_ledger", "tx_logical"]
-    for t in tables_to_clear:
-        test_db.execute(f"DELETE FROM {t}")
-    yield
-
-
-# ===================================================================
+    monkeysession.setattr("perfi.transaction.chain_to_ledger.db", test_db)
+    monkeysession.setattr("perfi.transaction.ledger_to_logical.db", test_db)
 
 
 class TestTxTyping:

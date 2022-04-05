@@ -20,47 +20,31 @@ from tests.helpers import *
 client = TestClient(app)
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     def test_db_returner(**kwargs):
         return test_db
 
-    monkeysession.setattr("api.DB", test_db_returner)
-    monkeysession.setattr("models.db", test_db)
-
-
-@pytest.fixture(scope="function", autouse=True)
-def before_each(test_db):
-    tables_to_clear = [
-        "entity",
-        "address",
-        "tx_chain",
-        "tx_ledger",
-        "tx_logical",
-        "tx_rel_ledger_logical",
-        "costbasis_lot",
-        "costbasis_disposal",
-        "costbasis_mapped_asset",
-        "costbasis_income",
-    ]
-    for t in tables_to_clear:
-        test_db.execute(f"DELETE FROM {t}")
-    yield
+    monkeysession.setattr("perfi.api.DB", test_db_returner)
+    monkeysession.setattr("perfi.models.db", test_db)
 
 
 ENTITY_NAME = "tester"
 TEST_ADDRESS = "test_address"
 
 
-@pytest.fixture(autouse=True)
-def entity(test_db):
-    entity_store = EntityStore(test_db)
-    entity_store.create(ENTITY_NAME)
+# @pytest.fixture(autouse=True)
+# def entity(test_db):
+#     entity_store = EntityStore(test_db)
+#     entity_store.create(ENTITY_NAME)
 
 
 def test_get_addresses(test_db):
+    entity_store = EntityStore(test_db)
+    entity = entity_store.create(name=ENTITY_NAME)
+
     address_store = AddressStore(test_db)
-    address_store.create("foo", Chain.ethereum, "0x123", ENTITY_NAME)
+    address_store.create("foo", Chain.ethereum, "0x123", entity.name)
     response = client.get("/addresses/")
     assert response.json() == [
         {
