@@ -18,9 +18,13 @@ It's currently in a pretty raw state and requires some technical know-how to run
 perfi depends on several third party API providers, some of which require (free) API keys:
 * [DeBank OpenAPI](https://open.debank.com/)
 * [CoinGecko API](https://www.coingecko.com/en/api) ([paid API](https://www.coingecko.com/en/api/pricing) supported)
+
+Not enabled (but in the code if you want to dig around) for the current release:
 * [Etherscan](https://etherscan.io/) and friends (polygonscan, snowtrace, ftmscan)
 * [Covalent](https://www.covalenthq.com/)
+* [Unmarshal](https://unmarshal.io/)
 
+### Getting Started
 Here's how to install
 ```
 git clone https://github.com/AUGMXNT/perfi
@@ -30,32 +34,66 @@ poetry install
 
 And how to run:
 ```
-# Configure perfi w/ you API keys, etc.
-poetry run python bin/setup_perfi.py
+# Interactive initial perfi setup (entity, accounts, API keys)
+poetry run python bin/cli.py setup
 
-# Run perfi
-poetry run python bin/generate_all.py
-```
+# You can also add entities or addresses manually
+# Add an entity 'peepo'
+poetry run python bin/cli.py entity create peepo
+# Add an ethereum style account named 'degen wallet'
+pr bin/cli.py entity add_address peepo 'degen wallet' 'ethereum' '0x0000000000000000000000000000000000000000'
+# You can of course add as many wallets as you want to an entity
 
-This runs:
-```
-# Update Coingecko Price List
+# Update the Coingecko Price Token List
 poetry run python bin/update_coingecko_pricelist.py
 
-# Ingest Exchange Transactions
-poetry run python bin/ingest_exchange_txs.py
+# Import Exchange Exports (more docs below) - exchange_account_id automatically appends exchange identifiers
+poetry run python bin/import_from_exchange.py --entity_name peepo --file peepo-coinbase-2021-rawtx.csv --exchange coinbase --exchange_account_id peepo
 
-# Ingest Onchain Transactions
-poetry run python bin/ingest_chain_txs.py
+# Import Onchain Transactions
+poetry run python bin/import_chain_txs.py peepo
 
 # Generate tx/price asset mappings
 poetry run python bin/map_assets.py
 
 # Turn raw exchange/onchain txs into grouped ledger txs
-poetry run python bin/group_transactions.py
+poetry run python bin/group_transactions.py peepo
 
 # Generate Costbasis lots and disposals, output to spreadsheet
-poetry run python bin/generate_costbasis.py
+poetry run python bin/generate_costbasis.py peepo
 ```
 
+`bin/cli.py` should let you do what you need for updating logical and ledger transactions (updatings prices, transactions types) and you can spelunk around the 8949 xlsx sheets.
+
+We recommend [DB Browser for SQLite](https://sqlitebrowser.org/) for spelunking around in `data/perfi.db`
+
+
+## Notes
+* perfi runs as much on your local system as possible, and while we use some third party APIs to make our job easier, our goal is to minimize any PII stored/leaked remotely. We appreciate our privacy and we think others do too.
+* This software is licensed with the AGPLv3, a strong copyleft license. This is meant to make sure that end-users of the software will always be able to have control/modify this software to their liking, and as devs, to maintain optionality/minimize free-riding as far as distribution goes.
+* If there's demand/we don't get bored, we may add some (privacy-first) Freemium services (higher resolution price/other metadata), access to archival nodes, etc in the future. In the meantime, if you find this useful or want to support development, feel free to check our donation address
+* For the regular exchange imports we've implemented, our HIFO lot matching algorithm almost exactly matches the best-in-class of the services we've tested (Bitcoin.tax) and beats others like Koinly or CoinTracking which fall down/have bugs (aggressively zero cost-basis transfers, don't understand foreign currency fiat transactions, etc)
+* Turns out this stuff is sort of complex, though. We will be publishing some Architectural Decision Records in due time discussing how we handle transactions and cost basis as well other considerations.
+* The plan is to build a DDL and community repository to allow perfi to understand arbitrary DeFi protocols and strategies
+* Taxes are not actually so interesting, but well, there was nothing out there that did anything close to what we needed, so why not start here. Future plans for perfi focus on the *per* part:
+  * Actually being able to track performance of your plays (vs doing benchmarks/hodling, accounting for transaction costs, tax efficiency)
+  * Farming/claim calculations and helpers
+  * You can see a preview of some of that sort of thing here: https://github.com/AUGMXNT/frax-analysis/
+
 ## Caveats
+* Many types of defi transactions aren't covered
+* We don't support NFTs very well atm, sorry
+* Tax treatments are hard coded and may not match your tax regime/preferences. In future versions we plan on making this easier to personalize/configure
+* Only supports EVM chains atm
+* Doesn't account for fees atm
+
+## Did You Know?
+Definitely **NOT** tax advice, but in the US, if you [file an extension](https://www.irs.gov/forms-pubs/extension-of-time-to-file-your-tax-return), and don't make an adequate prepayment, you will owe a [Failure to Pay Penalty](https://www.irs.gov/payments/failure-to-pay-penalty) of 0.5%/mo - or 3% if you get things sorted by the automatic extension period. [Interesting, right?](https://coindix.com/?kind=stable&sort=-apy&tvl=1m).
+* Note, the [Failure to File Penalty](https://www.irs.gov/payments/failure-to-file-penalty) is 5%/mo...
+
+## Donations
+If you've found this software useful, feel free to zap some coins/tokens into our multisig. We promise to farm the shit out of it:
+
+## See also
+* [rotki](https://github.com/rotki/rotki) - this app has very similar goals as we do, and if it would have done the trick, would have saved a few hundred hours and counting of dev time. There is a small dedicated team [beavering away for years](https://github.com/rotki/rotki) - worth a look if it'll do what you need. They have a GUI and like [users, and stuff](https://github.com/rotki/rotki/issues)
+* [bitcoin.tax](https://bitcoin.tax/) - if all you have is centralized exchange transactions, crypto taxes are a solved problem. We checked out over a dozen services and bitcoin.tax did the best job of any of them, but most of them are probably fine.
