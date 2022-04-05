@@ -5,6 +5,7 @@ from enum import Enum
 import json
 import logging
 from devtools import debug
+from rich.console import Console
 import sys
 import time
 import typer
@@ -46,6 +47,13 @@ TX Logical
 Costbasis Lot
 [] update asset_price_id/symbol
 =======================================
+
+colors
+* https://typer.tiangolo.com/tutorial/printing/
+* https://github.com/tiangolo/typer/issues/196
+* https://github.com/click-contrib/click-help-colors
+rich vs pytermgui
+* https://github.com/bczsalba/pytermgui
 """
 
 logger = logging.getLogger(__name__)
@@ -60,6 +68,9 @@ if sys.stdout.isatty():
     logger.addHandler(console)
 
 args = None
+
+# rich console
+console = Console()
 
 
 entity_store = EntityStore(db)
@@ -219,13 +230,15 @@ app.add_typer(ledger_app, name="ledger")
 @app.command("setup")
 def setup_perfi():
     # Entity
-    print(
-        "perfi uses Entities to group On-Chain Addresses together. Think of an Entity like a user."
+    console.print(
+        "[i]perfi[/i] uses [b]entities[/b] to group [b]addresses[/b] together. Think of an [b]entity[/b] like a user."
     )
     entity_name = typer.prompt("Please enter a name for your first entity")
     entity = entity_store.create(name=entity_name)
-    print(f"Created entity {entity}")
-    print("Now you should probably add at least one Address for your Entity.")
+    console.print(f"Created entity [b]{entity}[/b]")
+    console.print(
+        "Now you should probably add at least one [b]address[/b] for your [b]entity[/b]."
+    )
     choice = ""
     num_addresses_added = 0
     while choice.lower() != "n":
