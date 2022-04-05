@@ -31,6 +31,7 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     make = TxFactory(db=test_db, address=address, chain=chain, asset_map=asset_map)
     monkeysession.setattr("perfi.transaction.chain_to_ledger.db", test_db)
     monkeysession.setattr("perfi.transaction.ledger_to_logical.db", test_db)
+    monkeysession.setattr("perfi.models.db", test_db)
 
 
 class TestTxTyping:
