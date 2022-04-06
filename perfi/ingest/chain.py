@@ -127,18 +127,31 @@ class MyEncoder(json.JSONEncoder):
 
 
 def normalized_chain_value(chain):
+    # LATER: update dynamically with https://openapi.debank.com/v1/chain/list
     vals = dict(
         arb="arbitrum",
+        astar="astar",
+        aurora="aurora",
         avax="avalanche",
         bsc="binancesc",
+        btt="btt",
         boba="boba",
         eth="ethereum",
+        celo="celo",
+        cro="cro",
         ftm="fantom",
+        fuse="fuse",
         heco="heco",
         hmy="harmony",
         matic="polygon",
         metis="metis",
+        mobm="moonbeam",
+        movr="moonriver",
         op="optimism",
+        okt="okc",
+        palm="palm",
+        sbch="smartbch",
+        sdn="shiden",
         xdai="xdai",
     )
     vals_with_normalized = vals.copy()
