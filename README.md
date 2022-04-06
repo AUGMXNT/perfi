@@ -74,7 +74,7 @@ poetry run python bin/map_assets.py
 poetry run python bin/group_transactions.py peepo
 
 # Calculate costbasis lots, disposals, and income
-poetry run python bin/generate_costbasis.py peepo
+poetry run python bin/calculate_costbasis.py peepo
 
 # Generate 8949 xlsx file
 poetry run python bin/generate_8949.py peepo
