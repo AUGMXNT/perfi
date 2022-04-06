@@ -199,3 +199,6 @@ CREATE TABLE IF NOT EXISTS "event"
     data      TEXT    not null,
     timestamp INTEGER not null
 );
+CREATE INDEX "idx_rel_tx_logical" ON "tx_rel_ledger_logical" (
+	"tx_logical_id"
+);
