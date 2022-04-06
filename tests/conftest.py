@@ -21,7 +21,7 @@ def monkeysession(request):
 @pytest.fixture(scope="function", autouse=True)
 def test_db():
     test_db_file = ":memory:"
-    tdb = DB(db_file=test_db_file, same_thread=False, foo='foo')
+    tdb = DB(db_file=test_db_file, same_thread=False)
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
     db_schema = Path(DB_SCHEMA_PATH).read_text()
