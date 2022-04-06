@@ -83,7 +83,7 @@ poetry run python bin/calculate_costbasis.py peepo
 poetry run python bin/generate_8949.py peepo
 ```
 
-###Importing data from exchanges
+### Importing data from exchanges
 Today, perfi supports importing trade data from Bitcoin.tax, Coinbase, Coinbase Pro, Gemini, and Kraken.
 
 To import data from an exchange you run the command:
@@ -95,7 +95,7 @@ poetry run bin/import_from_exchange.py --entity_name <peepo> --file <path/to/exp
 - supported exchange names for the `--exchange` parameter are: `coinbase` `coinbasepro` `gemini` `kraken` `bitcointax`
 - for the `--file` parameter, see below for which file you need to provide for a given exchange
 
-####How to export files from supported exchanges
+#### How to export files from supported exchanges
 - **Coinbase**
   - Tax Section → Documents → Generate Report → Raw Transaction Activity (can only do for All Time, which is fine). Format should be CSV.
 - **Coinbase Pro**
@@ -161,7 +161,6 @@ If you've found this software useful, feel free to zap us some coins/tokens. We 
 ```
 0x0bcee2cd8564b2c61caec20113f1f87a16e10cb0
 ```
-
 
 ## See also
 * [DeBank](https://debank.com/) - this is by far the best DeFi portfolio viewer and we use their [OpenAPI](https://open.debank.com/) extensively. You should definitely be using it.
