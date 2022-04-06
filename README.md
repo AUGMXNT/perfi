@@ -129,7 +129,10 @@ This is definitely **NOT** tax advice, but in the US, if you [file an extension]
 * Note, the [Failure to File Penalty](https://www.irs.gov/payments/failure-to-file-penalty) is 5%/mo if you don't get things sorted by the time your extension period ends
 
 ## Donations
-If you've found this software useful, feel free to zap some coins/tokens into our multisigs. We promise to farm the shit out of it:
+If you've found this software useful, feel free to zap us some coins/tokens. We promise to farm the shit out of it:
+```
+0x0bcee2cd8564b2c61caec20113f1f87a16e10cb0
+```
 
 
 ## See also
