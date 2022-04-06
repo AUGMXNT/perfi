@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from functools import cache
 from pprint import pformat
 
 import jsonpickle
@@ -208,6 +209,7 @@ class TxLogical(BaseModel):
                 self.others.append(t)
 
     @classmethod
+    @cache
     def from_id(cls, id: str, entity_name: str = None):
         txl = cls(id=id, entity=entity_name)
         txl.id = id
