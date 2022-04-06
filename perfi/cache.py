@@ -41,8 +41,14 @@ class Cache:
         if use_mem:
             self.db.use_mem()
 
+        self.client = None
+
     def _client(self):
-        return httpx.Client(proxies=self.proxy)
+        if self.client:
+            return self.client
+        else:
+            self.client = httpx.Client(proxies=self.proxy)
+            return self.client
 
     def set_cookies_for_requests(self, hostname, cookies):
         for k, v in cookies.items():
