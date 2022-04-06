@@ -67,6 +67,13 @@ if sys.stdout.isatty():
     )
     logger.addHandler(console)
 
+
+def save_setting(key: str, value: str):
+    sql = """REPLACE INTO setting (key, value) VALUES (?, ?)"""
+    params = [key, value]
+    db.execute(sql, params)
+
+
 args = None
 
 # rich console
@@ -266,17 +273,20 @@ def setup_perfi():
         "If you want to create more Entities later, run `poetry run bin/cli.py entity create`"
     )
     print(
-        "If you want to create more Addresses later, run `poetry run bin/cli.py address create`"
-    )  # TODO check these help texts
+        "If you want to create more Addresses later, run `poetry run bin/cli.py entity add_address`"
+    )
 
     # Add Settings
     print(
-        "perfi interacts with some third-party systems to gather data. You'll need to enter some API keys now..."
+        "\nperfi interacts with some third-party systems to gather data. You don't need to enter any API keys but if you have any of the following you can enter them now:"
     )
-
-    # Various Keys, or skip - optional
-
-    # TODO: crawling, skip service if we don't have a key (eg covalent)?
+    choice = typer.prompt(
+        f"Would you like to add a CoinGecko paid API key? [Y]es or [N]o"
+    )
+    if choice.lower() == "y" or choice.lower() == "yes":
+        key = typer.prompt(f"Enter your CoinGecko API Key:")
+        save_setting("COINCECKO_KEY", key)
+    print("OK. You're done configuring perfi!")
 
 
 def main():
