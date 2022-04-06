@@ -47,6 +47,9 @@ And how to run:
 # Interactive initial perfi setup (entity, accounts, API keys)
 poetry run python bin/cli.py setup
 
+# NOTE: Many commands below require an entity name to operate on.
+# For the rest of these examples, we assume you have an entity named 'peepo'
+
 # OPTIONAL: You can also add entities or addresses manually
 #
 # Add an entity 'peepo'
@@ -80,12 +83,37 @@ poetry run python bin/calculate_costbasis.py peepo
 poetry run python bin/generate_8949.py peepo
 ```
 
+###Importing data from exchanges
+Today, perfi supports importing trade data from Bitcoin.tax, Coinbase, Coinbase Pro, Gemini, and Kraken.
+
+To import data from an exchange you run the command:
+```
+poetry run bin/import_from_exchange.py --entity_name <peepo> --file <path/to/export/file> --exchange <coinbase|coinbasepro|gemini|kraken|bitcointax> --exchange_account_id <anything_eg_default>
+```
+
+- use anything you want for the `--exchange-account-id` parameter; it's just used to help potentially differentiate multiple accounts from the same exchange
+- supported exchange names for the `--exchange` parameter are: `coinbase` `coinbasepro` `gemini` `kraken` `bitcointax`
+- for the `--file` parameter, see below for which file you need to provide for a given exchange
+
+####How to export files from supported exchanges
+- **Coinbase**
+  - Tax Section → Documents → Generate Report → Raw Transaction Activity (can only do for All Time, which is fine). Format should be CSV.
+- **Coinbase Pro**
+  - Statements → Generate → Account Statement → Select date range and 'All Accounts'. Format should be CSV.
+- **Gemini**
+  - Account → Settings → Statements and History → Transaction History → Exchange Transaction History → Click the download icon next to this label. Format should be XLSX.
+- **Kraken**
+  -  History → Export → Select 'Ledgers' and pick date range. Format should be CSV.
+- **Bitcoin.Tax**
+  - Opening → Download. Format should be CSV.
+
+###Other Usage Notes
+
 `bin/cli.py` should let you do what you need for updating logical and ledger transactions (updatings prices, transactions types). We try to be smart about updating downstream results, although if things look wonky, you may need to re-run `bin/group_transactions.py` on down...
 
 We've included `--help` for some of the options in the various CLI apps as there's some functionality not in this document yet.
 
 Disposals in generated 8949 xlsx sheets internally link to their associated lots with transaction ids and hashes. LibreOffice and Google Sheets have been tested to play nice with our output file.
-
 
 We also recommend [DB Browser for SQLite](https://sqlitebrowser.org/) for spelunking around in `data/perfi.db`
 
