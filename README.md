@@ -107,7 +107,7 @@ poetry run bin/import_from_exchange.py --entity_name <peepo> --file <path/to/exp
 - **Bitcoin.Tax**
   - Opening → Download. Format should be CSV.
 
-###Other Usage Notes
+### Other Usage Notes
 
 `bin/cli.py` should let you do what you need for updating logical and ledger transactions (updatings prices, transactions types). We try to be smart about updating downstream results, although if things look wonky, you may need to re-run `bin/group_transactions.py` on down...
 
