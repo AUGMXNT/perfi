@@ -2132,3 +2132,118 @@ class Form8949:
                         except:
                             # Could be empty
                             pass
+
+    def get_ledger(self):
+        sql = f"""SELECT id, tx_logical_type, flags
+                  FROM tx_logical
+                  WHERE address IN (
+                      SELECT address
+                      FROM address, entity
+                      WHERE entity_id = entity.id
+                      AND entity.name = ?
+                  )
+                 AND count > 0
+                 AND timestamp  >= {self.start}
+                 AND timestamp < {self.end}
+                 ORDER BY timestamp ASC
+              """
+        params = [self.entity]
+        results = db.query(sql, params)
+
+        ws = self.wb.add_worksheet("Ledger TXs")
+
+        ws.write_row(
+            0,
+            0,
+            [
+                "Date",
+                "Entity Address",
+                "tx_logical_type",
+                "tx_ledger_type",
+                "Direction",
+                "Is Fee",
+                "Chain",
+                "from_address",
+                "to_address",
+                "Amount",
+                "Price USD",
+                "symbol",
+                "asset_price_id",
+                "asset_tx_id",
+                "Hash",
+                "tx_ledger.id",
+                "flags",
+            ],
+            self.header_format,
+        )
+
+        # Column Widths
+        ws.set_column("A:A", 14)
+        ws.set_column("B:B", 38)
+        ws.set_column("C:D", 14)
+        ws.set_column("E:F", 9)
+        ws.set_column("G:G", 18)
+        ws.set_column("H:I", 38)
+        ws.set_column("J:K", 14)
+        ws.set_column("L:L", 9)
+        ws.set_column("M:M", 16)
+        ws.set_column("N:N", 38)
+        ws.set_column("O:P", 60)
+        ws.set_column("Q:Q", 30)
+
+        i = 1
+        for txlog in results:
+            sql = """SELECT id,
+                            chain,
+                            address,
+                            hash,
+                            from_address,
+                            to_address,
+                            asset_tx_id,
+                            isfee,
+                            amount,
+                            timestamp,
+                            direction,
+                            tx_ledger_type,
+                            asset_price_id,
+                            symbol,
+                            price_usd
+                     FROM tx_ledger txle
+                     JOIN tx_rel_ledger_logical as rel ON txle.id = rel.tx_ledger_id
+                     WHERE rel.tx_logical_id = ?
+                     ORDER by timestamp ASC
+                  """
+            params = [txlog["id"]]
+            r_txle = db.query(sql, params)
+
+            for txle in r_txle:
+                d = arrow.get(txle["timestamp"])
+                # TODO: use settings for tz
+                d = d.to("US/Pacific")
+                date = d.format()
+
+                url = get_url(txle["chain"], txle["hash"])
+
+                ws.write(i, 0, date, self.default_format)
+                ws.write(i, 1, txle["address"], self.default_format)
+                ws.write(i, 2, txlog["tx_logical_type"], self.default_format)
+                ws.write(i, 3, txle["tx_ledger_type"], self.default_format)
+                ws.write(i, 4, txle["direction"], self.default_format)
+                ws.write(i, 5, txle["isfee"], self.default_format)
+                ws.write(i, 6, txle["chain"], self.default_format)
+                ws.write(i, 7, txle["from_address"], self.default_format)
+                ws.write(i, 8, txle["to_address"], self.default_format)
+                ws.write(i, 9, txle["amount"], self.amount_format)
+                ws.write(i, 10, txle["price_usd"], self.currency_format)
+                ws.write(i, 11, txle["symbol"], self.default_format)
+                ws.write(i, 12, txle["asset_price_id"], self.default_format)
+                ws.write(i, 13, txle["asset_tx_id"], self.default_format)
+                ws.write_url(i, 14, url, self.default_format, txle["hash"])
+                ws.write(i, 15, txle["id"], self.default_format)
+                ws.write(i, 16, txlog["flags"], self.default_format)
+                i += 1
+            # Extra space between logical groups
+            i += 1
+
+        # Freeze Header Row
+        ws.freeze_panes(1, 0)

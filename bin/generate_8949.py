@@ -34,6 +34,7 @@ def main():
     f.get_income()
     f.get_lots()
     f.link_lots()
+    f.get_ledger()
 
     f.wb.close()
 
