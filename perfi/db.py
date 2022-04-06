@@ -42,6 +42,8 @@ class DB:
         self.cur.execute("pragma journal_mode=wal")
         self.cur.execute("pragma synchronous=normal")
         self.cur.execute("pragma temp_store=memory")
+        # 100 MiB just in case
+        self.cur.execute("pragma cache_size=-100000")
 
         if db_file != ":memory:":
             free_memory = psutil.virtual_memory().free
