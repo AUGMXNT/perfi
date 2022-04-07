@@ -308,8 +308,8 @@ class KrakenImporter:
                     continue
 
             # Non-swap case
-            transaction_types_for_receive = ["deposit"]
-            transaction_types_for_send = ["transfer", "withdrawal", "staking"]
+            transaction_types_for_receive = ["deposit", "receive"]
+            transaction_types_for_send = ["transfer", "withdrawal", "staking", "spend"]
             receives = []
             sends = []
             t = dict(
