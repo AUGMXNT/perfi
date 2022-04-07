@@ -53,19 +53,20 @@ def regenerate_costbasis_lots(entity, args=None, quiet=False):
         global DEBUG
         DEBUG = False
 
-    # Theoretically
-    # costbasis_lot is idempotent to tx_ledger_id and we can generally leave it
-    # LATER in the future we want to be able to store and replay edits, maybe in costbasis_edits table?
-    sql = """DELETE FROM costbasis_lot WHERE entity = ?"""
-    db.execute(sql, entity)
+    if not args.resumefrom:
+        # Theoretically
+        # costbasis_lot is idempotent to tx_ledger_id and we can generally leave it
+        # LATER in the future we want to be able to store and replay edits, maybe in costbasis_edits table?
+        sql = """DELETE FROM costbasis_lot WHERE entity = ?"""
+        db.execute(sql, entity)
 
-    # Clear out costbasis_disposal for each run - this uses an autoincrement ID, must be regenerated
-    sql = """DELETE FROM costbasis_disposal WHERE entity = ?"""
-    db.execute(sql, entity)
+        # Clear out costbasis_disposal for each run - this uses an autoincrement ID, must be regenerated
+        sql = """DELETE FROM costbasis_disposal WHERE entity = ?"""
+        db.execute(sql, entity)
 
-    # Clear out costbasis_income for each run
-    sql = """DELETE FROM costbasis_income WHERE entity = ?"""
-    db.execute(sql, entity)
+        # Clear out costbasis_income for each run
+        sql = """DELETE FROM costbasis_income WHERE entity = ?"""
+        db.execute(sql, entity)
 
     # Get start and end range for year...
     if args and args.year:  # type: ignore
