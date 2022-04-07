@@ -115,6 +115,8 @@ We've included `--help` for some of the options in the various CLI apps as there
 
 Disposals in generated 8949 xlsx sheets internally link to their associated lots with transaction ids and hashes. LibreOffice and Google Sheets have been tested to play nice with our output file.
 
+If you run into weird problems, you could try nuking `data/perfi.db` and do a "clean" run (keeping the `cache/cache.db` should be fine and will make runs a lot faster). Also, you can take a look in `logs/` to see if there's more useful info there. 
+
 We also recommend [DB Browser for SQLite](https://sqlitebrowser.org/) for spelunking around in `data/perfi.db`
 
 ## perfi Tax Behavior
