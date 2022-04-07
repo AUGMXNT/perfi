@@ -1,7 +1,8 @@
-import argparse
-import logging
 from perfi import costbasis
 from perfi.constants.paths import LOG_DIR
+
+import argparse
+import logging
 import sys
 
 if sys.stdout.isatty():
@@ -17,6 +18,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("entity", help="name of entity")
     parser.add_argument("--year", help="Generates cost basis for a specific year")
+    parser.add_argument(
+        "--resumefrom", help="Skip tx_logicals until after the id specified"
+    )
     global args
     args = parser.parse_args()
 

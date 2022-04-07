@@ -1,3 +1,5 @@
+from devtools import debug
+
 from .db import db
 from .constants import assets
 from .models import (
@@ -11,6 +13,7 @@ from .models import (
 from .price import price_feed
 
 import arrow
+import atexit
 from collections import namedtuple, defaultdict
 from copy import copy
 from datetime import date, datetime
@@ -95,17 +98,52 @@ def regenerate_costbasis_lots(entity, args=None, quiet=False):
 
     logger.debug(f"Found {len(results)} TxLogicals to process...")
 
+    global last_tx_logical_id
+    global finished_cleanly
+
+    last_tx_logical_id = None
+
+    @atexit.register
+    def report_last_processed_id():
+        if not finished_cleanly:
+            print("-------------------------------------------------------------------")
+            print("It looks like calculating costbasis didn't finish cleanly...")
+            print(f"The last in-progress tx_logical_id was: {last_tx_logical_id}")
+            print("-------------------------------------------------------------------")
+
+    stop_skipping = False
+    finished_cleanly = False
     for r in tqdm(results, desc="Generating Costbasis", disable=None):
-        tx_logical = TxLogical.from_id(id=r["id"], entity_name=entity)
+        tx_logical: TxLogical = TxLogical.from_id(id=r["id"], entity_name=entity)
+        last_tx_logical_id = r["id"]
 
         if TX_LOGICAL_FLAG.ignored_from_costbasis.value in [
             f["name"] for f in tx_logical.flags
         ]:
             continue
 
+        if args.resumefrom and not stop_skipping:
+            if tx_logical.id == args.resumefrom:
+                stop_skipping = True
+                print(f"Resuming now on tx_logical_id {args.resumefrom} ")
+            else:
+                continue
+
         # only process non-empty tx_logicals
         if len(tx_logical.tx_ledgers) > 0:
-            CostbasisGenerator(tx_logical).process()
+            try:
+                CostbasisGenerator(tx_logical).process()
+            except Exception as err:
+                logger.error("-----------------")
+                logger.error(
+                    "Encountered an unknown error when processing a tx_logical for costbasis:"
+                )
+                logger.error(err, exc_info=True)
+                logger.error("TxLogical:")
+                logger.error(pformat(tx_logical))
+                logger.error("-----------------")
+
+    finished_cleanly = True
 
     logger.debug(f"Done regenerating costbasis lots for {entity}")
 
