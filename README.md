@@ -76,6 +76,8 @@ poetry run python bin/map_assets.py
 # Turn raw exchange/onchain txs into grouped logical/ledger txs
 poetry run python bin/group_transactions.py peepo
 
+### Generally you should not need to re-run anything above this line again ###
+
 # Calculate costbasis lots, disposals, and income
 poetry run python bin/calculate_costbasis.py peepo
 
