@@ -202,3 +202,16 @@ CREATE TABLE IF NOT EXISTS "event"
 CREATE INDEX "idx_rel_tx_logical" ON "tx_rel_ledger_logical" (
 	"tx_logical_id"
 );
+CREATE INDEX "idx_address_address" ON "address" (
+	"address"
+);
+CREATE INDEX "idx_address_entity_id" ON "address" (
+	"entity_id"
+);
+CREATE INDEX "idx_lotmatcher" ON "costbasis_lot" (
+	"asset_price_id",
+	"asset_tx_id",
+	"timestamp",
+	"address",
+	"price_usd"
+);
