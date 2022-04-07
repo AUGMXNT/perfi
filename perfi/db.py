@@ -51,6 +51,9 @@ class DB:
             if free_memory - (200 * 1024 * 1024) > mmap_size:
                 self.cur.execute(f"pragma mmap_size={mmap_size}")
 
+        # improve db perf...
+        atexit.register(self.optimize)
+
     def use_mem(self):
         # print('using memory')
         self.fcon.backup(self.mcon)
@@ -84,6 +87,9 @@ class DB:
         with open(schema_path) as f:
             schema_sql = f.read()
             self.cur.executescript(schema_sql)
+
+    def optimize(self):
+        self.cur.execute("pragma optimize")
 
 
 # Singleton for perfi db
