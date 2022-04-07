@@ -1832,7 +1832,7 @@ class Form8949:
 
         short = []
         long = []
-        for r in disposal_results:
+        for r in tqdm(disposal_results, desc="Getting Disposals", disable=None):
             if r[10]:
                 logical_flags = jsonpickle.decode(r[10])
                 if TX_LOGICAL_FLAG.hidden_from_8949.value in [
@@ -1893,7 +1893,7 @@ class Form8949:
         )
 
         i = 1
-        for r, summary in disposals:
+        for r, summary in tqdm(disposals, desc=title, disable=None):
             amount = r[0]
             symbol = r[1]
             in_timestamp = r[2]
@@ -1962,7 +1962,9 @@ class Form8949:
         params = [self.entity]
         results = db.query(sql, params)
 
-        ws = self.wb.add_worksheet(f"{self.year} Earned Income")
+        title = f"{self.year} Earned Income"
+
+        ws = self.wb.add_worksheet(title)
         # Column Widths
         ws.set_column("A:A", 20)
         ws.set_column("B:C", 12)
@@ -1988,7 +1990,7 @@ class Form8949:
         )
 
         i = 1
-        for r in results:
+        for r in tqdm(results, desc=title, disable=None):
             description = f"{r[0]:,.2f} {r[1]}"
 
             d = arrow.get(r[2])
@@ -2167,7 +2169,6 @@ class Form8949:
                 )
 
                 # Lets look at our sheet now
-                print(ws.name)
                 for row in ws.table:
                     if row != 0:
                         try:
@@ -2239,7 +2240,7 @@ class Form8949:
         ws.set_column("Q:Q", 30)
 
         i = 1
-        for txlog in results:
+        for txlog in tqdm(results, desc="Logical TXs", disable=None):
             sql = """SELECT id,
                             chain,
                             address,
