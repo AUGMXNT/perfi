@@ -109,6 +109,8 @@ poetry run bin/import_from_exchange.py --entity_name <peepo> --file <path/to/exp
 
 ### Other Usage Notes
 
+**KNOWN BUG**: LP calculations can currently be a bit wonky (especially if it can't get prices for some of the assets). We're looking into it atm... 
+
 `bin/cli.py` should let you do what you need for updating logical and ledger transactions (updatings prices, transactions types). We try to be smart about updating downstream results, although if things look wonky, you may need to re-run `bin/group_transactions.py` on down...
 
 We've included `--help` for some of the options in the various CLI apps as there's some functionality not in this document yet.
@@ -134,7 +136,6 @@ This is currently hard-coded. Here's a summary:
   * current tx types: borrow, repay, deposit, withdraw, disposal, lp, swap, yield
   * we have flags for: receipt, ownership_change, disposal, and income
 
-
 ## Notes
 * perfi runs as much on your local system as possible, and while we use some third party APIs to make our job easier, our goal is to minimize any PII stored/leaked remotely. We appreciate our privacy and we think others do too.
 * This software is licensed with the AGPLv3, a strong copyleft license. This is meant to make sure that end-users of the software will always be able to have control and be able to modify this software to their liking, and as devs, we can maintain optionality/minimize free-riding
@@ -148,7 +149,7 @@ This is currently hard-coded. Here's a summary:
   * You can see a preview of some of that sort of thing here: https://github.com/AUGMXNT/frax-analysis/
 
 ## Caveats
-* Somes types of defi transactions still aren't handled well (balancer/Curve-style multi-asset LP entries, maybe some more exotic hedging/margin strategies aren't accounted for, DSA/EOA-style operations, like Instadapp, UniV3 multicalls)
+* Somes types of defi transactions still aren't handled well (balancer/Curve-style multi-asset LP entries, maybe some more exotic hedging/margin strategies aren't accounted for, DSA/EOA-style operations, like Instadapp, UniV3 multicalls, GMX/GLP)
 * We don't support NFTs very well atm, [sorry](https://twitter.com/DanielitoG25/status/1498358636648800257)
 * Tax treatments are hard coded and may not match your tax regime/preferences. In future versions we plan on making this easier to personalize/configure
 * Only supports some EVM chains atm
