@@ -29,7 +29,23 @@ import xlsxwriter
 
 logger = logging.getLogger(__name__)
 
+
 ### Helper Functions
+
+
+# This is added for rounding errors...
+CLOSE_TO_ZERO = Decimal(0.0000000001)
+
+
+def round_to_zero(number):
+    if number == None:
+        return None
+
+    if Decimal(number) < CLOSE_TO_ZERO:
+        return Decimal(0)
+    else:
+        return Decimal(number)
+
 
 # Asset
 def get_asset_price_record(asset_tx_id=None):
@@ -180,10 +196,10 @@ def save_costbasis_lot(lot: CostbasisLot):
         lot.asset_price_id,
         lot.symbol,
         lot.asset_tx_id,
-        Decimal(lot.original_amount),
-        Decimal(lot.current_amount),
-        Decimal(lot.price_usd),
-        Decimal(lot.basis_usd),
+        round_to_zero(lot.original_amount),
+        round_to_zero(lot.current_amount),
+        round_to_zero(lot.price_usd),
+        round_to_zero(lot.basis_usd),
         lot.timestamp,
         jsonpickle.encode(lot.history),
         jsonpickle.encode(lot.flags),
@@ -295,13 +311,13 @@ def save_costbasis_disposal(disposal):
         disposal.address,
         disposal.asset_price_id,
         disposal.symbol,
-        Decimal(disposal.amount),
+        round_to_zero(disposal.amount),
         disposal.timestamp,
         disposal.duration_held,
         disposal.basis_timestamp,  # <--
         disposal.basis_tx_ledger_id,
-        Decimal(disposal.basis_usd),
-        Decimal(disposal.total_usd),
+        round_to_zero(disposal.basis_usd),
+        round_to_zero(disposal.total_usd),
         disposal.tx_ledger_id,
     ]
     db.execute(sql, params)
@@ -313,7 +329,7 @@ def update_costbasis_lot_current_amount(tx_ledger_id, new_amount_remaining):
              SET current_amount = ?
              WHERE tx_ledger_id = ?
           """
-    params = [Decimal(new_amount_remaining), tx_ledger_id]
+    params = [round_to_zero(new_amount_remaining), tx_ledger_id]
     db.execute(sql, params)
 
 
@@ -929,7 +945,7 @@ class CostbasisGenerator:
 
             deposit_receipt_balance -= amount_to_subtract_from_lot
 
-            if deposit_receipt_balance == 0:
+            if deposit_receipt_balance <= CLOSE_TO_ZERO:
                 break
 
         # We assign the remaining deposit_withdrawal_balance to our history TxLedger
@@ -937,13 +953,16 @@ class CostbasisGenerator:
         history_txle.amount = deposit_withdrawal_balance_remaining
 
         # Reconcilation lots if we still have deposit_receipt_balance
-        if deposit_receipt_balance > 0:
+        if deposit_receipt_balance > CLOSE_TO_ZERO:
             lot = self.create_reconciliation_lot(
                 t, deposit_receipt_balance, history=[history_txle]
             )
 
         # Track income, create lot if we earned more
-        if deposit_withdrawal_balance_remaining != 0:
+        if (
+            deposit_withdrawal_balance_remaining > CLOSE_TO_ZERO
+            or deposit_withdrawal_balance_remaining < CLOSE_TO_ZERO
+        ):
             self.create_costbasis_income(history_txle)
 
     # Handler for loan repayment outputs
@@ -1112,7 +1131,7 @@ class CostbasisGenerator:
 
             loan_receipt_balance -= amount_to_subtract_from_lot
 
-            if loan_receipt_balance == 0:
+            if loan_receipt_balance <= CLOSE_TO_ZERO:
                 break
 
         # This is the difference between what we repaid and what we originally borrowed
@@ -1123,13 +1142,13 @@ class CostbasisGenerator:
         history_txle.amount = loan_asset_balance
 
         # Reconcilation lots if we still have loan_receipt_balance
-        if loan_receipt_balance > 0:
+        if loan_receipt_balance > CLOSE_TO_ZERO:
             lot = self.create_reconciliation_lot(
                 loan_receipt, loan_receipt_balance, history=[history_txle]
             )
 
         # Track income, create lot if we earned more
-        if loan_asset_balance != 0:
+        if loan_asset_balance > CLOSE_TO_ZERO or loan_asset_balance < CLOSE_TO_ZERO:
             self.create_costbasis_income(history_txle)
 
     def create_costbasis_income(self, tin):
@@ -1154,12 +1173,12 @@ class CostbasisGenerator:
         params = [
             self.entity,
             tin.address,
-            Decimal(net_usd),
+            round_to_zero(net_usd),
             symbol,
             tin.timestamp,
             tin.id,
-            tin.price_usd,
-            Decimal(amount),
+            round_to_zero(tin.price_usd),
+            round_to_zero(amount),
             jsonpickle.encode([]),
         ]
         db.execute(sql, params)
@@ -1223,7 +1242,7 @@ class CostbasisGenerator:
                 )
 
         amount_left_to_subtract = Decimal(t.amount)
-        while amount_left_to_subtract > 0:
+        while amount_left_to_subtract > CLOSE_TO_ZERO:
             for lot in lots:
                 # up to the amount of the lot
                 amount_to_subtract_from_lot = min(
@@ -1405,11 +1424,11 @@ class CostbasisGenerator:
                 amount_left_to_subtract -= amount
 
                 # We're done and can stop looking at other lots
-                if amount_left_to_subtract == 0:
+                if amount_left_to_subtract <= CLOSE_TO_ZERO:
                     break
 
             # We ran out of appropriate lots for this asset.
-            if amount_left_to_subtract > 0:
+            if amount_left_to_subtract > CLOSE_TO_ZERO:
                 # So, create a new zero-cost lost to handle the remainder
                 lot = self.create_reconciliation_lot(
                     t, amount_left_to_subtract  # ???? <--- XXX
@@ -1671,7 +1690,7 @@ class LotMatcher:
                  timestamp <= ?
                  {'AND asset_price_id = ?' if asset_price_id else ''}
                  {'AND asset_tx_id = ?' if not asset_price_id else ''}
-                 AND current_amount > 0
+                 AND current_amount > {CLOSE_TO_ZERO:.18f}
         """
         if algorithm == "hifo":
             sql += "ORDER BY price_usd DESC"
@@ -2124,7 +2143,7 @@ class Form8949:
 
             self.lot_row[tx_hash] = i
 
-            if current_amount == 0 or receipt == 1:
+            if current_amount <= CLOSE_TO_ZERO or receipt == 1:
                 ws.write(i, 0, date, self.default_format_grey)
                 ws.write(i, 1, address, self.default_format_grey)
                 ws.write(i, 2, current_amount, self.amount_format_grey)
