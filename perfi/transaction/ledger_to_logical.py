@@ -28,7 +28,7 @@ class TransactionLogicalGrouper:
         self._print = print
         self.event_store = event_store
 
-    def update_entity_transactions(self, skip_regeneration=False, clear_db=True):
+    def update_entity_transactions(self, skip_regeneration=False):
         logger.debug(f"Entity: {self.entity}")
         logger.debug("---")
         # Get List of Accounts
@@ -45,11 +45,9 @@ class TransactionLogicalGrouper:
             chain = wallet[1]
             address = wallet[2]
 
-            self.update_wallet_logical_transactions(
-                address, skip_regeneration, clear_db
-            )
+            self.update_wallet_logical_transactions(address, skip_regeneration)
 
-    def update_wallet_logical_transactions(self, address, skip_regeneration, clear_db):
+    def update_wallet_logical_transactions(self, address, skip_regeneration):
         logger.debug(f"Updating {address}")
         sql = """SELECT id, chain, address, hash, from_address, to_address, from_address_name, to_address_name, asset_tx_id, isfee, amount, timestamp, direction, tx_ledger_type, asset_price_id, symbol, price_usd
                FROM tx_ledger
@@ -92,12 +90,6 @@ class TransactionLogicalGrouper:
         for hash in tqdm(
             tx_logicals_by_hash, desc="Generate MOVE events", disable=None
         ):
-            if not clear_db:
-                logger.debug(
-                    "> SKIPPING move generation unless we have cleared the DB, otherwise we will have a bajillion MOVEs"
-                )
-                break
-
             hg = tx_logicals_by_hash[hash]
             txs = sorted(
                 hg, key=lambda t: tx_ledger.timestamp + tx_ledger.isfee

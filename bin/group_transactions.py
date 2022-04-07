@@ -25,11 +25,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("entity", help="name of entity")
     parser.add_argument(
-        "--clear",
-        action="store_true",
-        help="DANGER: clears all tx_logical state transitions",
-    )
-    parser.add_argument(
         "--skip", action="store_true", help="DEBUG: skips regenerating tx_logical"
     )
     parser.add_argument(
@@ -56,15 +51,10 @@ def main():
 
     ### Ledger to Logical
 
-    # Option to clear state transitions
-    # 'clear' should only be used during development. It blows away all state transitions!
-    if args.clear:
-        logger.debug(
-            "CLEARING ALL tx_logical_event STATE TRANSITIONS in 5 seconds... (cancel quick if you didn't mean to do this!)"
-        )
-        time.sleep(5)
-        sql = "DELETE FROM event WHERE source != 'manual'"
-        db.execute(sql)
+    # Clear all the non-manual events from the DB.
+    # perfi will make some source='perfi' move events below, then it will apply them, then we will apply other manual events
+    sql = "DELETE FROM event WHERE source != 'manual'"
+    db.execute(sql)
 
     if args.refresh_type:
         # Later: if it's too slow we should implement only refreshing types
@@ -77,7 +67,11 @@ def main():
     tlg = TransactionLogicalGrouper(
         args.entity, EventStore(db, TxLogical, TxLedger), print=True
     )
-    tlg.update_entity_transactions(args.skip, args.clear)
+    tlg.update_entity_transactions(args.skip)
+
+    # re-apply any manual events
+    event_store = EventStore(db, TxLogical, TxLedger)
+    event_store.apply_events(source="manual")
 
 
 if __name__ == "__main__":

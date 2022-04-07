@@ -36,17 +36,23 @@ class EventStore:
     def new_id(self):
         return str(uuid.uuid4())
 
-    def apply_events(self, action: EVENT_ACTION = None):
+    def apply_events(self, action: EVENT_ACTION = None, source: str = None):
+        # QUESTION: should we consider moving to entity-scoped events?
+        # Right now we re-apply all events here, which is fine as long as we
+        # keep event application as idempotent.
         sql = f"""
             SELECT id, source, action, data, timestamp
             FROM event
             WHERE 1=1
             {'AND action = ?' if action else ''}
+            {'AND source = ?' if source else ''}
             ORDER BY timestamp
         """
         params = []
         if action:
             params.append(action.value)
+        if source:
+            params.append(source)
         results = self.db.query(sql, params)
         desc = "Applying events"
         if action:
