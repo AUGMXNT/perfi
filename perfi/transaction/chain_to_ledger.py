@@ -356,6 +356,7 @@ class LedgerTx:
         [self.asset_tx_id, self.symbol, self.asset_price_id] = self.normalize_asset(
             self.chain, tok["id"]
         )  # Is symbol the best key? can also use name or optimized_symbol
+
         if self.asset_tx_id is None:
             messages.append(
                 f"No asset_tx_id found for token. Hash: {self.hash}  Chain: {self.chain}   Tok: {tok}"

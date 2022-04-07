@@ -1295,12 +1295,13 @@ class CostbasisGenerator:
                     # Fallback
                     asset_price_id = t.asset_price_id
                     symbol = t.symbol
-                    sql = "SELECT id FROM asset_price WHERE symbol = ?"
-                    r = db.query(sql, symbol)
-                    try:
-                        asset_price_id = r[0][0]
-                    except:
-                        pass
+                    if symbol:
+                        sql = "SELECT id FROM asset_price WHERE symbol = ?"
+                        r = db.query(sql, symbol)
+                        try:
+                            asset_price_id = r[0][0]
+                        except:
+                            pass
 
                     # Normally we want to be aggressive about how we map our assets for drawdowns, except in the case of a
                     # receipt
@@ -1365,6 +1366,12 @@ class CostbasisGenerator:
 
                     # Only certain types of ownership_change's are disposals - see CostbasisGenerator.process()
                     if is_disposal:
+                        # See https://etherscan.io/tx/0x0c0ad7b213997a82b890b741754870bd08a4ac0fd1c8cd13cd5f99c9e48d851b
+                        # for example of receiving an ERC-721 CRV/SS that DeBank doesnt know how to make into a symbo.
+                        # for now we'll just call this __UNKNOWN__.
+                        symbol = "__UNKNOWN__"
+                        if symbol is None:
+                            symbol = "__UNKNOWN__"
                         disposal = CostbasisDisposal(
                             entity=self.entity,
                             address=t.address,
@@ -1447,6 +1454,8 @@ class CostbasisGenerator:
 
                 # Make sure we also dispose from that new zerocost lot if is_disposal
                 if is_disposal:
+                    if symbol is None:
+                        symbol = "__UNKNOWN__"
                     sale_price, _ = self.get_costbasis_price_and_source(t)
                     disposal = CostbasisDisposal(
                         entity=self.entity,
