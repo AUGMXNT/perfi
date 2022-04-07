@@ -69,7 +69,7 @@ def regenerate_costbasis_lots(entity, args=None, quiet=False):
         global DEBUG
         DEBUG = False
 
-    if not args.resumefrom:
+    if not args or not args.resumefrom:
         # Theoretically
         # costbasis_lot is idempotent to tx_ledger_id and we can generally leave it
         # LATER in the future we want to be able to store and replay edits, maybe in costbasis_edits table?
