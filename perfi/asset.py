@@ -1,6 +1,7 @@
 import json
 import logging
 import lzma
+from tqdm import tqdm
 
 from perfi.db import db
 
@@ -74,7 +75,7 @@ def update_assets_from_txchain():
         "fantom:0x328a7b4d538a2b3942653a9983fda3c12c571141": "usd-coin",  # crUSDC/ibUSDC
     }
 
-    for tx_chain in results:
+    for tx_chain in tqdm(results, desc="Scanning Assets from TxChain", disable=None):
         chain = tx_chain[0]
         address = tx_chain[1]
         hash = tx_chain[2]
@@ -125,7 +126,7 @@ def update_assets_from_txchain():
            WHERE asset_price_id IS NULL"""
     results = db.query(sql)
 
-    for asset in results:
+    for asset in tqdm(results, desc="Updating Assets from TxChain", disable=None):
         chain = asset[0]
         id = asset[1]
         symbol = asset[2]
@@ -155,51 +156,52 @@ def update_assets_from_txchain():
                     db.execute(sql, params)
             logger.debug(f"{chain}:{symbol} - {len(results)}")
 
-        # TODO: cleanup...
-        fixups_sql = """
-            -- VAULTS
-            -- Yield Yak Vault
-            UPDATE asset_tx SET type='vault' WHERE symbol = 'YRT';
-            -- Beefy Finance Vault
-            UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'moo*';
-            -- Yearn Finance Vault
-            UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'yv*';
-            -- Stake DAO Vault
-            UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'sd*';
-            -- Kogefarm
-            UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'v*' AND name LIKE '%vault%';
-            -- Qi Compounding
-            UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'cam*';
-            -- Tokemak
-            UPDATE asset_tx SET type='vault' WHERE symbol GLOB 't*' AND name GLOB 'Tokemak*';
-            -- Curve Gauges
-            UPDATE asset_tx
-            SET type='vault', tag='curve'
-            WHERE asset_price_id IS NULL
-            AND symbol GLOB '*-gauge'
-            AND name GLOB 'Curve.fi *';
-            -- Aave Deposits
-            UPDATE asset_tx
-            SET type='vault', tag='aave'
-            WHERE symbol GLOB 'a*'
-            AND name GLOB 'Aave *';
-            -- Aave Loans
-            UPDATE asset_tx
-            SET type='loan', tag='aave'
-            WHERE symbol GLOB 'variableDebt*';
+    # Extra Fixups
+    print("Extra Fixups...")
+    fixups_sql = """
+        -- VAULTS
+        -- Yield Yak Vault
+        UPDATE asset_tx SET type='vault' WHERE symbol = 'YRT';
+        -- Beefy Finance Vault
+        UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'moo*';
+        -- Yearn Finance Vault
+        UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'yv*';
+        -- Stake DAO Vault
+        UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'sd*';
+        -- Kogefarm
+        UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'v*' AND name LIKE '%vault%';
+        -- Qi Compounding
+        UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'cam*';
+        -- Tokemak
+        UPDATE asset_tx SET type='vault' WHERE symbol GLOB 't*' AND name GLOB 'Tokemak*';
+        -- Curve Gauges
+        UPDATE asset_tx
+        SET type='vault', tag='curve'
+        WHERE asset_price_id IS NULL
+        AND symbol GLOB '*-gauge'
+        AND name GLOB 'Curve.fi *';
+        -- Aave Deposits
+        UPDATE asset_tx
+        SET type='vault', tag='aave'
+        WHERE symbol GLOB 'a*'
+        AND name GLOB 'Aave *';
+        -- Aave Loans
+        UPDATE asset_tx
+        SET type='loan', tag='aave'
+        WHERE symbol GLOB 'variableDebt*';
 
-            -- LPs
-            UPDATE asset_tx
-            SET type='lp', tag='balancer'
-            WHERE asset_price_id IS NULL
-            AND symbol GLOB 'B*'
-            AND name GLOB 'Balancer *';
-            -- Lots of random LP tokens... (checked that they are all LP tokens in DB...)
-            UPDATE asset_tx
-            SET type='lp'
-            WHERE asset_price_id IS NULL
-            AND type = 'token'
-            AND symbol GLOB '*LP*'
-            AND name GLOB '*LP*';
-        """
-        db.cur.executescript(fixups_sql)
+        -- LPs
+        UPDATE asset_tx
+        SET type='lp', tag='balancer'
+        WHERE asset_price_id IS NULL
+        AND symbol GLOB 'B*'
+        AND name GLOB 'Balancer *';
+        -- Lots of random LP tokens... (checked that they are all LP tokens in DB...)
+        UPDATE asset_tx
+        SET type='lp'
+        WHERE asset_price_id IS NULL
+        AND type = 'token'
+        AND symbol GLOB '*LP*'
+        AND name GLOB '*LP*';
+    """
+    db.cur.executescript(fixups_sql)

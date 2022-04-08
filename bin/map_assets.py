@@ -30,6 +30,7 @@ if sys.stdout.isatty():
 
 def main():
     update_assets_from_txchain()
+    print("Generating Constants...")
     generate_constants()
 
 
