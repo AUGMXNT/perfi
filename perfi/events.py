@@ -107,6 +107,7 @@ class EventStore:
             timestamp,
         ]
         self.db.execute(sql, params)
+        TxLogical.from_id.cache_clear()
         return Event(id, source, action, data, timestamp)
 
     def create_tx_ledger_type_updated(
@@ -137,6 +138,7 @@ class EventStore:
             timestamp,
         ]
         self.db.execute(sql, params)
+        TxLogical.from_id.cache_clear()
         return Event(id, source, action, data, timestamp)
 
     def create_tx_ledger_moved(
@@ -172,6 +174,7 @@ class EventStore:
             timestamp,
         ]
         self.db.execute(sql, params)
+        TxLogical.from_id.cache_clear()
         return Event(id, source, action, data, timestamp)
 
     def create_tx_ledger_price_updated(
@@ -199,6 +202,7 @@ class EventStore:
             timestamp,
         ]
         self.db.execute(sql, params)
+        TxLogical.from_id.cache_clear()
         return Event(id, source, action, data, timestamp)
 
     # TODO refactor type signature to use TX_LOGICAL_FLAG for flag param after we move TX_LOGICAL_FLAG to its own module to avoid circular imports
@@ -227,6 +231,7 @@ class EventStore:
             timestamp,
         ]
         self.db.execute(sql, params)
+        TxLogical.from_id.cache_clear()
         return Event(id, source, action, data, timestamp)
 
     def handle_tx_ledger_moved_event(self, event: Event):
@@ -254,6 +259,7 @@ class EventStore:
               """
             params = [id, id]
             self.db.execute(sql, params)
+        TxLogical.from_id.cache_clear()
 
     def handle_tx_ledger_type_updated_event(self, event: Event):
         tx = self.TxLedger.get(event.data["tx_ledger_id"])
@@ -262,6 +268,7 @@ class EventStore:
         sql = """UPDATE tx_ledger SET tx_ledger_type = ? where id = ?"""
         params = [event.data["tx_ledger_type_new"], event.data["tx_ledger_id"]]
         self.db.execute(sql, params)
+        TxLogical.from_id.cache_clear()
 
     def handle_tx_logical_type_updated_event(self, event: Event):
         tx = self.TxLogical.from_id(event.data["tx_logical_id"])
@@ -270,6 +277,7 @@ class EventStore:
         sql = """UPDATE tx_logical SET tx_logical_type = ? where id = ?"""
         params = [event.data["tx_logical_type_new"], event.data["tx_logical_id"]]
         self.db.execute(sql, params)
+        TxLogical.from_id.cache_clear()
 
     def handle_tx_ledger_price_updated_event(self, event: Event):
         tx = self.TxLedger.get(event.data["tx_ledger_id"])
@@ -278,6 +286,7 @@ class EventStore:
         sql = """UPDATE tx_ledger SET price_usd = ? where id = ?"""
         params = [event.data["price_usd_new"], event.data["tx_ledger_id"]]
         self.db.execute(sql, params)
+        TxLogical.from_id.cache_clear()
 
     def handle_tx_logical_flag_added_event(self, event: Event):
         tx = self.TxLogical.from_id(event.data["tx_logical_id"])
@@ -286,3 +295,4 @@ class EventStore:
         sql = """UPDATE tx_logical SET flags = ? where id = ?"""
         params = [jsonpickle.encode(updated_flags), event.data["tx_logical_id"]]
         self.db.execute(sql, params)
+        TxLogical.from_id.cache_clear()

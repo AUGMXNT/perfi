@@ -139,7 +139,7 @@ def regenerate_costbasis_lots(entity, args=None, quiet=False):
         ]:
             continue
 
-        if args.resumefrom and not stop_skipping:
+        if args and args.resumefrom and not stop_skipping:
             if tx_logical.id == args.resumefrom:
                 stop_skipping = True
                 print(f"Resuming now on tx_logical_id {args.resumefrom} ")
