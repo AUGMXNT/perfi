@@ -21,6 +21,7 @@ def main():
     parser.add_argument(
         "--resumefrom", help="Skip tx_logicals until after the id specified"
     )
+    parser.add_argument("--debugtx", help="Look for tx_ledger.id and debug")
     global args
     args = parser.parse_args()
 

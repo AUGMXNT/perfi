@@ -29,9 +29,9 @@ import xlsxwriter
 
 logger = logging.getLogger(__name__)
 
+DEBUG_TXID = None
 
 ### Helper Functions
-
 
 # This is added for rounding errors...
 CLOSE_TO_ZERO = Decimal(0.0000000001)
@@ -65,6 +65,11 @@ def get_asset_price_record(asset_tx_id=None):
 
 
 def regenerate_costbasis_lots(entity, args=None, quiet=False):
+    if args and args.debugtx:
+        # TODO - it may be worth not tearing down CostbasisGenerator for perf reasons, then can assign this to generator
+        global DEBUG_TXID
+        DEBUG_TXID = args.debugtx
+
     if quiet:
         global DEBUG
         DEBUG = False
@@ -445,6 +450,13 @@ class CostbasisGenerator:
             self.is_receipt = 1
         # if self.tx_logical.tx_logical_type == 'repay' and len(self.outs) > 1:
         #     self.is_receipt = 1
+
+        ### For Debugging...
+        if DEBUG_TXID:
+            if [t for t in self.tx_logical.tx_ledgers if t.id == DEBUG_TXID]:
+                import ipdb
+
+                ipdb.set_trace()
 
         ### Processing transaction types
         """
