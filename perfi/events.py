@@ -56,7 +56,7 @@ class EventStore:
         results = self.db.query(sql, params)
         desc = "Applying events"
         if action:
-            desc += "  Action: " + action.value
+            desc += ": " + action.value
         for rec in tqdm(results, desc=desc, disable=None):
             id = rec[0]
             source = rec[1]

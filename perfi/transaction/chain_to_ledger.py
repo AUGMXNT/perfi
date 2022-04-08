@@ -18,6 +18,7 @@ import logging
 import lzma
 from pprint import pformat, pprint
 import sys
+from tqdm import tqdm
 
 messages = (
     []
@@ -79,7 +80,7 @@ def update_wallet_ledger_transactions(address):
 
     ledger_txs = []
 
-    for tx_chain in results:
+    for tx_chain in tqdm(results, desc="Generate Ledger TXs", disable=None):
         chain = tx_chain[0]
         hash = tx_chain[2]
         timestamp = tx_chain[3]
@@ -211,7 +212,7 @@ def update_wallet_ledger_transactions(address):
 
     # Now we have all our ledger_txs, so lets put them into the tx_ledger table in the DB
     tx_ledger_store = TxLedgerStore(db)
-    for tx in ledger_txs:
+    for tx in tqdm(ledger_txs, desc="Saving Ledger TXs", disable=None):
         tx.generate_id()
         tx.assign_tx_ledger_type()
         tx.assign_price()
