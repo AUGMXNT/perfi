@@ -5,7 +5,7 @@ import arrow
 
 from perfi.ingest.chain import MyEncoder
 from perfi.asset import update_assets_from_txchain
-from perfi.price import CoinPrice
+from perfi.price import CoinPrice, PriceFeed
 
 
 def setup_entity(test_db, name, addresses):
@@ -21,6 +21,7 @@ def setup_entity(test_db, name, addresses):
 class MockPriceFeed:
     def __init__(self):
         self.stubs = dict()
+        self.price_feed = PriceFeed()
 
     def stub_key(self, epoch, coin_id):
         return f"{epoch}:{coin_id}"
@@ -43,6 +44,21 @@ class MockPriceFeed:
 
     def clear_stubs(self):
         self.stubs = dict()
+
+    def map_asset(self, chain, asset_tx_id, symbol_fallback=False):
+        return self.price_feed.map_asset(chain, asset_tx_id, symbol_fallback)
+
+    def get_by_asset_tx_id(self, chain, asset_tx_id, timestamp):
+        asset_price = self.map_asset(chain, asset_tx_id)
+        if asset_price:
+            try:
+                return self.get(asset_price["asset_price_id"], timestamp)
+            except:
+                raise Exception(
+                    f"Failed to get price from pricefeed despite having an asset_price record of: {asset_price} for asset_tx_id {asset_tx_id}"
+                )
+        else:
+            return None
 
 
 class TxFactory:
