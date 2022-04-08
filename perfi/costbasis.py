@@ -208,23 +208,7 @@ def save_costbasis_lot(lot: CostbasisLot):
     db.execute(sql, params)
 
 
-# PriceFeed
-def get_coinprice_for_asset(chain, asset_tx_id, timestamp):
-    asset_price = costbasis_asset_mapper(chain, asset_tx_id)
-
-    if asset_price:
-        try:
-            return price_feed.get(asset_price["asset_price_id"], timestamp)
-        except:
-            raise Exception(
-                f"Failed to get price from pricefeed despite having an asset_price record of: {asset_price} for asset_tx_id {asset_tx_id}"
-            )
-    else:
-        return None
-
-
 # CostbasisLot
-# TODO: Make this better!
 """
 We actually want to map our costbasis_lots with a mapped asset_price_id that is a canonical version
 eg, all chain USDC linclude USDC.e should map to USDC.e
@@ -238,65 +222,6 @@ we should generate the costbasis_canonical_asset_tx, then match SYMBOL to it
 
 We have a more aggressive symbol_fallback that needs to be used carefully (or made smarter to skip known receipts of LP tokens...)
 """
-
-
-def costbasis_asset_mapper(chain, asset_tx_id, symbol_fallback=False):
-    # We want things like usdc_on_avax -> usdc_core
-    # This will be differen from our asset_tx_id -> asset_price_id mapping because that goes for the most specific asset_price_id it can find, but for costbasis, we want to group all the variants together for LOT MATCHING purposes. This mapping can be used for exposure mapping as well (we need to do additional mappings for exposure since that needs to split LP amounts and account for ib multipliers)
-
-    # This allows up to use our manual COSTBASIS_LIKEKIND matching for imported asset_tx_ids
-    if chain.startswith("import."):
-        chain = "import"
-
-    tx_key = f"{chain}:{asset_tx_id}"
-    canonical_key = None
-    symbol = None
-    if tx_key in assets.COSTBASIS_LIKEKIND:
-        canonical_key = assets.COSTBASIS_LIKEKIND[tx_key]
-        sql = """SELECT symbol
-                 FROM asset_price
-                 WHERE id = ?
-              """
-        r = db.query(sql, canonical_key)
-        symbol = r[0][0]
-    else:
-        sql = """SELECT asset_price_id, symbol
-                 FROM asset_tx
-                 WHERE chain = ?
-                 AND id = ?
-              """
-        params = (chain, asset_tx_id)
-        r = db.query(sql, params)
-        if r:
-            canonical_key = r[0][0]
-            symbol = r[0][1]
-
-    if canonical_key and symbol:
-        return {
-            "asset_price_id": canonical_key,
-            "symbol": symbol,
-        }
-    # Only if asked to do a symbol_fallback do we try to match by symbol...
-    elif symbol_fallback:
-        """
-        LATER: Make sure we have guards to protect against known different assets with the same symbol (like QI and QI)
-               Also make sure we skip any type of LPs or deposit receipts...
-               ??? Are LP tokens really receipts?
-        """
-        if symbol:
-            sql = """SELECT * FROM asset_price
-                     WHERE symbol = ?
-                     AND market_cap IS NOT NULL
-                     ORDER BY market_cap DESC
-                  """
-            r = db.query(sql, symbol)
-            if r:
-                return {
-                    "asset_price_id": r[0][0],
-                    "symbol": symbol,
-                }
-
-    return None
 
 
 # CostbasisDisposal
@@ -715,7 +640,7 @@ class CostbasisGenerator:
     def create_reconciliation_lot(self, t, current_amount, history=None):
         self.print_if_debug(f"** RECONCILIATION LOT: {current_amount} is left")
         # We want the asset_price_id
-        mapped_asset = costbasis_asset_mapper(t.chain, t.asset_tx_id)
+        mapped_asset = price_feed.map_asset(t.chain, t.asset_tx_id)
         if mapped_asset:
             asset_price_id = mapped_asset["asset_price_id"]
             symbol = mapped_asset["symbol"]
@@ -1163,7 +1088,7 @@ class CostbasisGenerator:
         net_usd = Decimal(amount) * sale_price
 
         # Mapped version of symbol only (price is from get_costbasis_price_and_source...)
-        mapped_asset = costbasis_asset_mapper(tin.chain, tin.asset_tx_id)
+        mapped_asset = price_feed.map_asset(tin.chain, tin.asset_tx_id)
         if mapped_asset:
             symbol = mapped_asset["symbol"]
         else:
@@ -1193,7 +1118,7 @@ class CostbasisGenerator:
         This code will store the costbasis mapped asset_price_id and symbol into CostbasisLot.
         This should be a cross-chain canonical (eg: usd-coin, USDC for all variations/chains and is what we use to intelligently do like-kind asset math on all our costbasis lots/drawdowns)
         """
-        mapped_asset = costbasis_asset_mapper(t.chain, t.asset_tx_id)
+        mapped_asset = price_feed.map_asset(t.chain, t.asset_tx_id)
         if mapped_asset:
             asset_price_id = mapped_asset["asset_price_id"]
             symbol = mapped_asset["symbol"]
@@ -1261,7 +1186,7 @@ class CostbasisGenerator:
                     if lot.receipt and lot.history:
                         # if lot is receipt, we need to follow history to get the cost basis
                         history_tx = lot.history[0]
-                        coin_price = get_coinprice_for_asset(
+                        coin_price = price_feed.get_by_asset_tx_id(
                             history_tx.chain,
                             history_tx.asset_tx_id,
                             history_tx.timestamp,
@@ -1328,7 +1253,7 @@ class CostbasisGenerator:
                     if not lot.receipt:
                         try:
                             # Try to get a mapped price/symbol from unwound tx
-                            mapped_asset = costbasis_asset_mapper(
+                            mapped_asset = price_feed.map_asset(
                                 history_tx.chain, history_tx.asset_tx_id
                             )
                             asset_price_id = mapped_asset["asset_price_id"]
@@ -1336,7 +1261,7 @@ class CostbasisGenerator:
                         except:
                             # Try to get mapped price/symbol from tx
                             try:
-                                mapped_asset = costbasis_asset_mapper(
+                                mapped_asset = price_feed.map_asset(
                                     t.chain, t.asset_tx_id
                                 )
                                 asset_price_id = mapped_asset["asset_price_id"]
@@ -1457,7 +1382,7 @@ class CostbasisGenerator:
                 """
                 try:
                     # Try to get a mapped price/symbol from unwound tx
-                    mapped_asset = costbasis_asset_mapper(
+                    mapped_asset = price_feed.map_asset(
                         history_tx.chain, history_tx.asset_tx_id
                     )
                     asset_price_id = mapped_asset["asset_price_id"]
@@ -1465,7 +1390,7 @@ class CostbasisGenerator:
                 except:
                     # Try to get mapped price/symbol from tx
                     try:
-                        mapped_asset = costbasis_asset_mapper(t.chain, t.asset_tx_id)
+                        mapped_asset = price_feed.map_asset(t.chain, t.asset_tx_id)
                         asset_price_id = mapped_asset["asset_price_id"]
                         symbol = mapped_asset["symbol"]
                     except:
@@ -1521,7 +1446,7 @@ class CostbasisGenerator:
 
         # 1. Try to get the price from our mapped assets
         # tx_ledgers[] have chain, not tx_logical
-        mapped_asset = costbasis_asset_mapper(tx.chain, tx.asset_tx_id, symbol_fallback)
+        mapped_asset = price_feed.map_asset(tx.chain, tx.asset_tx_id, symbol_fallback)
         if mapped_asset:
             costbasis_asset_price_id = mapped_asset["asset_price_id"]  # type: ignore
             coin_price = price_feed.get(costbasis_asset_price_id, tx.timestamp)
@@ -1529,7 +1454,9 @@ class CostbasisGenerator:
                 return (Decimal(coin_price.price), "price_feed__mapped_asset")
 
         # 2. Try to get a price from the asset_tx_id's corresponding asset_price_id, if it has one
-        coin_price = get_coinprice_for_asset(tx.chain, tx.asset_tx_id, tx.timestamp)
+        coin_price = price_feed.get_by_asset_tx_id(
+            tx.chain, tx.asset_tx_id, tx.timestamp
+        )
         if coin_price:
             return (Decimal(coin_price.price), "price_feed__asset")
 
@@ -1551,7 +1478,7 @@ class CostbasisGenerator:
             # If we can value the OUT asset, then the cost basis price will be
             # amount_of_asset_in / amount_of_asset_out * asset_out_price
             # LATER: all our coinpricing from assets should look for mapped prices if available?
-            coin_price = get_coinprice_for_asset(
+            coin_price = price_feed.get_by_asset_tx_id(
                 out_tx.chain, out_tx.asset_tx_id, out_tx.timestamp
             )
             if coin_price:
@@ -1561,7 +1488,7 @@ class CostbasisGenerator:
                 return price, "derived_from_out"
 
             # If we're still here, we should try the IN before giving up
-            coin_price = get_coinprice_for_asset(
+            coin_price = price_feed.get_by_asset_tx_id(
                 in_tx.chain, in_tx.asset_tx_id, in_tx.timestamp
             )
             if coin_price:
@@ -1610,7 +1537,7 @@ class CostbasisGenerator:
             price_accum = 0
             for t in assets_to_price:
                 # We really want to be able to price our tokens if we can to establish an LP value, so we use symbol_fallback
-                mapped_asset = costbasis_asset_mapper(
+                mapped_asset = price_feed.map_asset(
                     t.chain, t.asset_tx_id, symbol_fallback=True
                 )
                 if mapped_asset:
@@ -1651,7 +1578,7 @@ class LotMatcher:
         asset_tx_id = tx.asset_tx_id
 
         # Try to match mapped lots...
-        mapped_asset = costbasis_asset_mapper(tx.chain, tx.asset_tx_id)
+        mapped_asset = price_feed.map_asset(tx.chain, tx.asset_tx_id)
         if mapped_asset:
             asset_price_id = mapped_asset["asset_price_id"]
 

@@ -1279,6 +1279,58 @@ class TestCostbasisSwap:
         assert disposal.duration_held == 1
         assert disposal.total_usd - disposal.basis_usd == 4.00
 
+    # this models https://etherscan.io/tx/0xf26c80e98a08d97c7eee6b63ee359b57adbee607738ae751347862063f08f594
+    def test_swap_with_asset_price_known_in_and_unknown_out(self, test_db):
+        make.tx(ins=["1.2 USDf|0xUSDf"], timestamp=1, from_address="A FRIEND")
+        # no price known for this
+
+        make.tx(
+            outs=["1.2 USDf|0xUSDf"],
+            ins=["1 USDC"],
+            debank_name="swapExactTokensForTokens",
+            fee=0.00123,
+            timestamp=2,
+            to_address="Some DEX",
+        )
+        price_feed.stub_price(2, "usd-coin", 1.00)
+
+        common(test_db)
+
+        # Check to make sure a CostbasisLot was generated with appropriate attrs
+        usdf_lots = [
+            l
+            for l in get_costbasis_lots(test_db, entity_name, address)
+            if l.asset_tx_id == "0xUSDf"
+        ]
+        usdc_lots = [
+            l
+            for l in get_costbasis_lots(test_db, entity_name, address)
+            if l.asset_price_id == "usd-coin"
+        ]
+
+        assert len(usdf_lots) == 1
+        assert len(usdc_lots) == 1
+
+        lot = usdc_lots[0]
+        assert lot.price_usd == Decimal(1.00)
+        assert lot.original_amount == 1
+        assert lot.current_amount == 1
+
+        lot = usdf_lots[0]
+        # assert lot.price_usd == Decimal(1.00) # don't know
+        assert lot.original_amount == approx(Decimal(1.2))
+        assert lot.current_amount == approx(0)
+
+        # Check to make sure a CostbasisDisposal was generated with appropriate attrs
+        disposals = get_disposals(test_db, "USDf", 2)
+        assert len(disposals) == 1
+        disposal = disposals[0]
+        assert disposal.amount == approx(Decimal(1.2))
+        assert disposal.timestamp == 2
+        assert disposal.duration_held == 1
+        assert disposal.total_usd == approx(Decimal(1.0))
+        assert disposal.basis_usd == Decimal(0.0)
+
 
 class TODO:
     def pending_test_send_to_address_not_belonging_to_entity_flags_it_for_review(

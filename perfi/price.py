@@ -1,4 +1,5 @@
 from .cache import cache
+from .constants import assets
 from .db import db
 from .settings import setting
 
@@ -120,20 +121,76 @@ class PriceFeed:
         except:
             pass
 
-    def get_old(self, coin_id, desired_epoch):
-        _refresh_db(db, coin_id, desired_epoch)
-        sql = """
-            SELECT coin_id, source, epoch, price
-            FROM prices
-            WHERE
-                coin_id = ?
-                AND epoch <= ?
-            ORDER BY epoch DESC
-            LIMIT 1"""
-        params = [coin_id, desired_epoch]
-        r = db.query(sql, params)
-        source, coin_id, actual_epoch, price = r[0]
-        return CoinPrice(coin_id, source, actual_epoch, price)
+    def get_by_asset_tx_id(self, chain, asset_tx_id, timestamp):
+        asset_price = self.map_asset(chain, asset_tx_id)
+
+        if asset_price:
+            try:
+                return self.get(asset_price["asset_price_id"], timestamp)
+            except:
+                raise Exception(
+                    f"Failed to get price from pricefeed despite having an asset_price record of: {asset_price} for asset_tx_id {asset_tx_id}"
+                )
+        else:
+            return None
+
+    def map_asset(self, chain, asset_tx_id, symbol_fallback=False):
+        # We want things like usdc_on_avax -> usdc_core
+        # This will be differen from our asset_tx_id -> asset_price_id mapping because that goes for the most specific asset_price_id it can find, but for costbasis, we want to group all the variants together for LOT MATCHING purposes. This mapping can be used for exposure mapping as well (we need to do additional mappings for exposure since that needs to split LP amounts and account for ib multipliers)
+
+        # This allows up to use our manual COSTBASIS_LIKEKIND matching for imported asset_tx_ids
+        if chain.startswith("import."):
+            chain = "import"
+
+        tx_key = f"{chain}:{asset_tx_id}"
+        canonical_key = None
+        symbol = None
+        if tx_key in assets.COSTBASIS_LIKEKIND:
+            canonical_key = assets.COSTBASIS_LIKEKIND[tx_key]
+            sql = """SELECT symbol
+                     FROM asset_price
+                     WHERE id = ?
+                  """
+            r = db.query(sql, canonical_key)
+            symbol = r[0][0]
+        else:
+            sql = """SELECT asset_price_id, symbol
+                     FROM asset_tx
+                     WHERE chain = ?
+                     AND id = ?
+                  """
+            params = (chain, asset_tx_id)
+            r = db.query(sql, params)
+            if r:
+                canonical_key = r[0][0]
+                symbol = r[0][1]
+
+        if canonical_key and symbol:
+            return {
+                "asset_price_id": canonical_key,
+                "symbol": symbol,
+            }
+        # Only if asked to do a symbol_fallback do we try to match by symbol...
+        elif symbol_fallback:
+            """
+            LATER: Make sure we have guards to protect against known different assets with the same symbol (like QI and QI)
+                   Also make sure we skip any type of LPs or deposit receipts...
+                   ??? Are LP tokens really receipts?
+            """
+            if symbol:
+                sql = """SELECT * FROM asset_price
+                         WHERE symbol = ?
+                         AND market_cap IS NOT NULL
+                         ORDER BY market_cap DESC
+                      """
+                r = db.query(sql, symbol)
+                if r:
+                    return {
+                        "asset_price_id": r[0][0],
+                        "symbol": symbol,
+                    }
+
+        return None
 
 
 price_feed = PriceFeed()
