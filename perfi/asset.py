@@ -61,8 +61,12 @@ def update_assets_from_txchain():
     manual_price_map = {
         # L1s
         "avalanche:avax": "avalanche-2",
+        "arbitrum:arb": "ethereum",
+        "binancesc:bsc": "binancecoin",
         "ethereum:eth": "ethereum",
         "fantom:ftm": "fantom",
+        "metis:metis": "metis-token",
+        "optimism:op": "ethereum",
         "polygon:matic": "matic-network",
         "xdai:xdai": "xdai",
         # Tokens
@@ -131,8 +135,8 @@ def update_assets_from_txchain():
 
         # first manual override
         if f"{chain}:{id}" in manual_price_map:
-            sql = """UPDATE asset_tx 
-               SET asset_price_id = ? 
+            sql = """UPDATE asset_tx
+               SET asset_price_id = ?
                WHERE chain = ? AND id = ?
             """
             params = [manual_price_map[f"{chain}:{id}"], chain, id]
@@ -143,8 +147,8 @@ def update_assets_from_txchain():
             # No dupe contract ids, great
             if len(results) <= 1:
                 for ap in results:
-                    sql = """UPDATE asset_tx 
-                   SET asset_price_id = ? 
+                    sql = """UPDATE asset_tx
+                   SET asset_price_id = ?
                    WHERE chain = ? AND id = ?
                 """
                     params = [ap[0], chain, id]
@@ -162,38 +166,38 @@ def update_assets_from_txchain():
             UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'yv*';
             -- Stake DAO Vault
             UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'sd*';
-            -- Kogefarm 
+            -- Kogefarm
             UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'v*' AND name LIKE '%vault%';
             -- Qi Compounding
             UPDATE asset_tx SET type='vault' WHERE symbol GLOB 'cam*';
             -- Tokemak
             UPDATE asset_tx SET type='vault' WHERE symbol GLOB 't*' AND name GLOB 'Tokemak*';
             -- Curve Gauges
-            UPDATE asset_tx 
+            UPDATE asset_tx
             SET type='vault', tag='curve'
-            WHERE asset_price_id IS NULL 
+            WHERE asset_price_id IS NULL
             AND symbol GLOB '*-gauge'
             AND name GLOB 'Curve.fi *';
             -- Aave Deposits
-            UPDATE asset_tx 
+            UPDATE asset_tx
             SET type='vault', tag='aave'
             WHERE symbol GLOB 'a*'
             AND name GLOB 'Aave *';
             -- Aave Loans
-            UPDATE asset_tx 
-            SET type='loan', tag='aave' 
+            UPDATE asset_tx
+            SET type='loan', tag='aave'
             WHERE symbol GLOB 'variableDebt*';
 
             -- LPs
-            UPDATE asset_tx 
-            SET type='lp', tag='balancer' 
-            WHERE asset_price_id IS NULL 
+            UPDATE asset_tx
+            SET type='lp', tag='balancer'
+            WHERE asset_price_id IS NULL
             AND symbol GLOB 'B*'
             AND name GLOB 'Balancer *';
             -- Lots of random LP tokens... (checked that they are all LP tokens in DB...)
-            UPDATE asset_tx 
+            UPDATE asset_tx
             SET type='lp'
-            WHERE asset_price_id IS NULL 
+            WHERE asset_price_id IS NULL
             AND type = 'token'
             AND symbol GLOB '*LP*'
             AND name GLOB '*LP*';
