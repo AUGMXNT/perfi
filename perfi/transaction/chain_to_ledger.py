@@ -7,6 +7,7 @@ from ..ingest.chain import (
     FantomTransactionsFetcher,
     HarmonyTransactionsFetcher,
 )
+from ..price import price_feed
 
 import arrow
 from decimal import *
@@ -213,6 +214,7 @@ def update_wallet_ledger_transactions(address):
     for tx in ledger_txs:
         tx.generate_id()
         tx.assign_tx_ledger_type()
+        tx.assign_price()
         tx_ledger_store.save(tx.as_tx_ledger())
         logger.debug(f"Inserted ledger_tx {tx.id}")
 
@@ -310,9 +312,6 @@ class LedgerTx:
             symbol = results[0][0]
             asset_price_id = results[0][1]
             return [token_id, symbol, asset_price_id]
-
-    def get_price(self, asset_price_id):
-        pass
 
     def get_attr_from_explorer(self, attr, raw_data):
         explorer = self.explorer_name()
@@ -467,6 +466,21 @@ class LedgerTx:
         type = self.TxTyper.get_transaction_type(self)
         self.tx_ledger_type = type
         logger.debug(f'{self.hash} | {type or "__None__"}')
+
+    def assign_price(self):
+        # This only works with chain imported assets...
+        if self.chain.startswith("import"):
+            return
+
+        asset_map = price_feed.map_asset(self.chain, self.asset_tx_id)
+        if asset_map:
+            # Don't override existing symbol...
+            if not self.symbol:
+                self.symbol = asset_map["symbol"]
+            self.asset_price_id = asset_map["asset_price_id"]
+            coin_price = price_feed.get(self.asset_price_id, self.timestamp)
+            if coin_price:
+                self.price = coin_price.price
 
     def as_tx_ledger(self):
         args = dict(
