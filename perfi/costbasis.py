@@ -1460,11 +1460,11 @@ class CostbasisGenerator:
             coin_price = Decimal(assets.FIXED_PRICE_TOKENS[tx_key])
             return (coin_price, "fixed_price")
 
-        # 0.5  If we have a price_usd on the tx_ledger, return that
+        # 1.  If we have a price_usd on the tx_ledger, return that
         if tx.price_usd is not None:
             return (Decimal(tx.price_usd), "tx_ledger")
 
-        # 1. Try to get the price from our mapped assets
+        # 2. Try to get the price from our mapped assets
         # tx_ledgers[] have chain, not tx_logical
         mapped_asset = price_feed.map_asset(tx.chain, tx.asset_tx_id, symbol_fallback)
         if mapped_asset:
@@ -1473,7 +1473,7 @@ class CostbasisGenerator:
             if coin_price:
                 return (Decimal(coin_price.price), "price_feed__mapped_asset")
 
-        # 2. Try to get a price from the asset_tx_id's corresponding asset_price_id, if it has one
+        # 3. Try to get a price from the asset_tx_id's corresponding asset_price_id, if it has one
         coin_price = price_feed.get_by_asset_tx_id(
             tx.chain, tx.asset_tx_id, tx.timestamp
         )
@@ -1483,7 +1483,20 @@ class CostbasisGenerator:
         out_tx = None
         in_tx = None
 
-        # 3. If this tx's logical type makes sense to allow deriving price from the corresponding out value (e.g. swap), do that
+        # 4. OK, lets try harder on mapped assets
+        mapped_asset = price_feed.map_asset(
+            tx.chain, tx.asset_tx_id, symbol_fallback=True
+        )
+        if mapped_asset:
+            costbasis_asset_price_id = mapped_asset["asset_price_id"]  # type: ignore
+            coin_price = price_feed.get(costbasis_asset_price_id, tx.timestamp)
+            if coin_price:
+                return (Decimal(coin_price.price), "price_feed_symbol_fallback")
+
+        # 5. If this tx's logical type makes sense to allow deriving price from the corresponding out value (e.g. swap), do that
+        if DEBUG_BREAK:
+            breakpoint()
+
         if len(self.outs) == 1 and len(self.ins) == 1:
             out_tx = self.outs[0]
             in_tx = self.ins[0]
@@ -1519,7 +1532,7 @@ class CostbasisGenerator:
 
             return price, source
 
-        # 4. tx_logical_type case handling
+        # 6. tx_logical_type case handling
 
         # borrow - still here?
         elif self.tx_logical.tx_logical_type == "borrow":
@@ -1552,6 +1565,11 @@ class CostbasisGenerator:
                 assets_to_price = self.ins
                 lp_txle = self.outs[0]
                 lp_amount = lp_txle.amount
+
+            # We should only do this derivation if we are looking at the actual LP token tx_ledgers
+            # Otherwise we are going to end up assigning the LP price to the wrong token!
+            if lp_txle != tx:
+                return 0, "price_unknown"
 
             #  We'll sum up our LP entry tokens to get the LP value
             price_accum = 0
