@@ -30,6 +30,7 @@ pytest = "^7.1.1"
 pre-commit = "^2.18.1"
 devtools = "^0.8.0"
 sttable = "^0.0.1"
+ipdb = "^0.13.9"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
