@@ -1548,6 +1548,10 @@ class CostbasisGenerator:
             #  We'll sum up our LP entry tokens to get the LP value
             price_accum = 0
             for t in assets_to_price:
+                # We need to make sure we reset everything for each asset we're summing
+                mapped_asset = None
+                coin_price = None
+
                 # We really want to be able to price our tokens if we can to establish an LP value, so we use symbol_fallback
                 mapped_asset = price_feed.map_asset(
                     t.chain, t.asset_tx_id, symbol_fallback=True
