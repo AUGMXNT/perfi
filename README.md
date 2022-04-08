@@ -26,7 +26,7 @@ ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
 ```
 
 ## Requirements
-You should be familiar with and have [Python 3.10](https://www.python.org/) and [Poetry](https://python-poetry.org/) installed.
+You should be familiar with and have [Python 3.10](https://www.python.org/) and [Poetry](https://python-poetry.org/) installed. We won't be providing any support for setting up your software environment. In the future, we'll be building more accessible packaged installer releases.
 
 perfi currently depends on several third party API providers (no configuration is required by default):
 * [DeBank OpenAPI](https://open.debank.com/) - provides a helpful list of transaction history per chain
@@ -111,28 +111,28 @@ poetry run bin/import_from_exchange.py --entity_name <peepo> --file <path/to/exp
 
 ### Other Usage Notes
 
-**KNOWN BUG**: LP calculations can currently be a bit wonky (especially if it can't get prices for some of the assets). We're looking into it atm... 
-
 `bin/cli.py` should let you do what you need for updating logical and ledger transactions (updatings prices, transactions types). We try to be smart about updating downstream results, although if things look wonky, you may need to re-run `bin/group_transactions.py` on down...
 
 We've included `--help` for some of the options in the various CLI apps as there's some functionality not in this document yet.
 
 Disposals in generated 8949 xlsx sheets internally link to their associated lots with transaction ids and hashes. LibreOffice and Google Sheets have been tested to play nice with our output file.
 
-If you run into weird problems, you could try nuking `data/perfi.db` and do a "clean" run (keeping the `cache/cache.db` should be fine and will make runs a lot faster). Also, you can take a look in `logs/` to see if there's more useful info there. 
+While the costbasis disposal/income/lot results may be wrong/incomplete, we've included debug data that links to where the disposals drawdown from as well as both ledger and on-chain hashes. We've included a collated "Ledger TXs" sheet as well that includes USD Price and asset assignments so it should be helpful even if you're putting together your disposals manually or using a different tool for accounting (eg, if the current tax treatments or lot matching is not to your liking).
+
+If you run into weird problems, you could try nuking `data/perfi.db` and do a "clean" run (keeping the `cache/cache.db` should be fine and will make runs a lot faster). Also, you can take a look in `logs/` to see if there's more useful info there.
 
 We also recommend [DB Browser for SQLite](https://sqlitebrowser.org/) for spelunking around in `data/perfi.db`
 
 ## perfi Tax Behavior
 This is currently hard-coded. Here's a summary:
 
-* We do specific-id lot matching, generally HIFO (although we do lowest cost basis for loan repayments), we don't do long-term/short-term optimizations, but the HIFO approach should still give near optimal (minimized) tax exposure for US tax rates
-* Transfers (including CEX transfers, bridging) are assumed to not disposal or income
+* We do specific-id lot matching, generally HIFO (although we do lowest cost basis for loan repayments), we don't do long-term/short-term optimizations, but the HIFO approach should generally still give near optimal (minimized) tax exposure for US tax rates
+* Transfers (including CEX transfers, bridging) are assumed to not be disposal or income. If they are, you should use `bin/cli.py` to manually change the TX type
 * Wrapping/unwrapping is also considered non-disposal
 * We will create zero-cost basis lots (with a flag) if necessary
-* Single-staking or single-asset deposits are treated as deposits, not disposal
+* Single-staking or single-asset deposits/withdrawals are treated as deposits, not disposal
 * Swaps/LP are like trades and are treated disposals
-* We try to do a good job accounting for income from yield or interest (see Tests)
+* We try to do a good job accounting for income from yield or interest (see Tests), however we can't track it currently if the protocol doesn't generate a deposit receipt
 * We do a best effort for pricing of LP tokens and try to track receipt tokens properly
 * For more details atm, take a look at `perfi/costbasis.py:process()` `perfi/models.py:TxLogical.refresh_type()`
   * current tx types: borrow, repay, deposit, withdraw, disposal, lp, swap, yield
@@ -151,7 +151,7 @@ This is currently hard-coded. Here's a summary:
   * You can see a preview of some of that sort of thing here: https://github.com/AUGMXNT/frax-analysis/
 
 ## Caveats
-* Somes types of defi transactions still aren't handled well (balancer/Curve-style multi-asset LP entries, maybe some more exotic hedging/margin strategies aren't accounted for, DSA/EOA-style operations, like Instadapp, UniV3 multicalls, GMX/GLP)
+* Somes types of defi transactions still aren't handled well (balancer/Curve-style multi-asset LP entries, maybe some more exotic hedging/margin strategies aren't accounted for, DSA/EOA-style operations, like Instadapp, UniV3 multicalls, GMX/GLP) and are ignored (but should be logged)
 * We don't support NFTs very well atm, [sorry](https://twitter.com/DanielitoG25/status/1498358636648800257)
 * Tax treatments are hard coded and may not match your tax regime/preferences. In future versions we plan on making this easier to personalize/configure
 * Only supports some EVM chains atm
@@ -168,6 +168,6 @@ If you've found this software useful, feel free to zap us some coins/tokens. We 
 ```
 
 ## See also
-* [DeBank](https://debank.com/) - this is by far the best DeFi portfolio viewer and we use their [OpenAPI](https://open.debank.com/) extensively. You should definitely be using it.
+* [DeBank](https://debank.com/) - this is by far the best DeFi portfolio viewer and we use their [API](https://open.debank.com/) extensively. If you are doing defi, you should definitely be using this tool.
 * [rotki](https://github.com/rotki/rotki) - this app shares some goals with perfi, and would have saved a few hundred hours and counting of dev time if it supported the chains/protocols we needed. There's a small dedicated team that [have been working for years](https://github.com/rotki/rotki) - worth a look if it'll do what you need. They have a GUI, [real documentation](https://rotki.readthedocs.io/en/latest/index.html), and like [users and stuff](https://github.com/rotki/rotki/issues)
-* [bitcoin.tax](https://bitcoin.tax/) - if all you have is centralized exchange transactions, crypto taxes are a solved problem. We checked out over a dozen services and bitcoin.tax did the best job of any of them (but most of them are probably good enough).
+* [bitcoin.tax](https://bitcoin.tax/) - if all you have is centralized exchange transactions, crypto taxes are a solved problem. We checked out a dozen services and bitcoin.tax did the best job of any of them (but most of them are probably good enough).
