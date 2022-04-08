@@ -117,7 +117,7 @@ class PriceFeed:
             source, actual_epoch, price = get_coingecko_price_for_day(
                 coin_id, desired_epoch
             )
-            return CoinPrice(coin_id, "coingecko", actual_epoch, price)
+            return CoinPrice("coingecko", coin_id, actual_epoch, price)
         except:
             pass
 
