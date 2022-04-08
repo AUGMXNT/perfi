@@ -18,6 +18,8 @@ from collections import namedtuple, defaultdict
 from copy import copy
 from datetime import date, datetime
 from decimal import Decimal
+
+# import ipdb
 import jsonpickle
 import logging
 from pprint import pprint, pformat
@@ -29,7 +31,10 @@ import xlsxwriter
 
 logger = logging.getLogger(__name__)
 
+DEBUG = False
 DEBUG_TXID = None
+# You should set PYTHONBREAKPOINT to ipdb.set_trace in your env
+DEBUG_BREAK = False
 
 ### Helper Functions
 
@@ -454,9 +459,11 @@ class CostbasisGenerator:
         ### For Debugging...
         if DEBUG_TXID:
             if [t for t in self.tx_logical.tx_ledgers if t.id == DEBUG_TXID]:
-                import ipdb
-
-                ipdb.set_trace()
+                global DEBUG
+                DEBUG = True
+                global DEBUG_BREAK
+                DEBUG_BREAK = True
+                breakpoint()
 
         ### Processing transaction types
         """
@@ -618,6 +625,8 @@ class CostbasisGenerator:
 
             # TODO: Refactor
             price, _ = self.get_costbasis_price_and_source(t)
+            if DEBUG_BREAK:
+                breakpoint()
             if price == Decimal(0.0):
                 # If we couldn't establish price, flag for review
                 flags.append(
@@ -1434,7 +1443,7 @@ class CostbasisGenerator:
     """
     symbol_feedback needs to be used carefully, but will ask the costbasis_asset_mapper to be more aggressive
     """
-    # def get_costbasis_price_and_source(self, chain, asset_tx_id, timestamp, symbol_fallback=False):
+
     def get_costbasis_price_and_source(self, tx: TxLedger, symbol_fallback=False):
         """
         Tries to return a price for asset_tx_id at timestamp.
