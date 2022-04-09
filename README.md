@@ -138,6 +138,8 @@ This is currently hard-coded. Here's a summary:
   * current tx types: borrow, repay, deposit, withdraw, disposal, lp, swap, yield
   * we have flags for: receipt, ownership_change, disposal, and income
 
+You may also want to check out [BittyTax](https://github.com/BittyTax/BittyTax), a set of tools to help with UK taxes, or [CoinTaxMan](https://github.com/provinzio/CoinTaxman) for German taxes.
+
 ## Notes
 * perfi runs as much on your local system as possible, and while we use some third party APIs to make our job easier, our goal is to minimize any PII stored/leaked remotely. We appreciate our privacy and we think others do too.
 * This software is licensed with the AGPLv3, a strong copyleft license. This is meant to make sure that end-users of the software will always be able to have control and be able to modify this software to their liking, and as devs, we can maintain optionality/minimize free-riding
