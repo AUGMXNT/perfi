@@ -1755,7 +1755,7 @@ class Form8949:
         self.lot_row = {}
 
         if args and args.year:
-            self.year = args.year
+            self.year = int(args.year)
         else:
             self.year = arrow.now().year - 1
 
