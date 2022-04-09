@@ -1,5 +1,5 @@
 # perfi
-defi portfolio analytics
+personal defi portfolio analytics
 
 ## About
 An open source (AGPLv3), local/private tool to help track your defi degen escapades.
