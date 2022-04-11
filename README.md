@@ -160,7 +160,7 @@ You may also want to check out [BittyTax](https://github.com/BittyTax/BittyTax),
 * Doesn't account for fees atm (this is high on the priority list)
 
 ## Did You Know?
-This is definitely **NOT** tax advice, but in the US, if you [file an extension](https://www.irs.gov/forms-pubs/extension-of-time-to-file-your-tax-return), and don't make an adequate prepayment, you will owe a [Failure to Pay Penalty](https://www.irs.gov/payments/failure-to-pay-penalty) of 0.5%/mo (3% for the 6 month automatic extension period == 6% APR). [Interesting, right?](https://coindix.com/?kind=stable&sort=-apy&tvl=1m)
+This is definitely **NOT** tax advice, but in the US, if you [file an extension](https://www.irs.gov/forms-pubs/extension-of-time-to-file-your-tax-return), and don't make an adequate prepayment, you will owe a [Failure to Pay Penalty](https://www.irs.gov/payments/failure-to-pay-penalty) of 0.5%/mo (6% APR). [Interesting, right?](https://coindix.com/?kind=stable&sort=-apy&tvl=1m)
 * Note, the [Failure to File Penalty](https://www.irs.gov/payments/failure-to-file-penalty) is 5%/mo if you don't get things sorted by the time your extension period ends
 
 ## Donations
