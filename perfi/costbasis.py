@@ -192,10 +192,11 @@ def save_costbasis_lot(lot: CostbasisLot):
               timestamp,
               history,
               flags,
-              receipt
+              receipt,
+              price_source
              )
              VALUES
-             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            """
 
     params = [
@@ -213,6 +214,7 @@ def save_costbasis_lot(lot: CostbasisLot):
         jsonpickle.encode(lot.history),
         jsonpickle.encode(lot.flags),
         lot.receipt,
+        lot.price_source,
     ]
     db.execute(sql, params)
 
@@ -282,7 +284,8 @@ def get_costbasis_lot_by_tx_ledger_id(tx_ledger_id):
                  basis_usd,
                  timestamp,
                  history,
-                 flags
+                 flags,
+                 price_source
              FROM costbasis_lot
              WHERE tx_ledger_id = ?
              AND current_amount > 0
@@ -624,7 +627,7 @@ class CostbasisGenerator:
             chain = t.chain
 
             # TODO: Refactor
-            price, _ = self.get_costbasis_price_and_source(t)
+            price, price_source = self.get_costbasis_price_and_source(t)
             if DEBUG_BREAK:
                 breakpoint()
             if price == Decimal(0.0):
@@ -655,7 +658,12 @@ class CostbasisGenerator:
                             lot_history.append(t_history)
 
             self.create_costbasis_lot(
-                t, price, receipt=self.is_receipt, history=lot_history, flags=flags
+                t,
+                price,
+                price_source,
+                receipt=self.is_receipt,
+                history=lot_history,
+                flags=flags,
             )
 
     def create_reconciliation_lot(self, t, current_amount, history=None):
@@ -670,7 +678,7 @@ class CostbasisGenerator:
             symbol = None
 
         # Get the price to use for this lot based on our `t` below
-        sale_price, _ = self.get_costbasis_price_and_source(t)
+        sale_price, sale_price_source = self.get_costbasis_price_and_source(t)
 
         flags = []
         flags.append(
@@ -684,19 +692,20 @@ class CostbasisGenerator:
         lot = CostbasisLot(
             tx_ledger_id=t.id,
             original_amount=current_amount,
-            current_amount=0.0,
+            current_amount=Decimal(0.0),
             address=t.address,
             entity=self.entity,
             asset_price_id=asset_price_id,
             symbol=symbol,
             asset_tx_id=t.asset_tx_id,
             # An overdrawn, auto-reconciled lot should be 0 cost basis
-            price_usd=0.0,
-            basis_usd=0.0,
+            price_usd=Decimal(0.0),
+            basis_usd=Decimal(0.0),
             timestamp=t.timestamp,
             history=history,
             flags=flags,
             receipt=0,
+            price_source=sale_price_source,
         )
         save_costbasis_lot(lot)
         return lot
@@ -740,7 +749,11 @@ class CostbasisGenerator:
                 ):
                     # We need to create a non-disposal wrapped token deposit
                     self.create_costbasis_lot(
-                        received, 0, receipt=True, history=[deposit]
+                        received,
+                        0,
+                        "non-disposal_wrapped_token_deposit",
+                        receipt=True,
+                        history=[deposit],
                     )
                     # We treat the wrapped token the same as unwrapped for our deposit math
                     actual_deposit_amount -= received.amount
@@ -770,7 +783,7 @@ class CostbasisGenerator:
             # We create our receipt lot now with the history attached, but with the amount adjusted to the actual deposit amount for our ratio calculations...
             # We set the price to 0; it's not a disposal so doesn't matter... LATER (check)
             self.create_costbasis_lot(
-                receipts[0], 0, receipt=True, history=[history_txle]
+                receipts[0], 0, "receipt_lot", receipt=True, history=[history_txle]
             )
 
             # We don't know how to handle more...
@@ -948,7 +961,7 @@ class CostbasisGenerator:
             return
 
         flags = []
-        price, _ = self.get_costbasis_price_and_source(loan_asset)
+        price, price_source = self.get_costbasis_price_and_source(loan_asset)
         if price == Decimal(0.0):
             # If we couldn't establish price, flag for review
             flags.append(
@@ -960,10 +973,20 @@ class CostbasisGenerator:
 
         # Now we add assign our loan_asset and loan_receipt
         self.create_costbasis_lot(
-            loan_asset, price, receipt=False, history=[loan_receipt], flags=flags
+            loan_asset,
+            price,
+            price_source,
+            receipt=False,
+            history=[loan_receipt],
+            flags=flags,
         )
         self.create_costbasis_lot(
-            loan_receipt, price, receipt=True, history=[loan_asset], flags=flags
+            loan_receipt,
+            price,
+            price_source,
+            receipt=True,
+            history=[loan_asset],
+            flags=flags,
         )
 
     # Handler for loan repayment outputs
@@ -1104,7 +1127,7 @@ class CostbasisGenerator:
                  VALUES
                  (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
-        sale_price, _ = self.get_costbasis_price_and_source(tin)
+        sale_price, sale_price_source = self.get_costbasis_price_and_source(tin)
         amount = tin.amount
         net_usd = Decimal(amount) * sale_price
 
@@ -1131,9 +1154,11 @@ class CostbasisGenerator:
 
         # Also create a costbasis lot for this if we got more of the asset
         if amount > 0:
-            self.create_costbasis_lot(tin, sale_price)
+            self.create_costbasis_lot(tin, sale_price, sale_price_source)
 
-    def create_costbasis_lot(self, t, price, receipt=False, history=[], flags=[]):
+    def create_costbasis_lot(
+        self, t, price, price_source, receipt=False, history=[], flags=[]
+    ):
         asset_price_id = None
         """
         This code will store the costbasis mapped asset_price_id and symbol into CostbasisLot.
@@ -1165,6 +1190,7 @@ class CostbasisGenerator:
             history=history,
             flags=flags,
             receipt=receipt,
+            price_source=price_source,
         )
         save_costbasis_lot(lot)
         self.print_if_debug(
@@ -1651,7 +1677,8 @@ class LotMatcher:
                      timestamp,
                      history,
                      flags,
-                     receipt
+                     receipt,
+                     price_source
                  FROM costbasis_lot
                  WHERE
                  address IN (
@@ -2032,6 +2059,7 @@ class Form8949:
                     cl.history,
                     cl.flags,
                     cl.receipt,
+                    cl.price_source,
                     tx.chain
                  FROM costbasis_lot cl
                  join tx_ledger tx on tx.id = cl.tx_ledger_id

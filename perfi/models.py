@@ -621,6 +621,7 @@ class CostbasisLot(BaseModel):
     history: list[TxLedger] = []
     flags: list[dict[str, str]] = []
     receipt: int
+    price_source: str
 
 
 class CostbasisDisposal(BaseModel):

@@ -179,6 +179,7 @@ CREATE TABLE IF NOT EXISTS "costbasis_lot" (
 	"history"	text,
 	"flags"	text,
 	"receipt"	INTEGER,
+	"price_source" TEXT,
 	PRIMARY KEY("tx_ledger_id")
 );
 CREATE TABLE IF NOT EXISTS "asset_price" (
