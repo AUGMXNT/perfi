@@ -1240,7 +1240,7 @@ class CostbasisGenerator:
                         )
                         if not coin_price:
                             # We set our disposal basis price as 0...
-                            coin_price = SimpleNamespace(price=0.0)
+                            coin_price = SimpleNamespace(price=Decimal(0.0))
                             """ LATER TODO: assign this flag somewhere appropriate???
                             We should have flags stored with a disposal, right?
                             flags.append({
@@ -1504,14 +1504,20 @@ class CostbasisGenerator:
             costbasis_asset_price_id = mapped_asset["asset_price_id"]  # type: ignore
             coin_price = price_feed.get(costbasis_asset_price_id, tx.timestamp)
             if coin_price:
-                return (Decimal(coin_price.price), "price_feed__mapped_asset")
+                return (
+                    Decimal(coin_price.price),
+                    f"map asset {tx.asset_tx_id} to {costbasis_asset_price_id}",
+                )
 
         # 3. Try to get a price from the asset_tx_id's corresponding asset_price_id, if it has one
         coin_price = price_feed.get_by_asset_tx_id(
             tx.chain, tx.asset_tx_id, tx.timestamp
         )
         if coin_price:
-            return (Decimal(coin_price.price), "price_feed__asset")
+            return (
+                Decimal(coin_price.price),
+                f"{tx.asset_tx_id} uses {coin_price.coin_id}",
+            )
 
         out_tx = None
         in_tx = None
@@ -1524,7 +1530,10 @@ class CostbasisGenerator:
             costbasis_asset_price_id = mapped_asset["asset_price_id"]  # type: ignore
             coin_price = price_feed.get(costbasis_asset_price_id, tx.timestamp)
             if coin_price:
-                return (Decimal(coin_price.price), "price_feed__symbol_fallback")
+                return (
+                    Decimal(coin_price.price),
+                    f"mapped symbol {mapped_asset['symbol']} to {coin_price.coin_id}",
+                )
 
         # 5. If this tx's logical type makes sense to allow deriving price from the corresponding out value (e.g. swap), do that
         if DEBUG_BREAK:
@@ -1552,7 +1561,7 @@ class CostbasisGenerator:
                 out_price, _ = (Decimal(coin_price.price), coin_price.source)
                 price = (Decimal(out_tx.amount) * out_price) / Decimal(in_tx.amount)
                 # LATER account for fees
-                return price, "derived_from_out"
+                return price, f"derivied:out - {coin_price.coin_id}"
 
             # If we're still here, we should try the IN before giving up
             coin_price = price_feed.get_by_asset_tx_id(
@@ -1562,10 +1571,10 @@ class CostbasisGenerator:
                 in_price, _ = (Decimal(coin_price.price), coin_price.source)
                 price = (Decimal(in_tx.amount) * in_price) / Decimal(out_tx.amount)
                 # LATER account for fees
-                return price, "derived_from_in"
+                return price, f"derived:in - {coin_price.coin_id}"
 
             # If we get this far, we couldn't find a price for either side of the swap
-            return 0, "price_unknown"
+            return 0, "swap - price_unknown"
 
         # 6. tx_logical_type case handling
 
@@ -1604,7 +1613,7 @@ class CostbasisGenerator:
             # We should only do this derivation if we are looking at the actual LP token tx_ledgers
             # Otherwise we are going to end up assigning the LP price to the wrong token!
             if lp_txle != tx:
-                return 0, "price_unknown"
+                return 0, "lp - price_unknown"
 
             #  We'll sum up our LP entry tokens to get the LP value
             price_accum = 0
@@ -1841,7 +1850,8 @@ class Form8949:
                     t.hash,
                     d.duration_held,
                     d.tx_ledger_id,
-                    tlo.flags
+                    tlo.flags,
+                    d.price_source
                  FROM costbasis_disposal as d
                  JOIN tx_ledger t ON d.basis_tx_ledger_id = t.id
                  JOIN tx_rel_ledger_logical trll on t.id = trll.tx_ledger_id
@@ -1890,6 +1900,7 @@ class Form8949:
         ws.set_column("N:N", 20)  # chain
         ws.set_column("O:O", 60)  # hash
         ws.set_column("P:P", 60)  # tx ledger id
+        ws.set_column("Q:Q", 60)  # price source
 
         # Header
         ws.write_row(
@@ -1912,6 +1923,7 @@ class Form8949:
                 "TX Chain",
                 "TX Hash",
                 "TX Ledger ID",
+                "Disposal Price Source",
             ],
             self.header_format,
         )
@@ -1928,6 +1940,7 @@ class Form8949:
             basis_chain = r[6]
             basis_hash = r[7]
             tx_ledger_id = r[9]
+            price_source = r[11]
 
             description = f"{amount:,.2f} {symbol}"
 
@@ -1963,6 +1976,7 @@ class Form8949:
                 ws.write(i, 13, chain, self.default_format)
                 ws.write(i, 14, get_url(chain, hash), self.default_format)
                 ws.write(i, 15, tx_ledger_id, self.default_format)
+                ws.write(i, 16, price_source, self.default_format)
 
                 i += 1
 
@@ -2059,8 +2073,8 @@ class Form8949:
                     cl.history,
                     cl.flags,
                     cl.receipt,
-                    cl.price_source,
-                    tx.chain
+                    tx.chain,
+                    cl.price_source
                  FROM costbasis_lot cl
                  join tx_ledger tx on tx.id = cl.tx_ledger_id
                  WHERE cl.entity = ?
@@ -2084,6 +2098,7 @@ class Form8949:
         ws.set_column("L:L", 9)
         ws.set_column("M:M", 12)
         ws.set_column("N:N", 60)
+        ws.set_column("O:O", 40)  # price source
 
         ws.write_row(
             0,
@@ -2103,6 +2118,7 @@ class Form8949:
                 "receipt",
                 "chain",
                 "tx_hash",
+                "price_source",
             ],
             self.header_format,
         )
@@ -2144,6 +2160,7 @@ class Form8949:
 
             chain = r[13]
             tx_hash = r[1]
+            price_source = r[14]
 
             url = get_url(chain, tx_hash)
 
@@ -2164,6 +2181,7 @@ class Form8949:
                 ws.write(i, 11, receipt, self.default_format_grey)
                 ws.write(i, 12, chain, self.default_format_grey)
                 ws.write_url(i, 13, url, self.default_format_grey, tx_hash)
+                ws.write(i, 14, price_source, self.default_format_grey)
             else:
                 ws.write(i, 0, date, self.default_format)
                 ws.write(i, 1, address, self.default_format)
@@ -2179,6 +2197,7 @@ class Form8949:
                 ws.write(i, 11, receipt, self.default_format)
                 ws.write(i, 12, chain, self.default_format)
                 ws.write_url(i, 13, url, self.default_format, tx_hash)
+                ws.write(i, 14, price_source, self.default_format_grey)
 
             i += 1
 
@@ -2262,7 +2281,7 @@ class Form8949:
         ws.set_column("M:M", 16)
         ws.set_column("N:N", 38)
         ws.set_column("O:P", 60)
-        ws.set_column("Q:Q", 30)
+        ws.set_column("Q:Q", 40)
 
         i = 1
         for txlog in tqdm(results, desc="Logical TXs", disable=None):

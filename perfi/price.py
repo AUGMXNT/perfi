@@ -112,7 +112,7 @@ class PriceFeed:
     def __init__(self):
         self.prices = defaultdict(lambda: defaultdict(lambda: []))
 
-    def get(self, coin_id, desired_epoch):
+    def get(self, coin_id, desired_epoch) -> CoinPrice:
         try:
             source, actual_epoch, price = get_coingecko_price_for_day(
                 coin_id, desired_epoch
@@ -121,7 +121,7 @@ class PriceFeed:
         except:
             pass
 
-    def get_by_asset_tx_id(self, chain, asset_tx_id, timestamp):
+    def get_by_asset_tx_id(self, chain, asset_tx_id, timestamp) -> CoinPrice:
         asset_price = self.map_asset(chain, asset_tx_id)
 
         if asset_price:
