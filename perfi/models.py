@@ -637,6 +637,7 @@ class CostbasisDisposal(BaseModel):
     basis_usd: Decimal
     total_usd: Decimal
     tx_ledger_id: str
+    price_source: str
 
 
 class CostbasisIncome(BaseModel):

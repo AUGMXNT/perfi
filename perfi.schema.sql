@@ -156,13 +156,12 @@ CREATE TABLE IF NOT EXISTS "costbasis_disposal" (
 "amount"DECIMAL,
 "timestamp"INTEGER,
 "duration_held"INTEGER,
-
 "basis_timestamp" INTEGER,
 "basis_tx_ledger_id" TEXT,
 "basis_usd" DECIMAL,
 "total_usd" DECIMAL,
-
-"tx_ledger_id"INTEGER,
+"tx_ledger_id" INTEGER,
+"price_source" TEXT,
 PRIMARY KEY("id" AUTOINCREMENT)
 );
 CREATE TABLE IF NOT EXISTS "costbasis_lot" (

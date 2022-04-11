@@ -43,8 +43,6 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     monkeysession.setattr("perfi.asset.db", test_db)
 
 
-
-
 def get_costbasis_lots(test_db, entity, address=None):
     sql = f"""SELECT
                  tx_ledger_id,
@@ -94,7 +92,8 @@ def get_disposals(test_db, symbol, timestamp=None):
                 basis_tx_ledger_id,
                 basis_usd,
                 total_usd,
-                tx_ledger_id
+                tx_ledger_id,
+                price_source
              FROM costbasis_disposal
              WHERE symbol = ?
              {"AND timestamp = ?" if timestamp else ""}

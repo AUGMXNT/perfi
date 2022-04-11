@@ -236,9 +236,9 @@ We have a more aggressive symbol_fallback that needs to be used carefully (or ma
 # CostbasisDisposal
 def save_costbasis_disposal(disposal):
     sql = """INSERT INTO costbasis_disposal
-             (entity, address, asset_price_id, symbol, amount, timestamp, duration_held, basis_timestamp, basis_tx_ledger_id, basis_usd, total_usd, tx_ledger_id)
+             (entity, address, asset_price_id, symbol, amount, timestamp, duration_held, basis_timestamp, basis_tx_ledger_id, basis_usd, total_usd, tx_ledger_id, price_source)
              VALUES
-             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     params = [
         disposal.entity,
@@ -253,6 +253,7 @@ def save_costbasis_disposal(disposal):
         round_to_zero(disposal.basis_usd),
         round_to_zero(disposal.total_usd),
         disposal.tx_ledger_id,
+        disposal.price_source,
     ]
     db.execute(sql, params)
 
@@ -1235,7 +1236,9 @@ class CostbasisGenerator:
                             )
 
                     # Sale Price
-                    sale_price, _ = self.get_costbasis_price_and_source(t)
+                    sale_price, sale_price_source = self.get_costbasis_price_and_source(
+                        t
+                    )
 
                     # Attrs for new Costbasis disposal row
                     total_usd = amount * sale_price
@@ -1349,6 +1352,7 @@ class CostbasisGenerator:
                             basis_usd=basis_usd,
                             total_usd=total_usd,
                             tx_ledger_id=tx_ledger_id,
+                            price_source=sale_price_source,
                         )
                         save_costbasis_disposal(disposal)
 
@@ -1420,7 +1424,9 @@ class CostbasisGenerator:
                 if is_disposal:
                     if symbol is None:
                         symbol = "__UNKNOWN__"
-                    sale_price, _ = self.get_costbasis_price_and_source(t)
+                    sale_price, sale_price_source = self.get_costbasis_price_and_source(
+                        t
+                    )
                     disposal = CostbasisDisposal(
                         entity=self.entity,
                         address=t.address,
@@ -1434,6 +1440,7 @@ class CostbasisGenerator:
                         basis_usd=Decimal(0.0),
                         total_usd=amount_left_to_subtract * sale_price,
                         tx_ledger_id=t.id,
+                        price_source=sale_price_source,
                     )
                     save_costbasis_disposal(disposal)
                 # We're done here
@@ -1491,7 +1498,7 @@ class CostbasisGenerator:
             costbasis_asset_price_id = mapped_asset["asset_price_id"]  # type: ignore
             coin_price = price_feed.get(costbasis_asset_price_id, tx.timestamp)
             if coin_price:
-                return (Decimal(coin_price.price), "price_feed_symbol_fallback")
+                return (Decimal(coin_price.price), "price_feed__symbol_fallback")
 
         # 5. If this tx's logical type makes sense to allow deriving price from the corresponding out value (e.g. swap), do that
         if DEBUG_BREAK:
@@ -1507,6 +1514,7 @@ class CostbasisGenerator:
         #     out_tx = self.ins[0]
         #     in_tx = self.ins[1]
 
+        # swap
         if out_tx and in_tx:
             # If we can value the OUT asset, then the cost basis price will be
             # amount_of_asset_in / amount_of_asset_out * asset_out_price
@@ -1530,7 +1538,8 @@ class CostbasisGenerator:
                 # LATER account for fees
                 return price, "derived_from_in"
 
-            return price, source
+            # If we get this far, we couldn't find a price for either side of the swap
+            return 0, "price_unknown"
 
         # 6. tx_logical_type case handling
 

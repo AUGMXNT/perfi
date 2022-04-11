@@ -93,7 +93,8 @@ def get_disposals(test_db, symbol, timestamp=None):
                 basis_tx_ledger_id,
                 basis_usd,
                 total_usd,
-                tx_ledger_id
+                tx_ledger_id,
+                price_source
              FROM costbasis_disposal
              WHERE symbol = ?
              {"AND timestamp = ?" if timestamp else ""}
