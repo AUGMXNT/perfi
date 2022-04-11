@@ -93,29 +93,6 @@ entity_app = typer.Typer()
 def entity_create(name: str):
     entity = entity_store.create(name=name)
     print(f"Created entity {entity}")
-    choice = ""
-    num_addresses_added = 0
-    while choice.lower() != "n":
-        choice = typer.prompt(
-            f"Would you like to add an{'other' if num_addresses_added > 0 else ''} address for `{name}`? [Y]es or [N]o"
-        )
-        match choice.lower():
-            case "y" | "yes":
-                address = typer.prompt(
-                    f"Enter an ethereum-compatible wallet address (e.g. 0x12345....):"
-                )
-                label = typer.prompt(
-                    f"Enter a label for this address (e.g. 'My DeFi'):"
-                )
-                address = address_store.create(
-                    entity_name=entity.name,
-                    label=label,
-                    chain=Chain.ethereum,
-                    address=address,
-                )
-                print(f"Created address {address}")
-                num_addresses_added += 1
-    print("Done!")
 
 
 @entity_app.command("add_address")
