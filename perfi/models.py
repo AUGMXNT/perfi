@@ -33,6 +33,7 @@ class TX_LOGICAL_TYPE(Enum):
     self_transfer = "self_transfer"
     receive = "receive"
     send = "send"
+    income = "income"
 
 
 # TODO: go find the places where we create unknown_send, zero_price, auto_reconciled flags and use this enum.value instead
@@ -492,6 +493,11 @@ class TxLogical(BaseModel):
         # TODO: We need to figure out not overriding types...
         if self.tx_logical_type == "airdrop":
             return
+        if self.tx_logical_type in [
+            "Coinbase.Airdrop",
+        ]:
+            self.save_type("airdrop")
+            return
 
         # lets do some UniV3...
         """
@@ -507,7 +513,7 @@ class TxLogical(BaseModel):
             return
         """
 
-        # HACK - but seeing if this works.  I don't think you can put assets into CoinbasePro without it being a self-transfer.
+        # self_transfer
         if self.tx_logical_type in [
             "CoinbasePro.deposit",
             "CoinbasePro.withdrawal",
@@ -522,6 +528,7 @@ class TxLogical(BaseModel):
             self.save_type("self_transfer")
             return
 
+        # trade
         if self.tx_logical_type in [
             "CoinbasePro.BUY",
             "CoinbasePro.SELL",
@@ -533,6 +540,13 @@ class TxLogical(BaseModel):
             "Coinbase.Sell",
         ]:
             self.save_type("trade")
+            return
+
+        # income
+        if self.tx_logical_type in [
+            "CoinbasePro.Reward",
+        ]:
+            self.save_type("income")
             return
 
         # receive
