@@ -1602,6 +1602,7 @@ class CostbasisGenerator:
 
         # lp - enter should have 2+ outs, in should have 2+ ins
         elif self.tx_logical.tx_logical_type == "lp":
+            lp_txle = None
             assets_to_price = []
             lp_amount = 0
             # LP Entry
@@ -1620,6 +1621,11 @@ class CostbasisGenerator:
                 lp_amount = lp_txle.amount
 
             # We should only do this derivation if we are looking at the actual LP token tx_ledgers
+            if not lp_txle:
+                logger.error("Couldn't find LP TxLedger?")
+                logger.error(t)
+                return 0, "lp - couldnt find lp tx"
+
             # Otherwise we are going to end up assigning the LP price to the wrong token!
             if lp_txle != tx:
                 return 0, "lp - price_unknown"
