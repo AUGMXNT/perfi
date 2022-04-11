@@ -14,7 +14,6 @@ from .price import price_feed
 
 import arrow
 import atexit
-from collections import namedtuple, defaultdict
 from copy import copy
 from datetime import date, datetime
 from decimal import Decimal
@@ -198,6 +197,9 @@ def save_costbasis_lot(lot: CostbasisLot):
              VALUES
              (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            """
+
+    if round_to_zero(lot.original_amount) == 0:
+        return  # We return early here because there is no sense in creating a lot for an amount of 0
 
     params = [
         lot.tx_ledger_id,
@@ -1331,9 +1333,16 @@ class CostbasisGenerator:
 
                         # We need to get the amount of the original asset to drawdown
                         # this is based on percent of the lot and multiplied by the original conversion amount
-                        history_tx.amount = (
-                            amount / Decimal(lot.original_amount) * history_tx.amount
-                        )
+                        if (
+                            amount == 0
+                        ):  # Guard against numerator being 0. If this is the case, just use 0 for the result.
+                            history_tx.amount = 0
+                        else:
+                            history_tx.amount = (
+                                amount
+                                / Decimal(lot.original_amount)
+                                * history_tx.amount
+                            )
 
                         # We call drawdown to subtract the original lots...
 
