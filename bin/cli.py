@@ -103,6 +103,25 @@ def entity_add_address(entity_name: str, label: str, chain: Chain, address: str)
     print(f"Created address {address}")
 
 
+# Setting
+# ---------------------------------------------
+setting_app = typer.Typer()
+
+
+@setting_app.command("set")
+def setting_update(key: str, value: str):
+    save_setting(key, value)
+    print(f"Done. Set {key} to {value}")
+
+
+@setting_app.command("remove")
+def setting_remove(key: str):
+    sql = """DELETE FROM SETTING WHERE key = ?"""
+    params = [key]
+    db.execute(sql, params)
+    print(f"Done. Removed setting with key {key}")
+
+
 # Ledgers
 # ---------------------------------------------
 
@@ -207,6 +226,7 @@ def ledger_move_tx_ledger(entity_name: str, tx_ledger_id: str, new_tx_logical_id
 app = typer.Typer(add_completion=False)
 app.add_typer(entity_app, name="entity")
 app.add_typer(ledger_app, name="ledger")
+app.add_typer(setting_app, name="setting")
 
 
 # Perfi Setup
