@@ -199,16 +199,16 @@ CREATE TABLE IF NOT EXISTS "event"
     data      TEXT    not null,
     timestamp INTEGER not null
 );
-CREATE INDEX "idx_rel_tx_logical" ON "tx_rel_ledger_logical" (
+CREATE INDEX IF NOT EXISTS "idx_rel_tx_logical" ON "tx_rel_ledger_logical" (
 	"tx_logical_id"
 );
-CREATE INDEX "idx_address_address" ON "address" (
+CREATE INDEX IF NOT EXISTS "idx_address_address" ON "address" (
 	"address"
 );
-CREATE INDEX "idx_address_entity_id" ON "address" (
+CREATE INDEX IF NOT EXISTS "idx_address_entity_id" ON "address" (
 	"entity_id"
 );
-CREATE INDEX "idx_lotmatcher" ON "costbasis_lot" (
+CREATE INDEX IF NOT EXISTS "idx_lotmatcher" ON "costbasis_lot" (
 	"asset_price_id",
 	"asset_tx_id",
 	"timestamp",
