@@ -25,7 +25,13 @@ import sys
 from tqdm import tqdm
 from types import SimpleNamespace
 import xlsxwriter
+from .settings import setting
 
+REPORTING_TIMEZONE = (
+    "US/Pacific"
+    if "REPORTING_TIMEZONE" not in setting(db)
+    else setting(db)["REPORTING_TIMEZONE"]
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,8 +102,8 @@ def regenerate_costbasis_lots(entity, args=None, quiet=False):
     if args and args.year:  # type: ignore
         start_year = int(args.year)  # type: ignore
         end_year = start_year + 1
-        start = arrow.get(date(start_year, 1, 1), "US/Pacific")
-        end = arrow.get(date(end_year, 1, 1), "US/Pacific")
+        start = arrow.get(date(start_year, 1, 1), REPORTING_TIMEZONE)
+        end = arrow.get(date(end_year, 1, 1), REPORTING_TIMEZONE)
         start = int(start.timestamp())
         end = int(end.timestamp()) - 1
 
@@ -1819,11 +1825,9 @@ class Form8949:
         else:
             self.year = arrow.now().year - 1
 
-        # TODO: TZ should load from settings
-
-        self.start = arrow.get(date(self.year, 1, 1), "US/Pacific")
+        self.start = arrow.get(date(self.year, 1, 1), REPORTING_TIMEZONE)
         self.start = int(self.start.timestamp())
-        self.end = arrow.get(date(self.year + 1, 1, 1), "US/Pacific")
+        self.end = arrow.get(date(self.year + 1, 1, 1), REPORTING_TIMEZONE)
         self.end = int(self.end.timestamp())
 
     def get_logical_summary(self, tx_ledger_id):
@@ -1961,11 +1965,11 @@ class Form8949:
 
             # User needs a time zone
             d = arrow.get(in_timestamp)
-            d = d.to("US/Pacific")
+            d = d.to(REPORTING_TIMEZONE)
             date_acquired = d.format("M/D/YYYY")
 
             d = arrow.get(out_timestamp)
-            d = d.to("US/Pacific")
+            d = d.to(REPORTING_TIMEZONE)
             date_disposed = d.format("M/D/YYYY")
 
             url = get_url(basis_chain, basis_hash)
@@ -2047,7 +2051,7 @@ class Form8949:
             description = f"{r[0]:,.2f} {r[1]}"
 
             d = arrow.get(r[2])
-            d = d.to("US/Pacific")
+            d = d.to(REPORTING_TIMEZONE)
             # Date Format in settings too
             date_earned = d.format("M/D/YYYY")
 
@@ -2141,8 +2145,7 @@ class Form8949:
         i = 1
         for r in results:
             d = arrow.get(r[0])
-            # TODO: use settings for tz
-            d = d.to("US/Pacific")
+            d = d.to(REPORTING_TIMEZONE)
             date = d.format()
 
             address = r[2]
@@ -2325,8 +2328,7 @@ class Form8949:
 
             for txle in r_txle:
                 d = arrow.get(txle["timestamp"])
-                # TODO: use settings for tz
-                d = d.to("US/Pacific")
+                d = d.to(REPORTING_TIMEZONE)
                 date = d.format()
 
                 url = get_url(txle["chain"], txle["hash"])

@@ -10,6 +10,7 @@ import sys
 import time
 import typer
 import os
+import pytz
 
 from perfi.constants.paths import (
     CACHEDB_PATH,
@@ -108,7 +109,7 @@ def entity_add_address(entity_name: str, label: str, chain: Chain, address: str)
 setting_app = typer.Typer()
 
 
-@setting_app.command("set")
+@setting_app.command("add")
 def setting_update(key: str, value: str):
     save_setting(key, value)
     print(f"Done. Set {key} to {value}")
@@ -120,6 +121,24 @@ def setting_remove(key: str):
     params = [key]
     db.execute(sql, params)
     print(f"Done. Removed setting with key {key}")
+
+
+@setting_app.command("set_reporting_timezone")
+def setting_set_reporting_timezone(name: str):
+    if name not in pytz.all_timezones_set:
+        print(f"ERROR - {name} is not a time zone name that perfi knows how to handle.")
+        print(
+            f"Try running `poetry run bin/cli.py setting get_timezone_names` to see all the valid time zone names."
+        )
+    else:
+        save_setting("REPORTING_TIMEZONE_NAME", name)
+        print(f"Done. Your disposal date/times will now be shown in {name} time.")
+
+
+@setting_app.command("get_timezone_names")
+def setting_get_reporting_timezones():
+    for name in pytz.all_timezones:
+        print(name)
 
 
 # Ledgers
@@ -231,6 +250,7 @@ def ledger_move_tx_ledger(entity_name: str, tx_ledger_id: str, new_tx_logical_id
 app = typer.Typer(add_completion=False)
 app.add_typer(entity_app, name="entity")
 app.add_typer(ledger_app, name="ledger")
+app.add_typer(setting_app, name="setting")
 
 
 # Perfi Setup
