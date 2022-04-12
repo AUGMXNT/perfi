@@ -78,6 +78,12 @@ poetry run python bin/group_transactions.py peepo
 
 ### Generally you should not need to re-run anything above this line again ###
 
+# OPTIONAL: Set the timezone used for reporting (defaults to US/Pacific)
+# Get a list of valid time zone names with:
+# > poetry run python bin/cli.py setting get_timezone_names
+# And set your reporting timezone with:
+# > poetry run python bin/cli.py setting set_reporting_timezone 'Europe/Lisbon'
+
 # Calculate costbasis lots, disposals, and income
 poetry run python bin/calculate_costbasis.py peepo
 
