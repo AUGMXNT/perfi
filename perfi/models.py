@@ -1,11 +1,12 @@
 from .constants import assets
 from .db import db
+from typing import Optional, List, Dict
 
 import logging
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from functools import cache
+from functools import lru_cache
 from pprint import pformat
 
 import jsonpickle
@@ -59,13 +60,13 @@ class Chain(Enum):
 
 
 class Entity(BaseModel):
-    id: int | None = None
+    id: Optional[int] = None
     name: str
-    note: str | None = None
+    note: Optional[str] = None
 
 
 class Address(BaseModel):
-    id: int | None = None
+    id: Optional[int] = None
     label: str
     chain: Chain
     address: str
@@ -79,23 +80,23 @@ Entity.update_forward_refs()
 
 
 class TxLedger(BaseModel):
-    id: str | None = None
+    id: Optional[str] = None
     chain: str  # Consider migrating to Chain enum
     address: str
     hash: str
     from_address: str
     to_address: str
-    from_address_name: str | None = None
-    to_address_name: str | None = None
+    from_address_name: Optional[str] = None
+    to_address_name: Optional[str] = None
     asset_tx_id: str
     isfee: int
     amount: Decimal
     timestamp: int
     direction: str  # Consider migrating to a new Direction enum
-    tx_ledger_type: str | None = None  # Consider migrating to TX_LOGICAL_TYPE enum
-    asset_price_id: str | None = None
-    symbol: str | None = None
-    price_usd: Decimal | None = None
+    tx_ledger_type: Optional[str] = None  # Consider migrating to TX_LOGICAL_TYPE enum
+    asset_price_id: Optional[str] = None
+    symbol: Optional[str] = None
+    price_usd: Optional[Decimal] = None
 
     def __eq__(self, other):
         if not isinstance(other, TxLedger):
@@ -184,16 +185,16 @@ class TxLogical(BaseModel):
     description: str = ""
     note: str = ""
     timestamp: int = -1
-    tx_ledgers: list[TxLedger] = []
+    tx_ledgers: List[TxLedger] = []
     address: str = ""
-    addresses: list[str] = []
+    addresses: List[str] = []
     tx_logical_type: str = ""  # replace with enum?
-    entity: str | None = None
-    flags: list[dict[str, str]] = []
-    ins: list[TxLedger] = []
-    outs: list[TxLedger] = []
-    fee: TxLedger | None = None
-    others: list[TxLedger] = []
+    entity: Optional[str] = None
+    flags: List[Dict[str, str]] = []
+    ins: List[TxLedger] = []
+    outs: List[TxLedger] = []
+    fee: Optional[TxLedger] = None
+    others: List[TxLedger] = []
 
     def _group_ledgers(self):
         # group ledgers into INs, OUTs, fee, others
@@ -210,7 +211,7 @@ class TxLogical(BaseModel):
                 self.others.append(t)
 
     @classmethod
-    @cache
+    @lru_cache
     def from_id(cls, id: str, entity_name: str = None):
         txl = cls(id=id, entity=entity_name)
         txl.id = id
@@ -617,32 +618,32 @@ class AssetPrice(BaseModel):
     symbol: str
     name: str
     raw_data: str
-    market_cap: int | None
+    market_cap: Optional[int]
 
 
 class CostbasisLot(BaseModel):
     tx_ledger_id: str
     entity: str
     address: str
-    asset_price_id: str | None = None
-    symbol: str | None = None
+    asset_price_id: Optional[str] = None
+    symbol: Optional[str] = None
     asset_tx_id: str
     original_amount: Decimal
     current_amount: Decimal
     price_usd: Decimal
     basis_usd: Decimal
     timestamp: int
-    history: list[TxLedger] = []
-    flags: list[dict[str, str]] = []
+    history: List[TxLedger] = []
+    flags: List[Dict[str, str]] = []
     receipt: int
     price_source: str
 
 
 class CostbasisDisposal(BaseModel):
-    id: int | None = None
+    id: Optional[int] = None
     entity: str
     address: str
-    asset_price_id: str | None
+    asset_price_id: Optional[str]
     symbol: str
     amount: Decimal
     timestamp: int
@@ -663,7 +664,7 @@ class CostbasisIncome(BaseModel):
     symbol: str
     timestamp: int
     tx_ledger_id: str
-    price: Decimal | None  # TODO: should this be allowed to be None?
+    price: Optional[Decimal]  # TODO: should this be allowed to be None?
     amount: Decimal
     lots: list
 
@@ -672,7 +673,7 @@ class EntityStore:
     def __init__(self, db):
         self.db = db
 
-    def create(self, name: str, note: str = None, addresses: list[Address] = None):
+    def create(self, name: str, note: str = None, addresses: List[Address] = None):
         entity = Entity(name=name, note=note)
         sql = """INSERT INTO entity (name) VALUES (?);"""
         params = [entity.name]
@@ -760,7 +761,7 @@ class TxLogicalStore:
 
     def list(self):
         sql = """SELECT id from tx_logical ORDER BY timestamp ASC"""
-        tx_logicals: list[TxLogical] = []
+        tx_logicals: List[TxLogical] = []
         for row in self.db.query(sql):
             txl = TxLogical.from_id(row["id"])
 

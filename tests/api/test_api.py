@@ -1,4 +1,5 @@
 import uuid
+from typing import List
 
 import pytest
 from starlette.testclient import TestClient
@@ -126,7 +127,7 @@ def make_tx_ledger(direction: str, tx_ledger_type: str, **kw):
     )
 
 
-def make_tx_logical(tx_ledgers: list[TxLedger], tx_logical_type: TX_LOGICAL_TYPE, **kw):
+def make_tx_logical(tx_ledgers: List[TxLedger], tx_logical_type: TX_LOGICAL_TYPE, **kw):
     tx_logical = TxLogical(
         id=f"test_tx_logical__{uuid.uuid4()}",
         count=len(tx_ledgers),

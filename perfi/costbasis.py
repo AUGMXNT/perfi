@@ -1722,7 +1722,7 @@ class LotMatcher:
                  AND current_amount > {CLOSE_TO_ZERO:.18f}
         """
         if algorithm == "hifo":
-            sql += "ORDER BY price_usd DESC"
+            sql += "ORDER BY price_usd DESC, timestamp ASC"
         if algorithm == "low":
             sql += "ORDER BY price_usd ASC"
         if algorithm == "fifo":

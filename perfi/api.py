@@ -2,6 +2,7 @@
 
 from .db import DB
 from .models import TxLogical, TxLedger, AddressStore, Address, TxLogicalStore
+from typing import List, Dict
 
 from fastapi import Depends, FastAPI
 from pydantic import BaseModel
@@ -40,11 +41,11 @@ class TxLogicalOut(BaseModel):
     timestamp: int = -1
     address: str = ""
     tx_logical_type: str = ""  # replace with enum?
-    flags: list[dict[str, str]] = []
-    ins: list[TxLedger] = []
-    outs: list[TxLedger] = []
-    fee: TxLedger | None = None
-    others: list[TxLedger] = []
+    flags: List[Dict[str, str]] = []
+    ins: List[TxLedger] = []
+    outs: List[TxLedger] = []
+    fee: Optional[TxLedger] = None
+    others: List[TxLedger] = []
 
     class Config:
         orm_mode = True
@@ -83,7 +84,7 @@ def delete_address(address_id: int, store: AddressStore = Depends(address_store)
 
 
 # List TxLogicals
-@app.get("/tx_logicals/", response_model=list[TxLogicalOut])
+@app.get("/tx_logicals/", response_model=List[TxLogicalOut])
 def list_tx_logicals(store: TxLogicalStore = Depends(tx_logical_store)):
     return store.list()
 

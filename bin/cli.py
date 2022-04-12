@@ -132,22 +132,27 @@ event_store = EventStore(db, TxLogical, TxLedger)
 
 def _refresh_state(entity_name: str, trigger_action: EVENT_ACTION):
     print("Refreshing downstream state...")
-    match trigger_action:
-        case EVENT_ACTION.tx_ledger_type_updated:
-            update_entity_transactions(entity_name)
-            tlg = TransactionLogicalGrouper(entity_name, event_store)
-            tlg.update_entity_transactions()
-            regenerate_costbasis_lots(entity_name, args=None, quiet=True)
-        case EVENT_ACTION.tx_ledger_moved | EVENT_ACTION.tx_logical_type_updated:
-            tlg = TransactionLogicalGrouper(entity_name, event_store)
-            tlg.update_entity_transactions()
-            regenerate_costbasis_lots(entity_name, args=None, quiet=True)
-        case EVENT_ACTION.tx_logical_flag_added | EVENT_ACTION.tx_ledger_price_updated:
-            regenerate_costbasis_lots(entity_name, args=None, quiet=True)
-        case _:
-            raise Exception(
-                f"Don't know how to handle refreshing state for trigger action {trigger_action.value}"
-            )
+    if trigger_action == EVENT_ACTION.tx_ledger_type_updated:
+        update_entity_transactions(entity_name)
+        tlg = TransactionLogicalGrouper(entity_name, event_store)
+        tlg.update_entity_transactions()
+        regenerate_costbasis_lots(entity_name, args=None, quiet=True)
+    elif trigger_action in [
+        EVENT_ACTION.tx_ledger_moved,
+        EVENT_ACTION.tx_logical_type_updated,
+    ]:
+        tlg = TransactionLogicalGrouper(entity_name, event_store)
+        tlg.update_entity_transactions()
+        regenerate_costbasis_lots(entity_name, args=None, quiet=True)
+    elif trigger_action in [
+        EVENT_ACTION.tx_logical_flag_added,
+        EVENT_ACTION.tx_ledger_price_updated,
+    ]:
+        regenerate_costbasis_lots(entity_name, args=None, quiet=True)
+    else:
+        raise Exception(
+            f"Don't know how to handle refreshing state for trigger action {trigger_action.value}"
+        )
     print("State is fully refreshed now.")
 
 
@@ -226,7 +231,6 @@ def ledger_move_tx_ledger(entity_name: str, tx_ledger_id: str, new_tx_logical_id
 app = typer.Typer(add_completion=False)
 app.add_typer(entity_app, name="entity")
 app.add_typer(ledger_app, name="ledger")
-app.add_typer(setting_app, name="setting")
 
 
 # Perfi Setup
@@ -249,22 +253,19 @@ def setup_perfi():
         choice = typer.prompt(
             f"Would you like to add an{'other' if num_addresses_added > 0 else ''} address for `{entity.name}`? [Y]es or [N]o"
         )
-        match choice.lower():
-            case "y" | "yes":
-                address = typer.prompt(
-                    f"Enter an ethereum-compatible wallet address (e.g. 0x12345....):"
-                )
-                label = typer.prompt(
-                    f"Enter a label for this address (e.g. 'My DeFi'):"
-                )
-                address = address_store.create(
-                    entity_name=entity.name,
-                    label=label,
-                    chain=Chain.ethereum,
-                    address=address,
-                )
-                print(f"Created address {address}")
-                num_addresses_added += 1
+        if choice.lower() in ["y", "yes"]:
+            address = typer.prompt(
+                f"Enter an ethereum-compatible wallet address (e.g. 0x12345....):"
+            )
+            label = typer.prompt(f"Enter a label for this address (e.g. 'My DeFi'):")
+            address = address_store.create(
+                entity_name=entity.name,
+                label=label,
+                chain=Chain.ethereum,
+                address=address,
+            )
+            print(f"Created address {address}")
+            num_addresses_added += 1
     print("Done!")
     print(
         "If you want to create more Entities later, run `poetry run bin/cli.py entity create`"
