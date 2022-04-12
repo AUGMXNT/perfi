@@ -26,7 +26,7 @@ ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
 ```
 
 ## Requirements
-You should be familiar with and have [Python 3.10](https://www.python.org/) and [Poetry](https://python-poetry.org/) installed. We won't be providing any support for setting up your software environment. In the future, we'll be building more accessible packaged installer releases.
+You should be familiar with and have [Python 3.8](https://www.python.org/) and [Poetry](https://python-poetry.org/) installed. We won't be providing any support for setting up your software environment. In the future, we'll be building more accessible packaged installer releases.
 
 perfi currently depends on several third party API providers (no configuration is required by default):
 * [DeBank OpenAPI](https://open.debank.com/) - provides a helpful list of transaction history per chain
