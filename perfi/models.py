@@ -1,3 +1,5 @@
+import time
+
 from .constants import assets
 from .db import db
 from typing import Optional, List, Dict
@@ -57,6 +59,55 @@ class Chain(Enum):
     import_kraken = "import.kraken"
     import_gemini = "import.gemini"
     import_bitcointax = "import.bitcointax"
+
+
+class Flag(BaseModel):
+    id: Optional[int]
+    target_type: Optional[str]
+    target_id: Optional[str]
+    source: str
+    created_at: Optional[int]
+    name: str
+    description: Optional[str]
+
+
+def load_flags(target_type: str, target_id: str) -> List[Flag]:
+    sql = """SELECT id, name, description, created_at, source FROM flag WHERE target_type = ? AND target_id = ?"""
+    params = [target_type, target_id]
+    rows = db.query(sql, params)
+    flags = []
+    for r in rows:
+        flags.append(
+            Flag(
+                id=r["id"],
+                target_type=target_type,
+                target_id=target_id,
+                name=r["name"],
+                description=r["description"],
+                created_at=r["created_at"],
+                source=r["source"],
+            )
+        )
+    return flags
+
+
+def add_flag(target_type: str, target_id: str, flag):
+    now = int(time.time())
+    insert_sql = """INSERT INTO flag (target_type, target_id, created_at, name, description, source) VALUES (?, ?, ?, ?, ?, ?)"""
+    params = [target_type, target_id, now, flag.name, flag.description, flag.source]
+    db.execute(insert_sql, params)
+
+
+def replace_flags(target_type: str, target_id: str, flags: List[Flag]):
+    delete_sql = """DELETE FROM flag WHERE target_type = ? AND target_id = ?"""
+    params = [target_type, target_id]
+    db.execute(delete_sql, params)
+
+    insert_sql = """INSERT INTO flag (target_type, target_id, created_at, name, description, source) VALUES (?, ?, ?, ?, ?, ?)"""
+    for flag in flags:
+        now = int(time.time())
+        params = [target_type, target_id, now, flag.name, flag.description, flag.source]
+        db.execute(insert_sql, params)
 
 
 class Entity(BaseModel):
@@ -190,7 +241,7 @@ class TxLogical(BaseModel):
     addresses: List[str] = []
     tx_logical_type: str = ""  # replace with enum?
     entity: Optional[str] = None
-    flags: List[Dict[str, str]] = []
+    flags: List[Flag] = []
     ins: List[TxLedger] = []
     outs: List[TxLedger] = []
     fee: Optional[TxLedger] = None
@@ -228,7 +279,7 @@ class TxLogical(BaseModel):
             txl.addresses = addresses
 
         # load the logical attrs
-        sql = """SELECT id, count, description, note, timestamp, address, tx_logical_type, flags
+        sql = """SELECT id, count, description, note, timestamp, address, tx_logical_type
              FROM tx_logical log
              WHERE log.id = ?
           """
@@ -240,10 +291,7 @@ class TxLogical(BaseModel):
         txl.timestamp = r[4]
         txl.address = r[5]
         txl.tx_logical_type = r[6]
-        try:
-            txl.flags = jsonpickle.decode(r[7])
-        except:
-            txl.flags = []
+        txl.flags = load_flags(cls.__name__, id)
 
         # load the tx ledgers
         sql = """SELECT id, chain, address, hash, from_address, to_address, from_address_name, to_address_name, asset_tx_id, isfee, amount, timestamp, direction, tx_ledger_type, asset_price_id, symbol, price_usd
@@ -317,7 +365,6 @@ class TxLogical(BaseModel):
                   timestamp = ?,
                   address = ?,
                   tx_logical_type = ?,
-                  flags = ?
                   WHERE
                   id = ?
                   """
@@ -328,10 +375,11 @@ class TxLogical(BaseModel):
             self.timestamp,
             self.address,
             self.tx_logical_type,
-            jsonpickle.encode(self.flags),
             self.id,
         ]
         db.execute(sql, params)
+
+        replace_flags(self.__class__.__name__, self.id, self.flags)
 
     # LATER: this should generate an event?
     def save_type(self, tx_logical_type):
@@ -571,13 +619,15 @@ class TxLogical(BaseModel):
             # if we don't know that we're sending to ourselves, then we should flag the tx_logical for review
             # LATER: could there be a case if someone manually groups sends to different addresses in txlogical and then this is false? maybe but we won't care since it'll be up to them to make sure the tx_logical_type is correct if they've manually combined stuff but by default we won't group multiple asset sends to different addresses
             if len(self.outs) >= 1 and self.outs[0].to_address not in self.addresses:
-                self.flags.append(
-                    {
-                        "name": "unknown_send",
-                        "description": "This send may be a PAYMENT or GIFT",
-                    }
+                add_flag(
+                    self.__class__.__name__,
+                    self.id,
+                    Flag(
+                        source="perfi",
+                        name="unknown_send",
+                        description="This send may be a PAYMENT or GIFT",
+                    ),
                 )
-                self.save()
             return
 
         ### TODO: flag guesses?
@@ -634,7 +684,7 @@ class CostbasisLot(BaseModel):
     basis_usd: Decimal
     timestamp: int
     history: List[TxLedger] = []
-    flags: List[Dict[str, str]] = []
+    flags: List[Flag] = []
     receipt: int
     price_source: str
 
@@ -788,7 +838,7 @@ class TxLogicalStore:
         """
 
         # First, handle the tx_logical record
-        sql = """INSERT INTO tx_logical (id, count, description, note, timestamp, address, tx_logical_type, flags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
+        sql = """INSERT INTO tx_logical (id, count, description, note, timestamp, address, tx_logical_type) VALUES (?, ?, ?, ?, ?, ?, ?)"""
 
         params = [
             tx_logical.id,
@@ -798,9 +848,10 @@ class TxLogicalStore:
             tx_logical.timestamp,
             tx_logical.address,
             tx_logical.tx_logical_type,
-            jsonpickle.encode(tx_logical.flags),
         ]
         self.db.execute(sql, params)
+
+        replace_flags(tx_logical.__class__.__name__, tx_logical.id, tx_logical.flags)
 
         # Now handle the related tx_ledgers
         for index, tx_ledger in enumerate(tx_logical.tx_ledgers):

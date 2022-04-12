@@ -9,6 +9,9 @@ from .models import (
     AssetPrice,
     CostbasisLot,
     CostbasisDisposal,
+    replace_flags,
+    load_flags,
+    Flag,
 )
 from .price import price_feed
 
@@ -98,6 +101,19 @@ def regenerate_costbasis_lots(entity, args=None, quiet=False):
         sql = """DELETE FROM costbasis_income WHERE entity = ?"""
         db.execute(sql, entity)
 
+        # Clear out Flags for costbasis lots
+        sql = """DELETE FROM flag WHERE target_type = ? and source != 'manual'"""
+        db.execute(sql, CostbasisLot.__name__)
+
+        # Clear out Flags for costbasis disposals
+        sql = """DELETE FROM flag WHERE target_type = ? and source != 'manual'"""
+        db.execute(sql, CostbasisDisposal.__name__)
+
+        # Clear out Flags for TxLogicals (some flags get added during refresh_type, which is called from in here)
+        sql = """DELETE FROM flag WHERE target_type = ? and source != 'manual'"""
+
+        db.execute(sql, TxLogical.__name__)
+
     # Get start and end range for year...
     if args and args.year:  # type: ignore
         start_year = int(args.year)  # type: ignore
@@ -149,7 +165,7 @@ def regenerate_costbasis_lots(entity, args=None, quiet=False):
         last_tx_logical_id = r["id"]
 
         if TX_LOGICAL_FLAG.ignored_from_costbasis.value in [
-            f["name"] for f in tx_logical.flags
+            f.name for f in tx_logical.flags
         ]:
             continue
 
@@ -641,10 +657,11 @@ class CostbasisGenerator:
             if price == Decimal(0.0):
                 # If we couldn't establish price, flag for review
                 flags.append(
-                    {
-                        "name": "zero_price",
-                        "description": "Couldn't establish a cost basis price for asset (set to $0)",
-                    }
+                    Flag(
+                        name="zero_price",
+                        description="Couldn't establish a cost basis price for asset (set to $0)",
+                        source="perfi",
+                    )
                 )
 
             # We want to make sure that we are tracking the swap history for receipt assets
@@ -690,10 +707,11 @@ class CostbasisGenerator:
 
         flags = []
         flags.append(
-            {
-                "name": "auto_reconciled",
-                "description": "Ran out of costbasis lots for asset; create a new reconciliation lot before consuming it",
-            }
+            Flag(
+                name="auto_reconciled",
+                description="Ran out of costbasis lots for asset; create a new reconciliation lot before consuming it",
+                source="perfi",
+            )
         )
 
         history = history or []
@@ -716,6 +734,7 @@ class CostbasisGenerator:
             price_source=sale_price_source,
         )
         save_costbasis_lot(lot)
+        replace_flags(type(lot).__name__, lot.tx_ledger_id, flags)
         return lot
 
     def deposit(self):
@@ -1196,11 +1215,11 @@ class CostbasisGenerator:
             basis_usd=basis_usd,
             timestamp=t.timestamp,
             history=history,
-            flags=flags,
             receipt=receipt,
             price_source=price_source,
         )
         save_costbasis_lot(lot)
+        replace_flags(type(lot).__name__, lot.tx_ledger_id, flags)
         self.print_if_debug(
             f"{datetime.fromtimestamp(t.timestamp)}  |  LOT_CREATED | {lot.original_amount} {lot.symbol} @ {lot.basis_usd}"
         )
@@ -1706,7 +1725,6 @@ class LotMatcher:
                      basis_usd,
                      timestamp,
                      history,
-                     flags,
                      receipt,
                      price_source
                  FROM costbasis_lot
@@ -1747,8 +1765,8 @@ class LotMatcher:
         for r in results:
             r = dict(**r)
             r["history"] = jsonpickle.decode(r["history"])
-            r["flags"] = jsonpickle.decode(r["flags"])
-            lot = CostbasisLot(**r)
+            flags = load_flags(CostbasisLot.__name__, r["tx_ledger_id"])
+            lot = CostbasisLot(flags=flags, **r)
             available_lots.append(lot)
         return available_lots
 
@@ -1869,12 +1887,13 @@ class Form8949:
                     t.hash,
                     d.duration_held,
                     d.tx_ledger_id,
-                    tlo.flags,
+                    f.name as hidden_from_8949,
                     d.price_source
                  FROM costbasis_disposal as d
                  JOIN tx_ledger t ON d.basis_tx_ledger_id = t.id
                  JOIN tx_rel_ledger_logical trll on t.id = trll.tx_ledger_id
                  JOIN tx_logical tlo on trll.tx_logical_id = tlo.id
+                 LEFT JOIN flag f on f.target_type = '{TxLogical.__name__}' and f.target_id = tlo.id and f.name = '{TX_LOGICAL_FLAG.hidden_from_8949.value}'
                  WHERE entity = ?
                  AND d.timestamp  >= {self.start}
                  AND d.timestamp < {self.end}
@@ -1886,14 +1905,10 @@ class Form8949:
         short = []
         long = []
         for r in tqdm(disposal_results, desc="Getting Disposals", disable=None):
-            if r[10]:
-                logical_flags = jsonpickle.decode(r[10])
-                if TX_LOGICAL_FLAG.hidden_from_8949.value in [
-                    f["name"] for f in logical_flags
-                ]:
-                    continue
+            if r["hidden_from_8949"]:
+                continue
             summary = self.get_logical_summary(r[9])
-            if r[8] > 31556952:
+            if r["duration_held"] > 31556952:
                 long.append((r, summary))
             else:
                 short.append((r, summary))
@@ -2090,10 +2105,10 @@ class Form8949:
                     cl.price_usd,
                     cl.basis_usd,
                     cl.history,
-                    cl.flags,
                     cl.receipt,
                     tx.chain,
-                    cl.price_source
+                    cl.price_source,
+                    cl.tx_ledger_id
                  FROM costbasis_lot cl
                  join tx_ledger tx on tx.id = cl.tx_ledger_id
                  WHERE cl.entity = ?
@@ -2144,26 +2159,26 @@ class Form8949:
 
         i = 1
         for r in results:
-            d = arrow.get(r[0])
+            d = arrow.get(r["timestamp"])
             d = d.to(REPORTING_TIMEZONE)
             date = d.format()
 
-            address = r[2]
+            address = r["address"]
 
-            current_amount = r[6]
+            current_amount = r["current_amount"]
             if current_amount < 0.01:
                 current_amount = 0
 
-            original_amount = r[7]
+            original_amount = r["original_amount"]
 
-            price = r[8]
-            basis = r[9]
+            price = r["price_usd"]
+            basis = r["basis_usd"]
 
-            symbol = r[4]
+            symbol = r["symbol"]
 
-            asset_price_id = r[3]
+            asset_price_id = r["asset_price_id"]
 
-            asset_tx_id = r[5]
+            asset_tx_id = r["asset_tx_id"]
 
             history = jsonpickle.decode(r[10])
             try:
@@ -2171,14 +2186,14 @@ class Form8949:
             except:
                 history_s = "x"
 
-            flags = jsonpickle.decode(r[11])
-            flags_s = ", ".join([f["name"] for f in flags])
+            flags = load_flags(CostbasisLot.__name__, r["tx_ledger_id"])
+            flags_s = ", ".join([f.name for f in flags])
 
-            receipt = r[12]
+            receipt = r["receipt"]
 
-            chain = r[13]
-            tx_hash = r[1]
-            price_source = r[14]
+            chain = r["chain"]
+            tx_hash = r["hash"]
+            price_source = r["price_source"]
 
             url = get_url(chain, tx_hash)
 
@@ -2244,7 +2259,7 @@ class Form8949:
                             pass
 
     def get_ledger(self):
-        sql = f"""SELECT id, tx_logical_type, flags
+        sql = f"""SELECT id, tx_logical_type
                   FROM tx_logical
                   WHERE address IN (
                       SELECT address
@@ -2303,6 +2318,7 @@ class Form8949:
 
         i = 1
         for txlog in tqdm(results, desc="Logical TXs", disable=None):
+            tx_log_flags = load_flags(TxLogical.__name__, txlog["id"])
             sql = """SELECT id,
                             chain,
                             address,
@@ -2349,7 +2365,12 @@ class Form8949:
                 ws.write(i, 13, txle["asset_tx_id"], self.default_format)
                 ws.write_url(i, 14, url, self.default_format, txle["hash"])
                 ws.write(i, 15, txle["id"], self.default_format)
-                ws.write(i, 16, txlog["flags"], self.default_format)
+                ws.write(
+                    i,
+                    16,
+                    ", ".join([f.name for f in tx_log_flags]),
+                    self.default_format,
+                )
                 i += 1
             # Extra space between logical groups
             i += 1

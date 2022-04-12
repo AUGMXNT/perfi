@@ -215,3 +215,20 @@ CREATE INDEX IF NOT EXISTS "idx_lotmatcher" ON "costbasis_lot" (
 	"address",
 	"price_usd"
 );
+
+CREATE TABLE IF NOT EXISTS flag
+(
+    id          integer not null    constraint flag_pk  primary key     autoincrement,
+    target_id   text    not null,
+    target_type integer not null,
+    name        text    not null,
+    description text,
+    created_at  integer not null,
+    source      text    not null
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS flag_id_uindex
+    on "flag" (id);
+
+CREATE INDEX IF NOT EXISTS flag_target_id_and_type_index
+    on "flag" (target_id, target_type);

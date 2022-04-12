@@ -7,6 +7,7 @@ from pprint import pprint
 import arrow
 from pytest import approx
 
+from e2e.test_e2e_costbasis import get_costbasis_lots
 from perfi.ingest.exchange import (
     CoinbaseProImporter,
     BROKEN_CoinbaseProAccountStatementImporter,
@@ -41,41 +42,6 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     monkeysession.setattr("costbasis.db", test_db)
     monkeysession.setattr("costbasis.price_feed", price_feed)
     monkeysession.setattr("perfi.asset.db", test_db)
-
-
-def get_costbasis_lots(test_db, entity, address=None):
-    sql = f"""SELECT
-                 tx_ledger_id,
-                 entity,
-                 address,
-                 asset_price_id,
-                 symbol,
-                 asset_tx_id,
-                 original_amount,
-                 current_amount,
-                 price_usd,
-                 basis_usd,
-                 timestamp,
-                 history,
-                 flags,
-                 receipt
-             FROM costbasis_lot
-             WHERE entity = ?
-             { 'AND address = ?' if address else '' }
-             ORDER BY timestamp ASC
-    """
-    params = [entity]
-    if address:
-        params.append(address)
-    results = test_db.query(sql, params)
-    lots_to_return = []
-    for r in results:
-        lot = CostbasisLot(*r)
-        lot = lot._replace(history=jsonpickle.decode(lot.history))
-        lot = lot._replace(flags=jsonpickle.decode(lot.flags))
-        lots_to_return.append(lot)
-
-    return lots_to_return
 
 
 def get_disposals(test_db, symbol, timestamp=None):
@@ -180,7 +146,6 @@ def BROKEN_test_coinbase_buy_usdc_send_to_pro_then_trade_for_eth_then_sell_eth_o
         csv_file,
         entity_address_for_imports=address,
         exchange_account_id="SomeCoinbaseProAccountId",
-        db=test_db,
     )
 
     common(test_db)

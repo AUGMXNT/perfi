@@ -18,6 +18,7 @@ from perfi.models import (
     CostbasisIncome,
     CostbasisLot,
     CostbasisDisposal,
+    load_flags,
 )
 
 from perfi.costbasis import regenerate_costbasis_lots
@@ -59,7 +60,6 @@ def get_costbasis_lots(test_db, entity, address):
                  basis_usd,
                  timestamp,
                  history,
-                 flags,
                  receipt,
                  price_source
              FROM costbasis_lot
@@ -73,8 +73,8 @@ def get_costbasis_lots(test_db, entity, address):
     for r in results:
         r = dict(**r)
         r["history"] = jsonpickle.decode(r["history"])
-        r["flags"] = jsonpickle.decode(r["flags"])
-        lot = CostbasisLot(**r)
+        flags = load_flags(CostbasisLot.__name__, r["tx_ledger_id"])
+        lot = CostbasisLot(flags=flags, **r)
         lots_to_return.append(lot)
 
     return lots_to_return
@@ -203,7 +203,7 @@ class TestCostbasisGeneral:
         # No flags on the normal avax lot, zero_cost on the zero_cost avax lot
         assert len(avax_normal_lot.flags) == 0
         assert len(avax_zerocost_lot.flags) > 0
-        flag_names = [f["name"] for f in avax_zerocost_lot.flags]
+        flag_names = [f.name for f in avax_zerocost_lot.flags]
         assert "auto_reconciled" in flag_names
         # We should make sure that we've properly drawndown the overdrawn balance
         assert avax_zerocost_lot.original_amount == approx(Decimal(6))
@@ -694,9 +694,8 @@ class TestCostbasisReceive:
         lot = lots[0]
         assert lot.current_amount == 1
         assert lot.price_usd == 0
-        flags = lot.flags
         assert "zero_price" in [
-            f["name"] for f in lot.flags
+            f.name for f in lot.flags
         ], f"No zero_price in lot {lot}"
 
 

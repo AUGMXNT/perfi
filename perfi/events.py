@@ -1,4 +1,4 @@
-from .models import TxLedger, TxLogical
+from .models import TxLedger, TxLogical, Flag, replace_flags
 
 from copy import copy
 from dataclasses import dataclass
@@ -289,10 +289,8 @@ class EventStore:
         TxLogical.from_id.cache_clear()
 
     def handle_tx_logical_flag_added_event(self, event: Event):
-        tx = self.TxLogical.from_id(event.data["tx_logical_id"])
-        new_flag = {"name": event.data["flag_value"]}
+        tx: TxLogical = self.TxLogical.from_id(event.data["tx_logical_id"])
+        new_flag = Flag(source="manual", name=event.data["flag_value"])
         updated_flags = tx.flags + [new_flag]
-        sql = """UPDATE tx_logical SET flags = ? where id = ?"""
-        params = [jsonpickle.encode(updated_flags), event.data["tx_logical_id"]]
-        self.db.execute(sql, params)
+        replace_flags(TxLogical.__name__, tx.id, updated_flags)
         TxLogical.from_id.cache_clear()
