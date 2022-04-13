@@ -31,6 +31,17 @@ from types import SimpleNamespace
 import xlsxwriter
 from .settings import setting
 
+PRECISION_18PLACES = Decimal(10) ** -18
+
+
+def decimal_mul(x, y, fp=PRECISION_18PLACES):
+    return (Decimal(x) * Decimal(y)).quantize(fp)
+
+
+def decimal_div(x, y, fp=PRECISION_18PLACES):
+    return (Decimal(x) / Decimal(y)).quantize(fp)
+
+
 REPORTING_TIMEZONE = (
     "US/Pacific"
     if "REPORTING_TIMEZONE" not in setting(db)
@@ -542,7 +553,7 @@ class CostbasisGenerator:
                             max_disposal_usd = None
                             break
                         else:
-                            max_disposal_usd += Decimal(t.price_usd) * Decimal(t.amount)
+                            max_disposal_usd += decimal_mul(t.price_usd, t.amount)
 
                 for t in self.outs:
                     lots = LotMatcher().get_lots(t)
@@ -828,10 +839,9 @@ class CostbasisGenerator:
         lots = LotMatcher().get_lots(t)
 
         # This is how much of our deposit receipt (eg avWAVAX) we are redeeming
-        deposit_receipt_balance = Decimal(t.amount)
+        deposit_receipt_balance: Decimal = Decimal(t.amount)
 
-        ### HACK: Temporary workaround for float rounding issues
-        deposit_receipt_balance = round(deposit_receipt_balance, 9)
+        deposit_receipt_balance = deposit_receipt_balance.quantize(PRECISION_18PLACES)
 
         # This is how much we actually got back from our deposit (AVAX)
         deposit_withdrawal_balance_remaining = Decimal(self.ins[0].amount)
@@ -851,16 +861,17 @@ class CostbasisGenerator:
             """
             if lot.history:
                 try:
-                    ratio_of_deposit_receipt_to_deposit = Decimal(
-                        lot.original_amount
-                    ) / Decimal(lot.history[0].amount)
-                    percent_of_original_lot = amount_to_subtract_from_lot / Decimal(
-                        lot.original_amount
+                    ratio_of_deposit_receipt_to_deposit = decimal_div(
+                        lot.original_amount, lot.history[0].amount
                     )
-                    deposit_redeemed = (
-                        percent_of_original_lot
-                        * amount_to_subtract_from_lot
-                        / ratio_of_deposit_receipt_to_deposit
+                    percent_of_original_lot = decimal_div(
+                        amount_to_subtract_from_lot, lot.original_amount
+                    )
+                    deposit_redeemed = decimal_div(
+                        decimal_mul(
+                            percent_of_original_lot, amount_to_subtract_from_lot
+                        ),
+                        ratio_of_deposit_receipt_to_deposit,
                     )
                 except:
                     deposit_redeemed = amount_to_subtract_from_lot
@@ -875,24 +886,25 @@ class CostbasisGenerator:
                 )
                 update_costbasis_lot_current_amount(
                     lot.tx_ledger_id,
-                    round(
-                        Decimal(lot.current_amount)
-                        - Decimal(amount_to_subtract_from_lot),
-                        18,
+                    (
+                        Decimal(lot.current_amount).quantize(PRECISION_18PLACES)
+                        - Decimal(amount_to_subtract_from_lot).quantize(
+                            PRECISION_18PLACES
+                        )
                     ),
                 )
                 return
 
             ### HACK: Temporary workaround for float rounding issues from lot.original_amount
-            deposit_redeemed = round(deposit_redeemed, 9)
+            deposit_redeemed = deposit_redeemed.quantize(PRECISION_18PLACES)
             deposit_withdrawal_balance_remaining -= deposit_redeemed
 
             # Subtract from the lot's `current_amount`
             update_costbasis_lot_current_amount(
                 lot.tx_ledger_id,
-                round(
-                    Decimal(lot.current_amount) - Decimal(amount_to_subtract_from_lot),
-                    18,
+                (
+                    Decimal(lot.current_amount).quantize(PRECISION_18PLACES)
+                    - Decimal(amount_to_subtract_from_lot).quantize(PRECISION_18PLACES)
                 ),
             )
 
@@ -1030,16 +1042,18 @@ class CostbasisGenerator:
         loan_receipt_balance = Decimal(loan_receipt.amount)
 
         ### HACK: Temporary workaround for float rounding issues
-        loan_receipt_balance = round(loan_receipt_balance, 9)
+        loan_receipt_balance = loan_receipt_balance.quantize(PRECISION_18PLACES)
         logger.debug(f"Loan receipt sent: {loan_receipt_balance} {loan_receipt.symbol}")
 
         # This is how much we actually got back from our loan (AVAX)
         loan_asset_repaid = Decimal(loan_asset.amount)
-        loan_asset_repaid = round(loan_asset_repaid, 9)
+        loan_asset_repaid = loan_asset_repaid.quantize(PRECISION_18PLACES)
         logger.debug(f"Loan asset repaid: {loan_asset_repaid} {loan_asset.symbol}")
 
         # This is always what we will use to calculate how much of the original loan to redeem
-        receipt_to_asset_ratio_repay = loan_receipt_balance / loan_asset_repaid
+        receipt_to_asset_ratio_repay = decimal_div(
+            loan_receipt_balance, loan_asset_repaid
+        )
 
         # We need these to total up what we originally borrowed and get our income difference
         loan_asset_originally_borrowed = Decimal(0.0)
@@ -1051,33 +1065,31 @@ class CostbasisGenerator:
             amount_to_subtract_from_lot = Decimal(
                 min(loan_receipt_balance, lot.current_amount)
             )
-            amount_to_subtract_from_lot = round(amount_to_subtract_from_lot, 9)
+            amount_to_subtract_from_lot = amount_to_subtract_from_lot.quantize(
+                PRECISION_18PLACES
+            )
 
-            percent_of_original_lot = amount_to_subtract_from_lot / Decimal(
-                lot.original_amount
+            percent_of_original_lot = decimal_div(
+                amount_to_subtract_from_lot, lot.original_amount
             )
 
             # We need to tally our for the receipts that we consume, what the original borrowed assets were
             try:
-                receipt_to_asset_ratio_borrowed = Decimal(
-                    lot.original_amount
-                ) / Decimal(lot.history[0].amount)
+                receipt_to_asset_ratio_borrowed = decimal_div(
+                    lot.original_amount, lot.history[0].amount
+                )
             except:
                 receipt_to_asset_ratio_borrowed = 1
-            loan_asset_originally_borrowed += round(
-                percent_of_original_lot
-                * amount_to_subtract_from_lot
-                / receipt_to_asset_ratio_borrowed,
-                9,
+            loan_asset_originally_borrowed += decimal_div(
+                decimal_mul(percent_of_original_lot, amount_to_subtract_from_lot),
+                receipt_to_asset_ratio_borrowed,
             )
 
             ### We need to handle the actual repayment of the loan_asset (subtract from our costbasis_lots)
-            loan_redeemed = (
-                percent_of_original_lot
-                * amount_to_subtract_from_lot
-                / receipt_to_asset_ratio_repay
+            loan_redeemed = decimal_div(
+                decimal_mul(percent_of_original_lot, amount_to_subtract_from_lot),
+                receipt_to_asset_ratio_repay,
             )
-            loan_redeemed = round(loan_redeemed, 9)
             asset_redeemed_txle = copy(loan_asset)
             asset_redeemed_txle.amount = loan_redeemed
             asset_lots = LotMatcher().get_lots(loan_asset, algorithm="low")
@@ -1086,10 +1098,8 @@ class CostbasisGenerator:
             # Subtract from the loan_receipt lot's `current_amount`
             update_costbasis_lot_current_amount(
                 lot.tx_ledger_id,
-                round(
-                    Decimal(lot.current_amount) - Decimal(amount_to_subtract_from_lot),
-                    18,
-                ),
+                Decimal(lot.current_amount).quantize(PRECISION_18PLACES)
+                - Decimal(amount_to_subtract_from_lot).quantize(PRECISION_18PLACES),
             )
 
             loan_receipt_balance -= amount_to_subtract_from_lot
@@ -1106,7 +1116,7 @@ class CostbasisGenerator:
 
         # Reconcilation lots if we still have loan_receipt_balance
         if loan_receipt_balance > CLOSE_TO_ZERO:
-            lot = self.create_reconciliation_lot(
+            self.create_reconciliation_lot(
                 loan_receipt, loan_receipt_balance, history=[history_txle]
             )
 
@@ -1123,7 +1133,7 @@ class CostbasisGenerator:
         """
         sale_price, sale_price_source = self.get_costbasis_price_and_source(tin)
         amount = tin.amount
-        net_usd = Decimal(amount) * sale_price
+        net_usd = decimal_mul(amount, sale_price)
 
         # Mapped version of symbol only (price is from get_costbasis_price_and_source...)
         mapped_asset = price_feed.map_asset(tin.chain, tin.asset_tx_id)
@@ -1167,7 +1177,7 @@ class CostbasisGenerator:
             symbol = None
 
         # LATER: we should be considering TxLogical fees, approvals, etc...
-        basis_usd = Decimal(price) * Decimal(t.amount)
+        basis_usd = decimal_mul(price, t.amount)
 
         lot = CostbasisLot(
             tx_ledger_id=t.id,
@@ -1217,7 +1227,9 @@ class CostbasisGenerator:
                 )
 
                 # We set this whether these is a disposal or not
-                amount = Decimal(amount_to_subtract_from_lot)
+                amount = Decimal(amount_to_subtract_from_lot).quantize(
+                    PRECISION_18PLACES
+                )
 
                 # Get the costbasis_lot's price if it's an ownership change, otherwise we don't care
                 lot_price = None
@@ -1250,10 +1262,9 @@ class CostbasisGenerator:
 
                         if coin_price.price:
                             # Lastly, we multiply by the ratio of the drawdown amount from the original amount
-                            lot_price = (
-                                Decimal(coin_price.price)
-                                * Decimal(history_tx.amount)
-                                / Decimal(lot.original_amount)
+                            lot_price = decimal_div(
+                                decimal_mul(coin_price.price, history_tx.amount),
+                                lot.original_amount,
                             )
 
                     # Sale Price
@@ -1262,8 +1273,8 @@ class CostbasisGenerator:
                     )
 
                     # Attrs for new Costbasis disposal row
-                    total_usd = amount * sale_price
-                    basis_usd = amount * lot_price
+                    total_usd = decimal_mul(amount, sale_price)
+                    basis_usd = decimal_mul(amount, lot_price)
 
                     # max_disposal guard simple - note, this should be less if we were multi-out aware
                     if max_disposal_usd:
@@ -1331,10 +1342,9 @@ class CostbasisGenerator:
                         ):  # Guard against numerator being 0. If this is the case, just use 0 for the result.
                             history_tx.amount = 0
                         else:
-                            history_tx.amount = (
-                                amount
-                                / Decimal(lot.original_amount)
-                                * history_tx.amount
+                            history_tx.amount = decimal_mul(
+                                decimal_div(amount, lot.original_amount),
+                                history_tx.amount,
                             )
 
                         # We call drawdown to subtract the original lots...
@@ -1387,18 +1397,19 @@ class CostbasisGenerator:
                 # We subtract the amount for the current lot
                 update_costbasis_lot_current_amount(
                     lot.tx_ledger_id,
-                    Decimal(lot.current_amount) - Decimal(amount_to_subtract_from_lot),
+                    Decimal(lot.current_amount).quantize(PRECISION_18PLACES)
+                    - Decimal(amount_to_subtract_from_lot).quantize(PRECISION_18PLACES),
                 )
 
                 # unused but putting it here in case we ever want the updated lot in memory, it should have the updated current_amount...
-                updated_current_amount = (
-                    lot.current_amount - amount_to_subtract_from_lot
-                )
+                updated_current_amount = Decimal(lot.current_amount).quantize(
+                    PRECISION_18PLACES
+                ) - Decimal(amount_to_subtract_from_lot).quantize(PRECISION_18PLACES)
                 updated_lot = lot.copy(
                     update={"current_amount": updated_current_amount}
                 )
 
-                amount_left_to_subtract -= amount
+                amount_left_to_subtract -= Decimal(amount).quantize(PRECISION_18PLACES)
 
                 # We're done and can stop looking at other lots
                 if amount_left_to_subtract <= CLOSE_TO_ZERO:
@@ -1407,9 +1418,7 @@ class CostbasisGenerator:
             # We ran out of appropriate lots for this asset.
             if amount_left_to_subtract > CLOSE_TO_ZERO:
                 # So, create a new zero-cost lost to handle the remainder
-                lot = self.create_reconciliation_lot(
-                    t, amount_left_to_subtract  # ???? <--- XXX
-                )
+                lot = self.create_reconciliation_lot(t, amount_left_to_subtract)
 
                 ### We have to repeat this because it's possible if there's no lot to start with we need to generate a new one
                 # Fallback
@@ -1466,7 +1475,7 @@ class CostbasisGenerator:
                         basis_timestamp=lot.timestamp,
                         basis_tx_ledger_id=lot.tx_ledger_id,
                         basis_usd=Decimal(0.0),
-                        total_usd=amount_left_to_subtract * sale_price,
+                        total_usd=decimal_mul(amount_left_to_subtract, sale_price),
                         tx_ledger_id=t.id,
                         price_source=sale_price_source,
                     )
@@ -1561,7 +1570,7 @@ class CostbasisGenerator:
             )
             if coin_price:
                 out_price, _ = (Decimal(coin_price.price), coin_price.source)
-                price = (Decimal(out_tx.amount) * out_price) / Decimal(in_tx.amount)
+                price = decimal_div(decimal_mul(out_tx.amount, out_price), in_tx.amount)
                 # LATER account for fees
                 return price, f"derivied:out - {coin_price.coin_id}"
 
@@ -1571,7 +1580,7 @@ class CostbasisGenerator:
             )
             if coin_price:
                 in_price, _ = (Decimal(coin_price.price), coin_price.source)
-                price = (Decimal(in_tx.amount) * in_price) / Decimal(out_tx.amount)
+                price = decimal_div(decimal_mul(in_tx.amount, in_price), out_tx.amount)
                 # LATER account for fees
                 return price, f"derived:in - {coin_price.coin_id}"
 
@@ -1639,10 +1648,10 @@ class CostbasisGenerator:
                     coin_price = price_feed.get(asset_price_id, t.timestamp)
                 if coin_price:
                     price, _ = (Decimal(coin_price.price), coin_price.source)
-                    price_accum += price * Decimal(t.amount)
+                    price_accum += decimal_mul(price, t.amount)
 
             if price_accum:
-                price = price_accum / Decimal(lp_amount)
+                price = decimal_div(price_accum, lp_amount)
                 # Only when we enter an lp do we want to update the price
                 if is_lp_entry:
                     lp_txle.save_price(price)

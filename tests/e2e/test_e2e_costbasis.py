@@ -7,7 +7,7 @@ from pprint import pprint
 from pytest import approx
 
 from perfi.events import EventStore
-from ..integration.test_tx_logicals import get_tx_logicals
+from tests.integration.test_tx_logicals import get_tx_logicals
 from tests.helpers import *
 from perfi.transaction.chain_to_ledger import update_entity_transactions
 from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
