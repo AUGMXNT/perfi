@@ -5,7 +5,7 @@ import os
 import psutil
 import sqlite3
 import sys
-from decimal import Decimal
+from decimal import Decimal, Context
 
 # Decimal adapting from https://stackoverflow.com/questions/6319409/how-to-convert-python-decimal-to-sqlite-numeric
 PRECISION_18PLACES = Decimal(10) ** -18
@@ -16,7 +16,10 @@ def adapt_decimal(d):
 
 
 def convert_decimal(s):
-    return Decimal(s.decode("ascii")).quantize(PRECISION_18PLACES)
+    # Context precision needs to accomodate 18 decimal palces PLUS whatever is to the left of the decimal point. 100 should be enough, right?
+    return Decimal(s.decode("ascii")).quantize(
+        PRECISION_18PLACES, context=Context(prec=100)
+    )
 
 
 sqlite3.register_adapter(Decimal, adapt_decimal)

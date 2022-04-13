@@ -19,7 +19,7 @@ import arrow
 import atexit
 from copy import copy
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, Context
 
 import jsonpickle
 import logging
@@ -35,11 +35,13 @@ PRECISION_18PLACES = Decimal(10) ** -18
 
 
 def decimal_mul(x, y, fp=PRECISION_18PLACES):
-    return (Decimal(x) * Decimal(y)).quantize(fp)
+    # Context precision needs to accomodate 18 decimal palces PLUS whatever is to the left of the decimal point. 100 should be enough, right?
+    return (Decimal(x) * Decimal(y)).quantize(fp, context=Context(prec=100))
 
 
 def decimal_div(x, y, fp=PRECISION_18PLACES):
-    return (Decimal(x) / Decimal(y)).quantize(fp)
+    # Context precision needs to accomodate 18 decimal palces PLUS whatever is to the left of the decimal point. 100 should be enough, right?
+    return (Decimal(x) / Decimal(y)).quantize(fp, context=Context(prec=100))
 
 
 REPORTING_TIMEZONE = (
@@ -58,7 +60,7 @@ DEBUG_BREAK = False
 ### Helper Functions
 
 # This is added for rounding errors...
-CLOSE_TO_ZERO = Decimal(0.0000000001)
+CLOSE_TO_ZERO = Decimal(0.0)
 
 
 def round_to_zero(number):
