@@ -8,7 +8,10 @@ import sys
 from decimal import Decimal, Context
 
 # Decimal adapting from https://stackoverflow.com/questions/6319409/how-to-convert-python-decimal-to-sqlite-numeric
-PRECISION_18PLACES = Decimal(10) ** -18
+DECIMAL_QUANTIZE_PLACES = (
+    Decimal(10) ** -16
+)  # Would like to use 18 places but DeBank gives 16 almost always right now so we'll use 16
+DECIMAL_QUANTIZE_CONTEXT = Context(prec=100)
 
 
 def adapt_decimal(d):
@@ -18,7 +21,7 @@ def adapt_decimal(d):
 def convert_decimal(s):
     # Context precision needs to accomodate 18 decimal palces PLUS whatever is to the left of the decimal point. 100 should be enough, right?
     return Decimal(s.decode("ascii")).quantize(
-        PRECISION_18PLACES, context=Context(prec=100)
+        DECIMAL_QUANTIZE_PLACES, context=DECIMAL_QUANTIZE_CONTEXT
     )
 
 

@@ -31,17 +31,24 @@ from types import SimpleNamespace
 import xlsxwriter
 from .settings import setting
 
-PRECISION_18PLACES = Decimal(10) ** -18
+DECIMAL_QUANTIZE_PLACES = Decimal(10) ** -16
+DECIMAL_QUANTIZE_CONTEXT = Context(prec=100)
 
 
-def decimal_mul(x, y, fp=PRECISION_18PLACES):
+def decimal_quantize(n):
+    return Decimal(n).quantize(
+        DECIMAL_QUANTIZE_PLACES, context=DECIMAL_QUANTIZE_CONTEXT
+    )
+
+
+def decimal_mul(x, y):
     # Context precision needs to accomodate 18 decimal palces PLUS whatever is to the left of the decimal point. 100 should be enough, right?
-    return (Decimal(x) * Decimal(y)).quantize(fp, context=Context(prec=100))
+    return decimal_quantize(Decimal(x) * Decimal(y))
 
 
-def decimal_div(x, y, fp=PRECISION_18PLACES):
+def decimal_div(x, y):
     # Context precision needs to accomodate 18 decimal palces PLUS whatever is to the left of the decimal point. 100 should be enough, right?
-    return (Decimal(x) / Decimal(y)).quantize(fp, context=Context(prec=100))
+    return decimal_quantize(Decimal(x) / Decimal(y))
 
 
 REPORTING_TIMEZONE = (
@@ -60,7 +67,7 @@ DEBUG_BREAK = False
 ### Helper Functions
 
 # This is added for rounding errors...
-CLOSE_TO_ZERO = Decimal(0.0)
+CLOSE_TO_ZERO = Decimal(10**-16)
 
 
 def round_to_zero(number):
@@ -843,7 +850,7 @@ class CostbasisGenerator:
         # This is how much of our deposit receipt (eg avWAVAX) we are redeeming
         deposit_receipt_balance: Decimal = Decimal(t.amount)
 
-        deposit_receipt_balance = deposit_receipt_balance.quantize(PRECISION_18PLACES)
+        deposit_receipt_balance = decimal_quantize(deposit_receipt_balance)
 
         # This is how much we actually got back from our deposit (AVAX)
         deposit_withdrawal_balance_remaining = Decimal(self.ins[0].amount)
@@ -889,24 +896,22 @@ class CostbasisGenerator:
                 update_costbasis_lot_current_amount(
                     lot.tx_ledger_id,
                     (
-                        Decimal(lot.current_amount).quantize(PRECISION_18PLACES)
-                        - Decimal(amount_to_subtract_from_lot).quantize(
-                            PRECISION_18PLACES
-                        )
+                        decimal_quantize(lot.current_amount)
+                        - decimal_quantize(amount_to_subtract_from_lot)
                     ),
                 )
                 return
 
             ### HACK: Temporary workaround for float rounding issues from lot.original_amount
-            deposit_redeemed = deposit_redeemed.quantize(PRECISION_18PLACES)
+            deposit_redeemed = decimal_quantize(deposit_redeemed)
             deposit_withdrawal_balance_remaining -= deposit_redeemed
 
             # Subtract from the lot's `current_amount`
             update_costbasis_lot_current_amount(
                 lot.tx_ledger_id,
                 (
-                    Decimal(lot.current_amount).quantize(PRECISION_18PLACES)
-                    - Decimal(amount_to_subtract_from_lot).quantize(PRECISION_18PLACES)
+                    decimal_quantize(lot.current_amount)
+                    - decimal_quantize(amount_to_subtract_from_lot)
                 ),
             )
 
@@ -1044,12 +1049,12 @@ class CostbasisGenerator:
         loan_receipt_balance = Decimal(loan_receipt.amount)
 
         ### HACK: Temporary workaround for float rounding issues
-        loan_receipt_balance = loan_receipt_balance.quantize(PRECISION_18PLACES)
+        loan_receipt_balance = decimal_quantize(loan_receipt_balance)
         logger.debug(f"Loan receipt sent: {loan_receipt_balance} {loan_receipt.symbol}")
 
         # This is how much we actually got back from our loan (AVAX)
         loan_asset_repaid = Decimal(loan_asset.amount)
-        loan_asset_repaid = loan_asset_repaid.quantize(PRECISION_18PLACES)
+        loan_asset_repaid = decimal_quantize(loan_asset_repaid)
         logger.debug(f"Loan asset repaid: {loan_asset_repaid} {loan_asset.symbol}")
 
         # This is always what we will use to calculate how much of the original loan to redeem
@@ -1067,9 +1072,7 @@ class CostbasisGenerator:
             amount_to_subtract_from_lot = Decimal(
                 min(loan_receipt_balance, lot.current_amount)
             )
-            amount_to_subtract_from_lot = amount_to_subtract_from_lot.quantize(
-                PRECISION_18PLACES
-            )
+            amount_to_subtract_from_lot = decimal_quantize(amount_to_subtract_from_lot)
 
             percent_of_original_lot = decimal_div(
                 amount_to_subtract_from_lot, lot.original_amount
@@ -1100,8 +1103,8 @@ class CostbasisGenerator:
             # Subtract from the loan_receipt lot's `current_amount`
             update_costbasis_lot_current_amount(
                 lot.tx_ledger_id,
-                Decimal(lot.current_amount).quantize(PRECISION_18PLACES)
-                - Decimal(amount_to_subtract_from_lot).quantize(PRECISION_18PLACES),
+                decimal_quantize(lot.current_amount)
+                - decimal_quantize(amount_to_subtract_from_lot),
             )
 
             loan_receipt_balance -= amount_to_subtract_from_lot
@@ -1229,9 +1232,7 @@ class CostbasisGenerator:
                 )
 
                 # We set this whether these is a disposal or not
-                amount = Decimal(amount_to_subtract_from_lot).quantize(
-                    PRECISION_18PLACES
-                )
+                amount = decimal_quantize(amount_to_subtract_from_lot)
 
                 # Get the costbasis_lot's price if it's an ownership change, otherwise we don't care
                 lot_price = None
@@ -1399,19 +1400,19 @@ class CostbasisGenerator:
                 # We subtract the amount for the current lot
                 update_costbasis_lot_current_amount(
                     lot.tx_ledger_id,
-                    Decimal(lot.current_amount).quantize(PRECISION_18PLACES)
-                    - Decimal(amount_to_subtract_from_lot).quantize(PRECISION_18PLACES),
+                    decimal_quantize(lot.current_amount)
+                    - decimal_quantize(amount_to_subtract_from_lot),
                 )
 
                 # unused but putting it here in case we ever want the updated lot in memory, it should have the updated current_amount...
-                updated_current_amount = Decimal(lot.current_amount).quantize(
-                    PRECISION_18PLACES
-                ) - Decimal(amount_to_subtract_from_lot).quantize(PRECISION_18PLACES)
+                updated_current_amount = decimal_quantize(
+                    lot.current_amount
+                ) - decimal_quantize(amount_to_subtract_from_lot)
                 updated_lot = lot.copy(
                     update={"current_amount": updated_current_amount}
                 )
 
-                amount_left_to_subtract -= Decimal(amount).quantize(PRECISION_18PLACES)
+                amount_left_to_subtract -= decimal_quantize(amount)
 
                 # We're done and can stop looking at other lots
                 if amount_left_to_subtract <= CLOSE_TO_ZERO:
