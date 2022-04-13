@@ -8,12 +8,15 @@ import sys
 from decimal import Decimal
 
 # Decimal adapting from https://stackoverflow.com/questions/6319409/how-to-convert-python-decimal-to-sqlite-numeric
+PRECISION_18PLACES = Decimal(10) ** -18
+
+
 def adapt_decimal(d):
     return str(d).encode("ascii")
 
 
 def convert_decimal(s):
-    return Decimal(s.decode("ascii"))
+    return Decimal(s.decode("ascii")).quantize(PRECISION_18PLACES)
 
 
 sqlite3.register_adapter(Decimal, adapt_decimal)

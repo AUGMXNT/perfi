@@ -83,7 +83,6 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     monkeysession.setattr("perfi.ingest.chain.db", test_db)
 
 
-
 def get_tx_chains(db, chain, address):
     sql = """SELECT chain, address, hash, timestamp, raw_data_lzma from tx_chain WHERE chain = ? AND address = ? ORDER BY timestamp ASC"""
     params = [chain, address]
@@ -415,7 +414,7 @@ class TestCoinbaseImporter:
             to_address="Coinbase:SomeCoinbaseAccountId",
             asset_tx_id="FIAT:USD",
             symbol="USD",
-            amount=Decimal("838.0499999999999992456"),
+            amount=Decimal("838.049999999999999246"),  # rounding to 18 decimal places
             timestamp=int(arrow.get("2020-01-04T00:00:00Z").timestamp()),
             direction="IN",
             tx_ledger_type="Coinbase.Sell",
