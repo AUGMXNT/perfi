@@ -157,7 +157,6 @@ def update_assets_from_txchain():
             logger.debug(f"{chain}:{symbol} - {len(results)}")
 
     # Extra Fixups
-    print("Extra Fixups...")
     fixups_sql = """
         -- VAULTS
         -- Yield Yak Vault

@@ -687,6 +687,7 @@ class CostbasisLot(BaseModel):
     flags: List[Flag] = []
     receipt: int
     price_source: str
+    chain: str
 
 
 class CostbasisDisposal(BaseModel):

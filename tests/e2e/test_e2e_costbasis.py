@@ -61,7 +61,8 @@ def get_costbasis_lots(test_db, entity, address):
                  timestamp,
                  history,
                  receipt,
-                 price_source
+                 price_source,
+                 chain
              FROM costbasis_lot
              WHERE entity = ?
              AND address = ?

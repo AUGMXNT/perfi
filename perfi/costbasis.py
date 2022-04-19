@@ -59,23 +59,6 @@ def round_to_zero(number):
         return Decimal(number)
 
 
-# Asset
-def get_asset_price_record(asset_tx_id=None):
-    if asset_tx_id is None:
-        raise Exception("You must provide an asset_tx_id to get a tx_price_id for")
-    sql = """SELECT p.id, p.source, p.symbol, p.name, p.raw_data
-             FROM asset_price p
-             JOIN asset_tx a on a.asset_price_id = p.id
-             WHERE a.id = ?
-          """
-    params = [asset_tx_id]
-    results = db.query(sql, params)
-    if len(results) > 0:
-        return AssetPrice(**results[0])
-    else:
-        return None
-
-
 def regenerate_costbasis_lots(entity, args=None, quiet=False):
     if args and args.debugtx:
         # TODO - it may be worth not tearing down CostbasisGenerator for perf reasons, then can assign this to generator
@@ -214,10 +197,11 @@ def save_costbasis_lot(lot: CostbasisLot):
               history,
               flags,
               receipt,
-              price_source
+              price_source,
+              chain
              )
              VALUES
-             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            """
 
     if round_to_zero(lot.original_amount) == 0:
@@ -239,6 +223,7 @@ def save_costbasis_lot(lot: CostbasisLot):
         jsonpickle.encode(lot.flags),
         lot.receipt,
         lot.price_source,
+        lot.chain,
     ]
     db.execute(sql, params)
 
@@ -292,35 +277,6 @@ def update_costbasis_lot_current_amount(tx_ledger_id, new_amount_remaining):
           """
     params = [round_to_zero(new_amount_remaining), tx_ledger_id]
     db.execute(sql, params)
-
-
-# CostbasisLot
-def get_costbasis_lot_by_tx_ledger_id(tx_ledger_id):
-    sql = """SELECT
-                 tx_ledger_id,
-                 entity,
-                 address,
-                 asset_price_id,
-                 asset_tx_id,
-                 original_amount,
-                 current_amount,
-                 price_usd,
-                 basis_usd,
-                 timestamp,
-                 history,
-                 flags,
-                 price_source
-             FROM costbasis_lot
-             WHERE tx_ledger_id = ?
-             AND current_amount > 0
-             ORDER BY price_usd DESC
-          """
-    params = [tx_ledger_id]
-    result = db.query(sql, params)
-    lot = CostbasisLot(*result[0])
-    lot._replace(history=jsonpickle.decode(lot.history))
-    lot._replace(flags=jsonpickle.decode(lot.flags))
-    return lot
 
 
 def get_url(chain, tx_hash):
@@ -732,6 +688,7 @@ class CostbasisGenerator:
             flags=flags,
             receipt=0,
             price_source=sale_price_source,
+            chain=t.chain,
         )
         save_costbasis_lot(lot)
         replace_flags(type(lot).__name__, lot.tx_ledger_id, flags)
@@ -1184,7 +1141,7 @@ class CostbasisGenerator:
             self.create_costbasis_lot(tin, sale_price, sale_price_source)
 
     def create_costbasis_lot(
-        self, t, price, price_source, receipt=False, history=[], flags=[]
+        self, t: TxLedger, price, price_source, receipt=False, history=[], flags=[]
     ):
         asset_price_id = None
         """
@@ -1217,6 +1174,7 @@ class CostbasisGenerator:
             history=history,
             receipt=receipt,
             price_source=price_source,
+            chain=t.chain,
         )
         save_costbasis_lot(lot)
         replace_flags(type(lot).__name__, lot.tx_ledger_id, flags)
@@ -1702,6 +1660,7 @@ class LotMatcher:
     def get_lots(self, tx, algorithm="hifo"):
         asset_price_id = tx.asset_price_id
         asset_tx_id = tx.asset_tx_id
+        chain = tx.chain
 
         # Try to match mapped lots...
         mapped_asset = price_feed.map_asset(tx.chain, tx.asset_tx_id)
@@ -1726,7 +1685,8 @@ class LotMatcher:
                      timestamp,
                      history,
                      receipt,
-                     price_source
+                     price_source,
+                     chain
                  FROM costbasis_lot
                  WHERE
                  address IN (
@@ -1743,6 +1703,7 @@ class LotMatcher:
                  timestamp <= ?
                  {'AND asset_price_id = ?' if asset_price_id else ''}
                  {'AND asset_tx_id = ?' if not asset_price_id else ''}
+                 {'AND chain = ?' if not asset_price_id else ''}
                  AND current_amount > {CLOSE_TO_ZERO:.18f}
         """
         if algorithm == "hifo":
@@ -1759,6 +1720,7 @@ class LotMatcher:
             params.append(asset_price_id)
         else:
             params.append(asset_tx_id)
+            params.append(chain)
         results = db.query(sql, params)
         available_lots = []
 
@@ -2108,7 +2070,8 @@ class Form8949:
                     cl.receipt,
                     tx.chain,
                     cl.price_source,
-                    cl.tx_ledger_id
+                    cl.tx_ledger_id,
+                    cl.chain
                  FROM costbasis_lot cl
                  join tx_ledger tx on tx.id = cl.tx_ledger_id
                  WHERE cl.entity = ?
@@ -2133,6 +2096,7 @@ class Form8949:
         ws.set_column("M:M", 12)
         ws.set_column("N:N", 60)
         ws.set_column("O:O", 40)  # price source
+        ws.set_column("P:P", 30)  # chain
 
         ws.write_row(
             0,
@@ -2153,6 +2117,7 @@ class Form8949:
                 "chain",
                 "tx_hash",
                 "price_source",
+                "chain",
             ],
             self.header_format,
         )
@@ -2215,6 +2180,7 @@ class Form8949:
                 ws.write(i, 12, chain, self.default_format_grey)
                 ws.write_url(i, 13, url, self.default_format_grey, tx_hash)
                 ws.write(i, 14, price_source, self.default_format_grey)
+                ws.write(i, 15, chain, self.default_format_grey)
             else:
                 ws.write(i, 0, date, self.default_format)
                 ws.write(i, 1, address, self.default_format)
@@ -2231,6 +2197,7 @@ class Form8949:
                 ws.write(i, 12, chain, self.default_format)
                 ws.write_url(i, 13, url, self.default_format, tx_hash)
                 ws.write(i, 14, price_source, self.default_format_grey)
+                ws.write(i, 15, chain, self.default_format_grey)
 
             i += 1
 

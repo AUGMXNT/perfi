@@ -170,6 +170,7 @@ CREATE TABLE IF NOT EXISTS "costbasis_lot" (
 	"address"	TEXT,
 	"asset_price_id"	TEXT,
 	"symbol"	TEXT,
+    "chain"	text,
 	"asset_tx_id"	text,
 	"original_amount"	DECIMAL,
 	"current_amount"	DECIMAL,
@@ -210,6 +211,7 @@ CREATE INDEX IF NOT EXISTS "idx_address_entity_id" ON "address" (
 );
 CREATE INDEX IF NOT EXISTS "idx_lotmatcher" ON "costbasis_lot" (
 	"asset_price_id",
+    "chain",
 	"asset_tx_id",
 	"timestamp",
 	"address",

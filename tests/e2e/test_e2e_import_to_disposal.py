@@ -7,7 +7,7 @@ from pprint import pprint
 import arrow
 from pytest import approx
 
-from e2e.test_e2e_costbasis import get_costbasis_lots
+from tests.e2e.test_e2e_costbasis import get_costbasis_lots
 from perfi.ingest.exchange import (
     CoinbaseProImporter,
     BROKEN_CoinbaseProAccountStatementImporter,
