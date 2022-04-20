@@ -1726,7 +1726,6 @@ class LotMatcher:
                  {'AND asset_price_id = ?' if asset_price_id else ''}
                  {'AND asset_tx_id = ?' if not asset_price_id else ''}
                  {'AND chain = ?' if not asset_price_id else ''}
-                 AND current_amount > {CLOSE_TO_ZERO:.18f}
         """
         if algorithm == "hifo":
             sql += "ORDER BY price_usd DESC, timestamp ASC"
@@ -1751,7 +1750,9 @@ class LotMatcher:
             r["history"] = jsonpickle.decode(r["history"])
             flags = load_flags(CostbasisLot.__name__, r["tx_ledger_id"])
             lot = CostbasisLot(flags=flags, **r)
-            available_lots.append(lot)
+            # We check the lot.current_amount > 0 here (and not in SQL) because we want to deal with Decimals not floats
+            if lot.current_amount > CLOSE_TO_ZERO:
+                available_lots.append(lot)
         return available_lots
 
 
