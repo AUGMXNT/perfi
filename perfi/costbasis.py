@@ -1,7 +1,7 @@
 from devtools import debug
 
 from .db import db
-from .constants import assets
+from .constants import assets, paths
 from .models import (
     TxLogical,
     TxLedger,
@@ -23,6 +23,7 @@ from decimal import Decimal
 
 import jsonpickle
 import logging
+from pathlib import Path
 from pprint import pprint, pformat
 import sys
 from tqdm import tqdm
@@ -57,6 +58,15 @@ def round_to_zero(number):
         return Decimal(0)
     else:
         return Decimal(number)
+
+
+def get_active_branch_name():
+    head_dir = Path(paths.ROOT) / ".git" / "HEAD"
+    with head_dir.open("r") as f:
+        content = f.read().splitlines()
+    for line in content:
+        if line[0:4] == "ref:":
+            return line.partition("refs/heads/")[2]
 
 
 def regenerate_costbasis_lots(entity, args=None, quiet=False):
@@ -1741,7 +1751,9 @@ class Form8949:
         if args and args.output:
             self.filename = args.output
         else:
-            self.filename = f"{self.entity}-8949.xlsx"
+            self.filename = (
+                f"{self.entity}-8949-{get_active_branch_name().lower()}.xlsx"
+            )
 
         print(f"Saving File: {self.filename}")
         self.wb = xlsxwriter.Workbook(self.filename)
