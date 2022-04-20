@@ -3,6 +3,9 @@
 *.db
 XX*
 
+# This is auto-generated
+perfi/constants/assets.py
+
 .DS_Store
 
 .idea/*
