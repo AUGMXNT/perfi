@@ -1480,6 +1480,12 @@ class CostbasisGenerator:
                 # We're done here
                 break
 
+    def update_tx_ledger_price(self, tx: TxLedger, price: Decimal, price_source: str):
+        event = event_store.create_tx_ledger_price_updated(
+            tx.id, Decimal(price), price_source
+        )
+        return event_store.apply_event(event)
+
     """
     symbol_feedback needs to be used carefully, but will ask the costbasis_asset_mapper to be more aggressive
     """
@@ -1498,12 +1504,14 @@ class CostbasisGenerator:
         # 0. FIXED PRICE OVERRIDE - mostly for worthless tokens
         tx_key = f"{tx.chain}:{tx.asset_tx_id}"
         if tx_key in assets.FIXED_PRICE_TOKENS:
-            coin_price = Decimal(assets.FIXED_PRICE_TOKENS[tx_key])
-            return (coin_price, "fixed_price")
+            price = Decimal(assets.FIXED_PRICE_TOKENS[tx_key])
+            price_source = "fixed_price"
+            self.update_tx_ledger_price(tx, price, price_source)
+            return price, price_source
 
         # 1.  If we have a price_usd on the tx_ledger, return that
         if tx.price_usd is not None:
-            return (Decimal(tx.price_usd), "tx_ledger")
+            return Decimal(tx.price_usd), "tx_ledger"
 
         # 2. Try to get the price from our mapped assets
         # tx_ledgers[] have chain, not tx_logical
@@ -1512,20 +1520,22 @@ class CostbasisGenerator:
             costbasis_asset_price_id = mapped_asset["asset_price_id"]  # type: ignore
             coin_price = price_feed.get(costbasis_asset_price_id, tx.timestamp)
             if coin_price:
-                return (
-                    Decimal(coin_price.price),
-                    f"map asset {tx.asset_tx_id} to {costbasis_asset_price_id}",
+                price = Decimal(coin_price.price)
+                price_source = (
+                    f"map asset {tx.asset_tx_id} to {costbasis_asset_price_id}"
                 )
+                self.update_tx_ledger_price(tx, price, price_source)
+                return price, price_source
 
         # 3. Try to get a price from the asset_tx_id's corresponding asset_price_id, if it has one
         coin_price = price_feed.get_by_asset_tx_id(
             tx.chain, tx.asset_tx_id, tx.timestamp
         )
         if coin_price:
-            return (
-                Decimal(coin_price.price),
-                f"{tx.asset_tx_id} uses {coin_price.coin_id}",
-            )
+            price = Decimal(coin_price.price)
+            price_source = f"{tx.asset_tx_id} uses {coin_price.coin_id}"
+            self.update_tx_ledger_price(tx, price, price_source)
+            return price, price_source
 
         out_tx = None
         in_tx = None
@@ -1538,10 +1548,12 @@ class CostbasisGenerator:
             costbasis_asset_price_id = mapped_asset["asset_price_id"]  # type: ignore
             coin_price = price_feed.get(costbasis_asset_price_id, tx.timestamp)
             if coin_price:
-                return (
-                    Decimal(coin_price.price),
-                    f"mapped symbol {mapped_asset['symbol']} to {coin_price.coin_id}",
+                price = Decimal(coin_price.price)
+                price_source = (
+                    f"mapped symbol {mapped_asset['symbol']} to {coin_price.coin_id}"
                 )
+                self.update_tx_ledger_price(tx, price, price_source)
+                return price, price_source
 
         # 5. If this tx's logical type makes sense to allow deriving price from the corresponding out value (e.g. swap), do that
         if DEBUG_BREAK:
@@ -1568,8 +1580,10 @@ class CostbasisGenerator:
             if coin_price:
                 out_price, _ = (Decimal(coin_price.price), coin_price.source)
                 price = (Decimal(out_tx.amount) * out_price) / Decimal(in_tx.amount)
+                price_source = f"derivied:out - {coin_price.coin_id}"
+                self.update_tx_ledger_price(tx, price, price_source)
                 # LATER account for fees
-                return price, f"derivied:out - {coin_price.coin_id}"
+                return price, price_source
 
             # If we're still here, we should try the IN before giving up
             coin_price = price_feed.get_by_asset_tx_id(
@@ -1578,26 +1592,40 @@ class CostbasisGenerator:
             if coin_price:
                 in_price, _ = (Decimal(coin_price.price), coin_price.source)
                 price = (Decimal(in_tx.amount) * in_price) / Decimal(out_tx.amount)
+                price_source = f"derived:in - {coin_price.coin_id}"
+                self.update_tx_ledger_price(tx, price, price_source)
                 # LATER account for fees
-                return price, f"derived:in - {coin_price.coin_id}"
+                return price, price_source
 
             # If we get this far, we couldn't find a price for either side of the swap
-            return 0, "swap - price_unknown"
+            price = Decimal(0)
+            price_source = "swap - price_unknown"
+            self.update_tx_ledger_price(tx, price, price_source)
+            return price, price_source
 
         # 6. tx_logical_type case handling
 
         # borrow - still here?
         elif self.tx_logical.tx_logical_type == "borrow":
-            return 0, "borrow_receipt"
+            price = Decimal(0)
+            price_source = "borrow_receipt"
+            self.update_tx_ledger_price(tx, price, price_source)
+            return price, price_source
 
         # repay - this should have 2 outs
         elif self.tx_logical.tx_logical_type == "repay":
-            return 0, "repay_receipt"
+            price = Decimal(0)
+            price_source = "repay_receipt"
+            self.update_tx_ledger_price(tx, price, price_source)
+            return price, price_source
 
         # withdraw - there can be two outs...
         elif self.tx_logical.tx_logical_type == "withdraw":
             # XXX LATER: for something like TOMB, 1 of these TSHARES might be a disposal!
-            return 0, "withdraw_receipt"
+            price = Decimal(0)
+            price_source = "withdraw_receipt"
+            self.update_tx_ledger_price(tx, price, price_source)
+            return price, price_source
 
         # lp - enter should have 2+ outs, in should have 2+ ins
         elif self.tx_logical.tx_logical_type == "lp":
@@ -1649,14 +1677,12 @@ class CostbasisGenerator:
 
             if price_accum:
                 price = price_accum / Decimal(lp_amount)
+                price_source = "derived via LP"
                 # Only when we enter an lp do we want to update the price
                 if is_lp_entry:
-                    event = event_store.create_tx_ledger_price_updated(
-                        lp_txle.id, Decimal(price), "derived via LP entry"
-                    )
-                    event_store.apply_event(event)
+                    self.update_tx_ledger_price(lp_txle, price, price_source)
 
-                return price, "lp_derived"
+                return price, price_source
             else:
                 # In the case that we can't get coin_prices for the LP exchange assets, we should
                 # TODO: We should flag properly if price_unknown
