@@ -15,7 +15,6 @@ import jsonpickle
 from devtools import debug
 from pydantic import BaseModel
 
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
@@ -148,6 +147,7 @@ class TxLedger(BaseModel):
     asset_price_id: Optional[str] = None
     symbol: Optional[str] = None
     price_usd: Optional[Decimal] = None
+    price_source: Optional[str] = None
 
     def __eq__(self, other):
         if not isinstance(other, TxLedger):
@@ -215,19 +215,6 @@ class TxLedger(BaseModel):
 
     def auto_description(self):
         return f"{self.amount} {self.symbol}"
-
-    def save_price(self, price_usd):
-        self.price_usd = price_usd
-        """
-        LATER: we should create a tx_ledger_event table
-        and apply price updates in the same way so they can be replayed, store source etc
-        """
-        sql = """UPDATE tx_ledger
-                 SET price_usd = ?
-                 WHERE id = ?
-              """
-        params = [float(price_usd), self.id]
-        db.execute(sql, params)
 
 
 class TxLogical(BaseModel):
@@ -873,9 +860,9 @@ class TxLedgerStore:
 
     def save(self, tx: TxLedger):
         sql = """REPLACE INTO tx_ledger
-             (id, chain, address, hash, from_address, to_address, from_address_name, to_address_name, asset_tx_id, isfee, amount, timestamp, direction, tx_ledger_type, asset_price_id, symbol, price_usd)
+             (id, chain, address, hash, from_address, to_address, from_address_name, to_address_name, asset_tx_id, isfee, amount, timestamp, direction, tx_ledger_type, asset_price_id, symbol, price_usd, price_source)
              VALUES
-             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           """
         params = [
             tx.id,
@@ -895,6 +882,7 @@ class TxLedgerStore:
             tx.asset_price_id,
             tx.symbol,
             tx.price_usd,
+            tx.price_source,
         ]
         self.db.execute(sql, params)
         return tx

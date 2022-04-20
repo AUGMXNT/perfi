@@ -216,7 +216,7 @@ def ledger_update_ledger_type(
 @ledger_app.command("update_price")
 def ledger_update_price(entity_name: str, tx_ledger_id: str, new_price_usd: float):
     event = event_store.create_tx_ledger_price_updated(
-        tx_ledger_id, new_price_usd, source="manual"
+        tx_ledger_id, Decimal(new_price_usd), "manual update", source="manual"
     )
     event_store.apply_event(event)
     print(f"Updated tx_ledger {tx_ledger_id} - set price to {new_price_usd}")

@@ -1,4 +1,7 @@
-from .models import TxLedger, TxLogical, Flag, replace_flags
+from decimal import Decimal
+
+from .models import Flag, replace_flags
+from perfi.ingest.chain import MyEncoder
 
 from copy import copy
 from dataclasses import dataclass
@@ -8,6 +11,12 @@ import json
 import jsonpickle
 import time
 import uuid
+
+
+def dump_json(obj):
+    return json.dumps(
+        obj, cls=MyEncoder, indent=4, sort_keys=True, ensure_ascii=False
+    ).encode("utf8")
 
 
 class EVENT_ACTION(Enum):
@@ -28,10 +37,10 @@ class Event:
 
 
 class EventStore:
-    def __init__(self, db, TxLogical, TxLedger):
+    def __init__(self, db, tx_logical_class, tx_ledger_class):
         self.db = db
-        self.TxLogical = TxLogical
-        self.TxLedger = TxLedger
+        self.TxLogical = tx_logical_class
+        self.TxLedger = tx_ledger_class
 
     def new_id(self):
         return str(uuid.uuid4())
@@ -103,11 +112,11 @@ class EventStore:
             id,
             source,
             action.value,
-            json.dumps(data),
+            dump_json(data),
             timestamp,
         ]
         self.db.execute(sql, params)
-        TxLogical.from_id.cache_clear()
+        self.TxLogical.from_id.cache_clear()
         return Event(id, source, action, data, timestamp)
 
     def create_tx_ledger_type_updated(
@@ -134,11 +143,11 @@ class EventStore:
             id,
             source,
             action.value,
-            json.dumps(data),
+            dump_json(data),
             timestamp,
         ]
         self.db.execute(sql, params)
-        TxLogical.from_id.cache_clear()
+        self.TxLogical.from_id.cache_clear()
         return Event(id, source, action, data, timestamp)
 
     def create_tx_ledger_moved(
@@ -170,15 +179,19 @@ class EventStore:
             id,
             source,
             action.value,
-            json.dumps(data),
+            dump_json(data),
             timestamp,
         ]
         self.db.execute(sql, params)
-        TxLogical.from_id.cache_clear()
+        self.TxLogical.from_id.cache_clear()
         return Event(id, source, action, data, timestamp)
 
     def create_tx_ledger_price_updated(
-        self, tx_ledger_id: str, new_price_usd: float, source: str = "perfi"
+        self,
+        tx_ledger_id: str,
+        new_price_usd: Decimal,
+        new_price_source: str,
+        source: str = "perfi",
     ):
         id = self.new_id()
         source = source
@@ -187,6 +200,7 @@ class EventStore:
             "version": 1,
             "tx_ledger_id": tx_ledger_id,
             "price_usd_new": new_price_usd,
+            "price_source_new": new_price_source,
         }
         timestamp = int(time.time())
         sql = """INSERT INTO event
@@ -198,11 +212,11 @@ class EventStore:
             id,
             source,
             action.value,
-            json.dumps(data),
+            dump_json(data),
             timestamp,
         ]
         self.db.execute(sql, params)
-        TxLogical.from_id.cache_clear()
+        self.TxLogical.from_id.cache_clear()
         return Event(id, source, action, data, timestamp)
 
     # TODO refactor type signature to use TX_LOGICAL_FLAG for flag param after we move TX_LOGICAL_FLAG to its own module to avoid circular imports
@@ -227,11 +241,11 @@ class EventStore:
             id,
             source,
             action.value,
-            json.dumps(data),
+            dump_json(data),
             timestamp,
         ]
         self.db.execute(sql, params)
-        TxLogical.from_id.cache_clear()
+        self.TxLogical.from_id.cache_clear()
         return Event(id, source, action, data, timestamp)
 
     def handle_tx_ledger_moved_event(self, event: Event):
@@ -259,7 +273,7 @@ class EventStore:
               """
             params = [id, id]
             self.db.execute(sql, params)
-        TxLogical.from_id.cache_clear()
+        self.TxLogical.from_id.cache_clear()
 
     def handle_tx_ledger_type_updated_event(self, event: Event):
         tx = self.TxLedger.get(event.data["tx_ledger_id"])
@@ -268,7 +282,7 @@ class EventStore:
         sql = """UPDATE tx_ledger SET tx_ledger_type = ? where id = ?"""
         params = [event.data["tx_ledger_type_new"], event.data["tx_ledger_id"]]
         self.db.execute(sql, params)
-        TxLogical.from_id.cache_clear()
+        self.TxLogical.from_id.cache_clear()
 
     def handle_tx_logical_type_updated_event(self, event: Event):
         tx = self.TxLogical.from_id(event.data["tx_logical_id"])
@@ -277,20 +291,26 @@ class EventStore:
         sql = """UPDATE tx_logical SET tx_logical_type = ? where id = ?"""
         params = [event.data["tx_logical_type_new"], event.data["tx_logical_id"]]
         self.db.execute(sql, params)
-        TxLogical.from_id.cache_clear()
+        self.TxLogical.from_id.cache_clear()
 
     def handle_tx_ledger_price_updated_event(self, event: Event):
         tx = self.TxLedger.get(event.data["tx_ledger_id"])
         updated_tx = copy(tx)
-        updated_tx.price_usd = event.data["price_usd_new"]
-        sql = """UPDATE tx_ledger SET price_usd = ? where id = ?"""
-        params = [event.data["price_usd_new"], event.data["tx_ledger_id"]]
+        updated_tx.price_usd = Decimal(event.data["price_usd_new"])
+        updated_tx.price_source = event.data["price_source_new"]
+        sql = """UPDATE tx_ledger SET price_usd = ?, price_source = ? WHERE id = ?"""
+        params = [
+            event.data["price_usd_new"],
+            event.data["price_source_new"],
+            event.data["tx_ledger_id"],
+        ]
         self.db.execute(sql, params)
-        TxLogical.from_id.cache_clear()
+        self.TxLogical.from_id.cache_clear()
+        return updated_tx
 
     def handle_tx_logical_flag_added_event(self, event: Event):
-        tx: TxLogical = self.TxLogical.from_id(event.data["tx_logical_id"])
+        tx = self.TxLogical.from_id(event.data["tx_logical_id"])
         new_flag = Flag(source="manual", name=event.data["flag_value"])
         updated_flags = tx.flags + [new_flag]
-        replace_flags(TxLogical.__name__, tx.id, updated_flags)
-        TxLogical.from_id.cache_clear()
+        replace_flags(self.TxLogical.__name__, tx.id, updated_flags)
+        self.TxLogical.from_id.cache_clear()

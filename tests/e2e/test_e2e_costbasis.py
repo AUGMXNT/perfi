@@ -626,7 +626,7 @@ class TestCostbasisPrice:
         tx_ledgers = get_tx_ledgers(test_db, chain, address)
         tx = tx_ledgers[0]
         event = event_store.create_tx_ledger_price_updated(
-            tx.id, 20.00, source="manual"
+            tx.id, Decimal(20.00), "manual update", source="manual"
         )
         event_store.apply_event(event)
 
@@ -636,7 +636,7 @@ class TestCostbasisPrice:
         assert tx.asset_tx_id == "avax"
         assert tx.amount == 1
         event = event_store.create_tx_ledger_price_updated(
-            tx.id, 10.00, source="manual"
+            tx.id, Decimal(10.00), "manual update", source="manual"
         )
         event_store.apply_event(event)
 

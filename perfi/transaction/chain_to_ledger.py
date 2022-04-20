@@ -242,6 +242,7 @@ class LedgerTx:
         self.asset_price_id = None
         self.symbol = None
         self.price = None
+        self.price_source = None
         self.debank_name = None
 
         self.TxTyper = TxTyper()
@@ -474,14 +475,19 @@ class LedgerTx:
             return
 
         asset_map = price_feed.map_asset(self.chain, self.asset_tx_id)
+        mapped = ""
         if asset_map:
             # Don't override existing symbol...
             if not self.symbol:
                 self.symbol = asset_map["symbol"]
+                mapped = "mapped "
             self.asset_price_id = asset_map["asset_price_id"]
             coin_price = price_feed.get(self.asset_price_id, self.timestamp)
             if coin_price:
                 self.price = coin_price.price
+                self.price_source = (
+                    f"priced via {mapped}symbol {self.symbol} on ingest from chain"
+                )
 
     def as_tx_ledger(self):
         args = dict(
@@ -502,6 +508,7 @@ class LedgerTx:
             asset_price_id=self.asset_price_id,
             symbol=self.symbol,
             price_usd=self.price,
+            price_source=self.price_source,
         )
         return TxLedger(**args)
 

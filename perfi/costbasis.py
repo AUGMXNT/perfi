@@ -1,7 +1,10 @@
+from typing import Optional
+
 from devtools import debug
 
 from .db import db
 from .constants import assets, paths
+from .events import EventStore
 from .models import (
     TxLogical,
     TxLedger,
@@ -38,6 +41,9 @@ REPORTING_TIMEZONE = (
 )
 
 logger = logging.getLogger(__name__)
+
+event_store = EventStore(db, TxLogical, TxLedger)
+
 
 DEBUG = False
 DEBUG_TXID = None
@@ -1595,7 +1601,7 @@ class CostbasisGenerator:
 
         # lp - enter should have 2+ outs, in should have 2+ ins
         elif self.tx_logical.tx_logical_type == "lp":
-            lp_txle = None
+            lp_txle: Optional[TxLedger] = None
             assets_to_price = []
             lp_amount = 0
             # LP Entry
@@ -1616,7 +1622,7 @@ class CostbasisGenerator:
             # We should only do this derivation if we are looking at the actual LP token tx_ledgers
             if not lp_txle:
                 logger.error("Couldn't find LP TxLedger?")
-                logger.error(t)
+                logger.error(tx)
                 return 0, "lp - couldnt find lp tx"
 
             # Otherwise we are going to end up assigning the LP price to the wrong token!
@@ -1645,7 +1651,10 @@ class CostbasisGenerator:
                 price = price_accum / Decimal(lp_amount)
                 # Only when we enter an lp do we want to update the price
                 if is_lp_entry:
-                    lp_txle.save_price(price)
+                    event = event_store.create_tx_ledger_price_updated(
+                        lp_txle.id, Decimal(price), "derived via LP entry"
+                    )
+                    event_store.apply_event(event)
 
                 return price, "lp_derived"
             else:
@@ -2277,6 +2286,7 @@ class Form8949:
                 "Hash",
                 "tx_ledger.id",
                 "flags",
+                "Price Source",
             ],
             self.header_format,
         )
@@ -2294,6 +2304,7 @@ class Form8949:
         ws.set_column("N:N", 38)
         ws.set_column("O:P", 60)
         ws.set_column("Q:Q", 40)
+        ws.set_column("R:R", 20)  # price_source
 
         i = 1
         for txlog in tqdm(results, desc="Logical TXs", disable=None):
@@ -2312,7 +2323,8 @@ class Form8949:
                             tx_ledger_type,
                             asset_price_id,
                             symbol,
-                            price_usd
+                            price_usd,
+                            price_source
                      FROM tx_ledger txle
                      JOIN tx_rel_ledger_logical as rel ON txle.id = rel.tx_ledger_id
                      WHERE rel.tx_logical_id = ?
@@ -2350,6 +2362,7 @@ class Form8949:
                     ", ".join([f.name for f in tx_log_flags]),
                     self.default_format,
                 )
+                ws.write(i, 17, txle["price_source"], self.default_format)
                 i += 1
             # Extra space between logical groups
             i += 1
