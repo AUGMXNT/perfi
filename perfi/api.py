@@ -1,8 +1,22 @@
 # Run this server like this: uvicorn api:app --reload
 import builtins
 import time
-
 import pytz
+import json
+
+from perfi.db import DB
+from perfi.models import TxLogical, TxLedger, AddressStore, Address, TxLogicalStore
+from starlette.middleware.sessions import SessionMiddleware
+from typing import List, Dict
+from fastapi import Cookie, Depends, FastAPI, responses, Response, status, Body, Request
+from siwe import siwe
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
+
+from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
+
+from bin.update_coingecko_pricelist import main as update_coingecko_pricelist_main
 
 from bin.cli import (
     ledger_update_logical_type,
@@ -36,18 +50,11 @@ from perfi.models import (
     TX_LOGICAL_FLAG,
 )
 from typing import List, Dict, Type
-
-from fastapi import Depends, FastAPI, Response, HTTPException, Request, UploadFile
-from pydantic import BaseModel
-from typing import Optional
-
-from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
-
-from bin.update_coingecko_pricelist import main as update_coingecko_pricelist_main
-
 """
 -------------------------
 TODOs
+[] CRUD Addresses
+[] List TxLogicals
 [] All the commands from cli_cmd
 [] Trigger a full processing all the way through costbasis-8949
 
@@ -96,11 +103,11 @@ def stores():
 class TxLogicalOut(BaseModel):
     id: str
     count: int = -1
-    description: str = ""
-    note: str = ""
+    description: Optional[str] = ""
+    note: Optional[str] = ""
     timestamp: int = -1
     address: str = ""
-    tx_logical_type: str = ""  # replace with enum?
+    tx_logical_type: Optional[str] = ""  # replace with enum?
     flags: List[Dict[str, str]] = []
     ins: List[TxLedger] = []
     outs: List[TxLedger] = []
@@ -126,6 +133,24 @@ class EnsureRecord:
 
 
 app = FastAPI()
+
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    "http://localhost:3001",
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key="change_me",  # pragma: allowlist secret
+)
 
 
 @app.get("/")
@@ -245,11 +270,22 @@ def get_settings_keys_used_list():
 # TX LOGICALS =================================================================================
 
 # List TxLogicals
-@app.get("/tx_logicals/", response_model=List[TxLogicalOut])
-def list_tx_logicals(store: TxLogicalStore = Depends(tx_logical_store)):
-    return store.list()
+@app.get("/tx_logicals/{entity_name}", response_model=List[TxLogicalOut])
+def list_tx_logicals(
+    entity_name: str,
+    page: Optional[int] = 0,
+    limit: Optional[int] = 100,
+    store: TxLogicalStore = Depends(tx_logical_store),
+):
+    return store.paginated_list(entity_name, items_per_page=limit, page_num=page)
 
 
+# Update Logical Type
+# Update Ledger Type
+# Update Ledger Price
+# Create Flag for Logical
+# Delete Flag for Logical
+# Move Ledger to new Logical
 @app.put(
     "/tx_logicals/{id}/tx_logical_type/{updated_type_name}", response_model=TxLogicalOut
 )

@@ -102,7 +102,7 @@ class DB:
 
 
 # Singleton for perfi db
-db = DB()
+db = DB(same_thread=False)
 db_is_empty = len(db.query("select * from sqlite_master")) == 0
 if db_is_empty:
     db.create_db(DB_SCHEMA_PATH)

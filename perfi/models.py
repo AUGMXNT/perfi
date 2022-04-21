@@ -898,16 +898,66 @@ class TxLogicalStore(BaseStore[TxLogical]):
         super().__init__(db, "tx_logical", TxLogical)
         super()._add_param_mapping("tx_logical_type", lambda c: c.value)
 
+    def paginated_list(
+        self,
+        entity_name: str,
+        items_per_page: int = 100,
+        page_num=0,
+        direction: str = "DESC",
+    ):
+        sql = f"""
+            SELECT id
+            FROM tx_logical
+             WHERE address IN (
+                 SELECT address
+                 FROM address, entity
+                 WHERE entity_id = entity.id
+                 AND entity.name = ?
+             )
+            AND count > 0
+            ORDER BY timestamp { "DESC" if direction == "DESC" else "ASC" }
+            LIMIT ? OFFSET ?
+        """
+        params = [entity_name, items_per_page, page_num * items_per_page]
+        tx_logicals: List[TxLogical] = []
+        for row in self.db.query(sql, params):
+            txl = TxLogical.from_id(
+                row["id"]
+            )  # this is some sad n+1 querying but whatever
+            tx_logicals.append(txl)
+        return tx_logicals
+
     def find_by_primary_key(self, key):
         sql = """SELECT id from tx_logical WHERE id = ? ORDER BY timestamp ASC"""
         params = [key]
         results = self.db.query(sql, params)
         return [TxLogical.from_id(r["id"]) for r in results]
 
-    def list(self, order_by="timestamp ASC"):
+    def list(self):
         sql = """SELECT id from tx_logical ORDER BY timestamp ASC"""
         tx_logicals: List[TxLogical] = []
-        for row in self.db.query(sql):
+        for row in self.db.query(sql, params):
+            txl = TxLogical.from_id(
+                row["id"]
+            )  # this is some sad n+1 querying but whatever
+            tx_logicals.append(txl)
+        return tx_logicals
+
+    def list(self, entity_name: str):
+        sql = """
+            SELECT id
+            FROM tx_logical
+             WHERE address IN (
+                 SELECT address
+                     FROM address, entity
+                     WHERE entity_id = entity.id
+                     AND entity.name = ?
+             )
+
+            ORDER BY timestamp ASC
+        """
+        tx_logicals: List[TxLogical] = []
+        for row in self.db.query(sql, entity_name):
             txl = TxLogical.from_id(row["id"])
             tx_logicals.append(txl)
         return tx_logicals

@@ -1628,7 +1628,7 @@ class CostbasisGenerator:
             # We should only do this derivation if we are looking at the actual LP token tx_ledgers
             if not lp_txle:
                 logger.error("Couldn't find LP TxLedger?")
-                logger.error(t)
+                logger.error(tx)
                 return 0, "lp - couldnt find lp tx"
 
             # Otherwise we are going to end up assigning the LP price to the wrong token!
