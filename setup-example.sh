@@ -6,11 +6,15 @@ pr="poetry run python"
 
 # This is an example script that you can modify to do your initial setup
 
+# Clear any existing DB atm (entity create and add_address are not idempotent)
+# We leave the cache.db alone
+rm data/perfi.db
+
 # Add your entity
 $pr bin/cli.py entity create peepo
 
 # Add your address(es)
-$pr python bin/cli.py entity add_address peepo 'degen wallet' 'ethereum' '0x000...'
+$pr bin/cli.py entity add_address peepo 'degen wallet' 'ethereum' '0x000...'
 
 # Update Coingecko token list
 $pr bin/update_coingecko_pricelist.py
