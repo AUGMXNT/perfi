@@ -4,6 +4,8 @@ from decimal import Decimal
 from enum import Enum
 import json
 import logging
+
+import coinaddrvalidator
 from devtools import debug
 from rich.console import Console
 import sys
@@ -31,6 +33,7 @@ from perfi.models import (
     TX_LOGICAL_TYPE,
     AddressStore,
     EntityStore,
+    RecordNotFoundException,
 )
 from perfi.db import db
 
@@ -92,16 +95,39 @@ entity_app = typer.Typer()
 
 @entity_app.command("create")
 def entity_create(name: str):
-    entity = entity_store.create(name=name)
-    print(f"Created entity {entity}")
+    try:
+        entity_store.get_by_name(name=name)
+        print(
+            f"ERROR: Failed to create entity. An entity with name {name} already exists."
+        )
+        return
+    except RecordNotFoundException as err:
+        entity = entity_store.create(name=name)
+        print(f"Created entity {entity}")
 
 
 @entity_app.command("add_address")
 def entity_add_address(entity_name: str, label: str, chain: Chain, address: str):
-    address = address_store.create(
-        entity_name=entity_name, label=label, chain=chain, address=address
-    )
-    print(f"Created address {address}")
+    try:
+        result = address_store.get_by_chain_and_address(
+            chain=chain.value, address=address
+        )
+        print(
+            f"ERROR: Failed to create address. An address with chain {chain.value} and address {address} already exists: {dict(**result)}"
+        )
+        return
+    except RecordNotFoundException as err:
+        validation_result = coinaddrvalidator.validate("eth", address)
+        if not validation_result.valid:
+            print(
+                f"ERROR: Failed to create address. Address {address} doesn't look valid for chain {chain.value}"
+            )
+            return
+
+        address = address_store.create(
+            entity_name=entity_name, label=label, chain=chain, address=address
+        )
+        print(f"Created address {address}")
 
 
 # Setting

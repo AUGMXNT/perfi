@@ -720,6 +720,10 @@ class CostbasisIncome(BaseModel):
     lots: list
 
 
+class RecordNotFoundException(Exception):
+    pass
+
+
 class EntityStore:
     def __init__(self, db):
         self.db = db
@@ -732,6 +736,15 @@ class EntityStore:
         # LATER do we want to allow creating of any addresses inside the passed <entity>?
         entity.id = db.cur.lastrowid
         return entity
+
+    def get_by_name(self, name: str):
+        sql = """SELECT * FROM entity WHERE name = ?"""
+        params = [name]
+        result = self.db.query(sql, params)
+        if len(result) == 1:
+            return result[0]
+        else:
+            raise RecordNotFoundException(f"No entity found matching name: {name}")
 
 
 class AddressStore:
@@ -774,6 +787,16 @@ class AddressStore:
         if not address.id:
             address.id = db.cur.lastrowid
         return address
+
+    def get_by_chain_and_address(self, chain, address):
+        sql = "SELECT * FROM address WHERE chain = ? and address = ?"
+        params = [chain, address]
+        result = self.db.query(sql, params)
+        if len(result) == 0:
+            raise RecordNotFoundException(
+                f"No address found with for chain `{chain}` and address `{address}`"
+            )
+        return result[0]
 
     # LATER: support accepting other attrs like type and source
     def create(
