@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS "tx_ledger" (
 	"price_usd"	DECIMAL,
 	"to_address_name"	text,
 	"from_address_name"	text,
+    "price_source"	text,
 	PRIMARY KEY("id")
 );
 CREATE TABLE IF NOT EXISTS "tx_logical" (

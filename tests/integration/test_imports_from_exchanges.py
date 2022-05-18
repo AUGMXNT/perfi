@@ -414,7 +414,7 @@ class TestCoinbaseImporter:
             to_address="Coinbase:SomeCoinbaseAccountId",
             asset_tx_id="FIAT:USD",
             symbol="USD",
-            amount=Decimal("838.049999999999999246"),  # rounding to 18 decimal places
+            amount=Decimal("838.0499999999999992"),  # rounding to 18 decimal places
             timestamp=int(arrow.get("2020-01-04T00:00:00Z").timestamp()),
             direction="IN",
             tx_ledger_type="Coinbase.Sell",

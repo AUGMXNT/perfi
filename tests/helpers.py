@@ -3,6 +3,7 @@ import json
 
 import arrow
 
+from bin.map_assets import generate_constants
 from perfi.ingest.chain import MyEncoder
 from perfi.asset import update_assets_from_txchain
 from perfi.price import CoinPrice, PriceFeed
@@ -230,3 +231,7 @@ class TxFactory:
 
 def update_all_chain_tx_asset_ids(test_db=None):
     update_assets_from_txchain()
+
+
+def generate_all_constants():
+    generate_constants()
