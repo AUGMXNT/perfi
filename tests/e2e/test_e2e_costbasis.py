@@ -141,9 +141,9 @@ def get_tx_ledgers(db, chain, address):
 
 
 def common(test_db, event_store=None):
-    update_entity_transactions(entity_name)
     update_all_chain_tx_asset_ids()
     generate_all_constants()
+    update_entity_transactions(entity_name)
     if event_store is None:
         event_store = EventStore(test_db, TxLogical, TxLedger)
     tlg = TransactionLogicalGrouper(entity_name, event_store)
