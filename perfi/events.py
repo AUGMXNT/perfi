@@ -178,7 +178,11 @@ class EventStore:
         return Event(id, source, action, data, timestamp)
 
     def create_tx_ledger_price_updated(
-        self, tx_ledger_id: str, new_price_usd: float, source: str = "perfi"
+        self,
+        tx_ledger_id: str,
+        new_price_usd: float,
+        new_price_source: str,
+        source: str = "perfi",
     ):
         id = self.new_id()
         source = source
@@ -187,6 +191,7 @@ class EventStore:
             "version": 1,
             "tx_ledger_id": tx_ledger_id,
             "price_usd_new": new_price_usd,
+            "price_source_new": new_price_source,
         }
         timestamp = int(time.time())
         sql = """INSERT INTO event
@@ -283,8 +288,12 @@ class EventStore:
         tx = self.TxLedger.get(event.data["tx_ledger_id"])
         updated_tx = copy(tx)
         updated_tx.price_usd = event.data["price_usd_new"]
-        sql = """UPDATE tx_ledger SET price_usd = ? where id = ?"""
-        params = [event.data["price_usd_new"], event.data["tx_ledger_id"]]
+        sql = """UPDATE tx_ledger SET price_usd = ?, price_source = ? where id = ?"""
+        params = [
+            event.data["price_usd_new"],
+            event.data["price_source_new"],
+            event.data["tx_ledger_id"],
+        ]
         self.db.execute(sql, params)
         TxLogical.from_id.cache_clear()
 

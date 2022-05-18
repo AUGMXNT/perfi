@@ -148,6 +148,7 @@ class TxLedger(BaseModel):
     asset_price_id: Optional[str] = None
     symbol: Optional[str] = None
     price_usd: Optional[Decimal] = None
+    price_source: Optional[str] = None
 
     def __eq__(self, other):
         if not isinstance(other, TxLedger):
