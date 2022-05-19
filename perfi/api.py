@@ -1,10 +1,18 @@
 # Run this server like this: uvicorn api:app --reload
 
-from .db import DB
-from .models import TxLogical, TxLedger, AddressStore, Address, TxLogicalStore
+from perfi.db import DB
+from perfi.models import (
+    TxLogical,
+    TxLedger,
+    AddressStore,
+    EntityStore,
+    Entity,
+    Address,
+    TxLogicalStore,
+)
 from typing import List, Dict
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Response
 from pydantic import BaseModel
 from typing import Optional
 
@@ -12,8 +20,6 @@ from typing import Optional
 """
 -------------------------
 TODOs
-[] CRUD Addresses
-[] List TxLogicals
 [] All the commands from cli_cmd
 [] Trigger a full processing all the way through costbasis-8949
 
@@ -29,8 +35,28 @@ def address_store(db=Depends(db)):
     return AddressStore(db)
 
 
+def entity_store(db=Depends(db)):
+    return EntityStore(db)
+
+
 def tx_logical_store(db=Depends(db)):
     return TxLogicalStore(db)
+
+
+class Stores:
+    def __init__(self, db: DB):
+        self.entity: EntityStore = EntityStore(db)
+        self.address: AddressStore = AddressStore(db)
+
+
+_stores = None
+
+
+def stores():
+    global _stores
+    if not _stores:
+        _stores = Stores(db())
+    return _stores
 
 
 class TxLogicalOut(BaseModel):
@@ -57,6 +83,33 @@ app = FastAPI()
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
+
+
+# List  Entities
+@app.get("/entities/")
+def list_entities(store: EntityStore = Depends(entity_store)):
+    return store.list()
+
+
+# List Addresses for Entity
+@app.get("/entities/{id}/addresses")
+def list_addresses_for_entity(
+    id: int, response: Response, stores: Stores = Depends(stores)
+):
+    entity = stores.entity.find(id=id)
+    if not entity:
+        response.status_code = 404
+        return dict(error=f"No entity found with id {id}")
+    return stores.address.find(entity_id=id)
+
+
+# @app.put("/entities/{id}")
+# def update_entity(id: int, response: Response, stores: Stores = Depends(stores)):
+#     entity = stores.entity.find(id=id)
+#     if not entity:
+#         response.status_code = 404
+#         return dict(error=f"No entity found with id {id}")
+#     stores.entity.update
 
 
 # List Addresses

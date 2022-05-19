@@ -40,6 +40,34 @@ TEST_ADDRESS = "test_address"
 #     entity_store.create(ENTITY_NAME)
 
 
+def test_list_entities(test_db):
+    entity_store = EntityStore(test_db)
+    entity_foo = entity_store.create(name="Entity Foo")
+    entity_bar = entity_store.create(name="Entity Bar")
+
+    response = client.get(f"/entities/")
+    assert response.json() == jsonable_encoder([entity_bar, entity_foo])
+    assert response.status_code == 200
+
+
+def test_list_addresses_for_entity(test_db):
+    entity_store = EntityStore(test_db)
+    address_store = AddressStore(test_db)
+    entity_foo = entity_store.create(name="Entity Foo")
+    entity_bar = entity_store.create(name="Entity Bar")
+
+    address_store.create("foo", Chain.ethereum, "0x123", entity_foo.name)
+    bar_1 = address_store.create("bar 1", Chain.ethereum, "0x456", entity_bar.name)
+    bar_2 = address_store.create("bar 2", Chain.ethereum, "0x789", entity_bar.name)
+
+    response = client.get(f"/entities/{entity_bar.id}/addresses")
+    assert response.json() == jsonable_encoder([bar_1, bar_2])
+    assert response.status_code == 200
+
+    response = client.get(f"/entities/-1/addresses")
+    assert response.status_code == 404
+
+
 def test_get_addresses(test_db):
     entity_store = EntityStore(test_db)
     entity = entity_store.create(name=ENTITY_NAME)

@@ -747,6 +747,19 @@ class EntityStore:
         else:
             raise RecordNotFoundException(f"No entity found matching name: {name}")
 
+    def list(self):
+        sql = """SELECT * FROM entity order by name ASC"""
+        return self.db.query(sql)
+
+    def find(self, **kwargs):
+        where = " AND ".join([f"{arg} = ?" for arg in kwargs])
+        sql = f"""SELECT *
+                  FROM entity
+                  WHERE {where}
+               """
+        params = [kwargs[arg] for arg in kwargs]
+        return self.db.query(sql, params)
+
 
 class AddressStore:
     def __init__(self, db):
@@ -827,6 +840,15 @@ class AddressStore:
         params = [address_id]
         self.db.execute(sql, params)
         return dict(deleted=True)
+
+    def find(self, **kwargs):
+        where = " AND ".join([f"{arg} = ?" for arg in kwargs])
+        sql = f"""SELECT *
+                  FROM address
+                  WHERE {where}
+               """
+        params = [kwargs[arg] for arg in kwargs]
+        return self.db.query(sql, params)
 
 
 class TxLogicalStore:
