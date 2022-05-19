@@ -103,13 +103,15 @@ def list_addresses_for_entity(
     return stores.address.find(entity_id=id)
 
 
-# @app.put("/entities/{id}")
-# def update_entity(id: int, response: Response, stores: Stores = Depends(stores)):
-#     entity = stores.entity.find(id=id)
-#     if not entity:
-#         response.status_code = 404
-#         return dict(error=f"No entity found with id {id}")
-#     stores.entity.update
+@app.put("/entities/{id}")
+def update_entity(
+    id: int, entity: Entity, response: Response, stores: Stores = Depends(stores)
+):
+    result = stores.entity.find(id=id)
+    if not result:
+        response.status_code = 404
+        return dict(error=f"No entity found with id {id}")
+    return stores.entity.save(entity)
 
 
 # List Addresses

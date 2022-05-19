@@ -68,6 +68,21 @@ def test_list_addresses_for_entity(test_db):
     assert response.status_code == 404
 
 
+def test_update_entity(test_db):
+    entity_store = EntityStore(test_db)
+    entity = entity_store.create(name="Original Name", note="Original Note")
+    entity.name = "Updated Name"
+    entity.note = "Updated Note"
+
+    updated_json = jsonable_encoder(entity)
+    response = client.put(f"/entities/{entity.id}", json=updated_json)
+    assert response.json() == updated_json
+    assert response.status_code == 200
+
+    response = client.put(f"/entities/-1", json=updated_json)
+    assert response.status_code == 404
+
+
 def test_get_addresses(test_db):
     entity_store = EntityStore(test_db)
     entity = entity_store.create(name=ENTITY_NAME)

@@ -1,8 +1,8 @@
 import time
 
 from .constants import assets
-from .db import db
-from typing import Optional, List, Dict
+from .db import db, DB
+from typing import Optional, List, Dict, Type
 
 import logging
 from datetime import datetime
@@ -725,18 +725,66 @@ class RecordNotFoundException(Exception):
     pass
 
 
-class EntityStore:
-    def __init__(self, db):
+class BaseStore:
+    def __init__(self, db: DB, table_name: str, model_class: Type[BaseModel]):
         self.db = db
+        self.table_name = table_name
+        self.model_class = model_class
+        self.param_mappings = {}
 
-    def create(self, name: str, note: str = None, addresses: List[Address] = None):
+    def _add_param_mapping(self, attr, mapping_func):
+        self.param_mappings[attr] = mapping_func
+
+    def find(self, **kwargs):
+        where = " AND ".join([f"{arg} = ?" for arg in kwargs])
+        sql = f"""SELECT *
+                  FROM {self.table_name}
+                  WHERE {where}
+               """
+        params = [kwargs[arg] for arg in kwargs]
+        result = self.db.query(sql, params)
+        print(sql)
+        print(params)
+        return [self.model_class(**r) for r in result]
+
+    def _model_field_names(self):
+        return list(self.model_class.schema(False).get("properties").keys())
+
+    def update_or_create(self, record):
+        attrs = self._model_field_names()
+        sql = ""
+        if record.id:
+            sql += "REPLACE INTO "
+        else:
+            sql += "INSERT INTO "
+            attrs.remove("id")
+        sql += f"{self.table_name} "
+        sql += f"""({", ".join(attrs)}) VALUES ({", ".join("?" * len(attrs))})"""
+
+        record_dict = record.dict()
+        params = []
+        for attr in attrs:
+            if self.param_mappings.get(attr):
+                mapped = self.param_mappings.get(attr)(record_dict[attr])
+                params.append(mapped)
+            else:
+                params.append(record_dict[attr])
+        self.db.execute(sql, params)
+        if not record.id:
+            record.id = db.cur.lastrowid
+        return record
+
+
+class EntityStore(BaseStore):
+    def __init__(self, db):
+        super().__init__(db, "entity", Entity)
+
+    def create(self, name: str, note: str = None) -> Entity:
         entity = Entity(name=name, note=note)
-        sql = """INSERT INTO entity (name) VALUES (?);"""
-        params = [entity.name]
-        result = self.db.execute(sql, params)
-        # LATER do we want to allow creating of any addresses inside the passed <entity>?
-        entity.id = db.cur.lastrowid
-        return entity
+        return self.update_or_create(entity)
+
+    def save(self, entity):
+        return self.update_or_create(entity)
 
     def get_by_name(self, name: str):
         sql = """SELECT * FROM entity WHERE name = ?"""
@@ -751,19 +799,11 @@ class EntityStore:
         sql = """SELECT * FROM entity order by name ASC"""
         return self.db.query(sql)
 
-    def find(self, **kwargs):
-        where = " AND ".join([f"{arg} = ?" for arg in kwargs])
-        sql = f"""SELECT *
-                  FROM entity
-                  WHERE {where}
-               """
-        params = [kwargs[arg] for arg in kwargs]
-        return self.db.query(sql, params)
 
-
-class AddressStore:
+class AddressStore(BaseStore):
     def __init__(self, db):
-        self.db = db
+        super().__init__(db, "address", Address)
+        super()._add_param_mapping("chain", lambda c: c.value)
 
     def list(self):
         sql = """SELECT a.*, e.name as entity_name FROM address a JOIN entity e on e.id = a.entity_id"""
@@ -778,29 +818,6 @@ class AddressStore:
             d["entity"] = entity
             addresses.append(Address(**d))
         return addresses
-
-    def _insert_or_create(self, address: Address):
-        if address.id:
-            sql = """REPLACE INTO address (id, label, chain, address, type, source, entity_id, ord) VALUES (?,?,?,?,?,?,?, ?)"""
-        else:
-            sql = """INSERT INTO address (label, chain, address, type, source, entity_id, ord) VALUES (?,?,?,?,?,?,?)"""
-
-        params = [
-            address.label,
-            address.chain.value,
-            address.address,
-            address.type,
-            address.source,
-            address.entity_id,
-            address.ord
-            or 1,  # TODO: count existing addresses and increment by 1 for this, rather than just hardcoding to 1
-        ]
-        if address.id:
-            params.insert(0, address.id)
-        self.db.execute(sql, params)
-        if not address.id:
-            address.id = db.cur.lastrowid
-        return address
 
     def get_by_chain_and_address(self, chain, address):
         sql = "SELECT * FROM address WHERE chain = ? and address = ?"
@@ -830,25 +847,16 @@ class AddressStore:
         address = Address(
             entity_id=entity_id, label=label, chain=chain, address=address
         )
-        return self._insert_or_create(address)
+        return self.update_or_create(address)
 
     def save(self, address: Address):
-        return self._insert_or_create(address)
+        return self.update_or_create(address)
 
     def delete(self, address_id):
         sql = """DELETE FROM address where id = ?"""
         params = [address_id]
         self.db.execute(sql, params)
         return dict(deleted=True)
-
-    def find(self, **kwargs):
-        where = " AND ".join([f"{arg} = ?" for arg in kwargs])
-        sql = f"""SELECT *
-                  FROM address
-                  WHERE {where}
-               """
-        params = [kwargs[arg] for arg in kwargs]
-        return self.db.query(sql, params)
 
 
 class TxLogicalStore:
