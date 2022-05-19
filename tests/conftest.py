@@ -76,8 +76,6 @@ def setup_asset_and_price_ids(test_db):
                 for chain, address in i["platforms"].items():
                     symbol_asset_mapping[f"{chain}:{symbol}"] = address
 
-    print("asset_price updated. Total rows:")
-    print([dict(**r) for r in test_db.query("SELECT * FROM asset_price")])
     yield symbol_asset_mapping
 
 

@@ -43,6 +43,7 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     monkeysession.setattr("perfi.costbasis.db", test_db)
     monkeysession.setattr("perfi.models.db", test_db)
     monkeysession.setattr("perfi.asset.db", test_db)
+    monkeysession.setattr("perfi.price.db", test_db)
     monkeysession.setattr("perfi.costbasis.price_feed", price_feed)
 
 
