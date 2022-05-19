@@ -49,7 +49,7 @@ class TestTxTyping:
             ins=["1 AVAX"], outs=[f"1 WAVAX|{WAVAX}"], timestamp=3, from_adddress=WAVAX
         )
 
-        update_all_chain_tx_asset_ids(test_db)
+        map_assets()
         update_entity_transactions(entity_name)
         tlg = TransactionLogicalGrouper(entity_name, event_store)
         tlg.update_entity_transactions()

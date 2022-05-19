@@ -29,7 +29,7 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
 
 def test_receiving_doesnt_generate_fee(monkeypatch, test_db):
     ethereum.tx(ins=["1 ETH"], timestamp=1, from_address="_FAKE_A")
-    update_all_chain_tx_asset_ids()
+    map_assets()
 
     update_entity_transactions(entity_name)
 
@@ -41,7 +41,7 @@ def test_receiving_doesnt_generate_fee(monkeypatch, test_db):
 
 def test_sending_generates_the_out_and_the_fee(monkeypatch, test_db):
     ethereum.tx(outs=["1 ETH"], timestamp=1, to_address="_FAKE_A")
-    update_all_chain_tx_asset_ids()
+    map_assets()
 
     update_entity_transactions(entity_name)
 
@@ -58,7 +58,7 @@ def test_swap_one_for_one_generates_3_ledger_txs(monkeypatch, test_db):
         timestamp=1,
         to_address="__MAKER_DAO",
     )
-    update_all_chain_tx_asset_ids()
+    map_assets()
 
     update_entity_transactions(entity_name)
 

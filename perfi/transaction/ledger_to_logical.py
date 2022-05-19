@@ -168,6 +168,7 @@ class TransactionLogicalGrouper:
                 "tx_ledger_type",
                 "asset_price_id",
                 "price",
+                "symbol",
             ]
             for t in tx_log.tx_ledgers:
                 if only_chain and t.chain != only_chain:
@@ -188,6 +189,7 @@ class TransactionLogicalGrouper:
                         t.tx_ledger_type,
                         t.asset_price_id,
                         t.price_usd,
+                        t.symbol,
                     ]
                 )
 

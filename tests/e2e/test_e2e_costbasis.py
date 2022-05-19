@@ -141,8 +141,7 @@ def get_tx_ledgers(db, chain, address):
 
 
 def common(test_db, event_store=None):
-    update_all_chain_tx_asset_ids()
-    generate_all_constants()
+    map_assets()
     update_entity_transactions(entity_name)
     if event_store is None:
         event_store = EventStore(test_db, TxLogical, TxLedger)
@@ -540,7 +539,7 @@ class TestCostbasisDisposal:
 
         pprint(avWAVAX_disposals)
 
-        # We also shouldn't have a avWAVAX disposals because a "swap" is a disposal
+        # We also should have one avWAVAX disposal because the swap of avWAVAX for USDC is a disposal
         assert len(avWAVAX_disposals) == 1
         assert avWAVAX_disposals[0].amount == approx(Decimal(0.25))
         assert avWAVAX_disposals[0].total_usd == approx(
