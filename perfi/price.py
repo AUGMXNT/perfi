@@ -152,7 +152,15 @@ class PriceFeed:
                      WHERE id = ?
                   """
             r = db.query(sql, canonical_key)
-            symbol = r[0][0]
+            try:
+                symbol = r[0][0]
+            except Exception as ex:
+                print("* * * * * ** * * ")
+                print(f"Failed to get symbol for {canonical_key}")
+                print("all rows in asset_price:")
+                print([dict(**r) for r in db.query("SELECT * FROM asset_price")])
+                print("* * * * * ** * * ")
+                raise ex
         else:
             sql = """SELECT asset_price_id, symbol
                      FROM asset_tx
