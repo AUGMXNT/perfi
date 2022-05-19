@@ -1,3 +1,5 @@
+import os
+
 from ..db import db
 from ..events import EventStore, EVENT_ACTION
 from ..models import TxLedger, TxLogical
@@ -20,6 +22,8 @@ from tqdm import tqdm
 
 
 logger = logging.getLogger(__name__)
+LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
+logger.setLevel(LOGLEVEL)
 
 
 class TransactionLogicalGrouper:
