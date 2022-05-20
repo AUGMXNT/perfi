@@ -1,6 +1,8 @@
 # Run this server like this: uvicorn api:app --reload
 import builtins
 
+import pytz
+
 from perfi.db import DB
 from perfi.models import (
     TxLogical,
@@ -14,6 +16,7 @@ from perfi.models import (
     StoreProtocol,
     SettingStore,
     Setting,
+    TX_LOGICAL_TYPE,
 )
 from typing import List, Dict, Type
 
@@ -53,6 +56,7 @@ class Stores:
         self.entity: EntityStore = EntityStore(db)
         self.address: AddressStore = AddressStore(db)
         self.setting: SettingStore = SettingStore(db)
+        self.tx_logical: TxLogicalStore = TxLogicalStore(db)
 
 
 def stores():
@@ -196,12 +200,38 @@ def delete_setting(key: str, stores: Stores = Depends(stores)):
     return stores.setting.delete(key)
 
 
+# Get list of reporting timezones
+@app.get("/settings/_help/reporting_timezones")
+def get_reporting_timezones_help():
+    return pytz.all_timezones
+
+
+# Get list of settings used by the app
+@app.get("/settings/_help/keys")
+def get_settings_keys_used_list():
+    return ["COINGECKO_KEY", "REPORTING_TIMEZONE", "ETHERSCAN_KEY", "COVALENT_KEY"]
+
+
 # TX LOGICALS =================================================================================
 
 # List TxLogicals
 @app.get("/tx_logicals/", response_model=List[TxLogicalOut])
 def list_tx_logicals(store: TxLogicalStore = Depends(tx_logical_store)):
     return store.list()
+
+
+@app.put(
+    "/tx_logicals/{id}/tx_logical_type/{updated_type_name}", response_model=TxLogicalOut
+)
+def update_tx_logical_type(
+    updated_type_name: str,
+    tx_logical: TxLogical = Depends(EnsureRecord("tx_logical")),
+    stores: Stores = Depends(stores),
+):
+    updated = tx_logical.copy(
+        update={"tx_logical_type": TX_LOGICAL_TYPE[updated_type_name].value}
+    )
+    return stores.tx_logical.save(updated)
 
 
 # Update Logical Type

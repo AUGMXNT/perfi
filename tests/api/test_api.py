@@ -290,3 +290,32 @@ def test_list_tx_logicals(test_db):
         [TxLogicalOut(**tx_logical1.dict()), TxLogicalOut(**tx_logical2.dict())]
     )
     assert response.status_code == 200
+
+
+def test_update_tx_logical_type(test_db):
+    entity_store = EntityStore(test_db)
+    entity = entity_store.create(name="Foo")
+
+    address_store = AddressStore(test_db)
+    address = address_store.create("foo", Chain.ethereum, "0x123", entity_id=entity.id)
+
+    tx_logical_store = TxLogicalStore(test_db)
+    tx_logical1 = make_tx_logical(
+        address=address.address,
+        tx_ledgers=[
+            make_tx_ledger("OUT", "send"),
+        ],
+        tx_logical_type=TX_LOGICAL_TYPE.send,
+    )
+    tx_logical1 = tx_logical_store.create(tx_logical1)
+
+    updated_type = TX_LOGICAL_TYPE.receive.value
+    response = client.put(
+        f"/tx_logicals/{tx_logical1.id}/tx_logical_type/{updated_type}"
+    )
+    assert response.json() == jsonable_encoder(
+        TxLogicalOut(
+            **tx_logical1.copy(update={"tx_logical_type": updated_type}).dict()
+        )
+    )
+    assert response.status_code == 200

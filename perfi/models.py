@@ -874,12 +874,18 @@ class AddressStore(BaseStore[Address]):
         return super().delete(address_id)
 
 
-class TxLogicalStore:
+class TxLogicalStore(BaseStore[TxLogical]):
     def __init__(self, db):
-        self.db = db
         self.tx_ledger_store = TxLedgerStore(db)
+        super().__init__(db, "tx_logical", TxLogical)
+        super()._add_param_mapping("tx_logical_type", lambda c: c.value)
 
-    def list(self):
+    def find_by_primary_key(self, key):
+        sql = """SELECT id from tx_logical ORDER BY timestamp ASC"""
+        results = self.db.query(sql)
+        return [TxLogical.from_id(r["id"]) for r in results]
+
+    def list(self, order_by="timestamp ASC"):
         sql = """SELECT id from tx_logical ORDER BY timestamp ASC"""
         tx_logicals: List[TxLogical] = []
         for row in self.db.query(sql):
@@ -933,6 +939,20 @@ class TxLogicalStore:
             params = [tx_ledger.id, tx_logical.id, index]
             self.db.execute(sql, params)
 
+        return tx_logical
+
+    def save(self, tx_logical: TxLogical):
+        sql = """REPLACE INTO tx_logical (id, count, description, note, timestamp, address, tx_logical_type) VALUES (?, ?, ?, ?, ?, ?, ?)"""
+        params = [
+            tx_logical.id,
+            tx_logical.count,
+            tx_logical.description,
+            tx_logical.note,
+            tx_logical.timestamp,
+            tx_logical.address,
+            tx_logical.tx_logical_type,
+        ]
+        self.db.execute(sql, params)
         return tx_logical
 
 
