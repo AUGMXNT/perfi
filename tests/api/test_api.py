@@ -18,8 +18,6 @@ from perfi.models import (
 from fastapi.encoders import jsonable_encoder
 from tests.helpers import *
 
-client = TestClient(app)
-
 
 @pytest.fixture(scope="function", autouse=True)
 def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
@@ -30,14 +28,7 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     monkeysession.setattr("perfi.models.db", test_db)
 
 
-ENTITY_NAME = "tester"
-TEST_ADDRESS = "test_address"
-
-
-# @pytest.fixture(autouse=True)
-# def entity(test_db):
-#     entity_store = EntityStore(test_db)
-#     entity_store.create(ENTITY_NAME)
+client = TestClient(app)
 
 
 def test_list_entities(test_db):
@@ -53,8 +44,8 @@ def test_list_entities(test_db):
 def test_list_addresses_for_entity(test_db):
     entity_store = EntityStore(test_db)
     address_store = AddressStore(test_db)
-    entity_foo = entity_store.create(name="Entity Foo")
-    entity_bar = entity_store.create(name="Entity Bar")
+    entity_foo = entity_store.create(name="Entity Foo2")
+    entity_bar = entity_store.create(name="Entity Bar2")
 
     address_store.create("foo", Chain.ethereum, "0x123", entity_foo.name)
     bar_1 = address_store.create("bar 1", Chain.ethereum, "0x456", entity_bar.name)
@@ -66,6 +57,16 @@ def test_list_addresses_for_entity(test_db):
 
     response = client.get(f"/entities/-1/addresses")
     assert response.status_code == 404
+
+
+def test_get_entity(test_db):
+    print(id(test_db))
+    entity_store = EntityStore(test_db)
+    entity = entity_store.create(name="Original Name", note="Original Note")
+
+    response = client.get(f"/entities/{entity.id}")
+    assert response.json() == jsonable_encoder(entity)
+    assert response.status_code == 200
 
 
 def test_update_entity(test_db):
@@ -83,9 +84,20 @@ def test_update_entity(test_db):
     assert response.status_code == 404
 
 
+def test_delete_entity(test_db):
+    entity_store = EntityStore(test_db)
+    entity = entity_store.create(name="Original Name", note="Original Note")
+
+    response = client.delete(f"/entities/{entity.id}")
+    assert response.status_code == 200
+
+    response = client.get(f"/entities/{entity.id}")
+    assert response.status_code == 404
+
+
 def test_get_addresses(test_db):
     entity_store = EntityStore(test_db)
-    entity = entity_store.create(name=ENTITY_NAME)
+    entity = entity_store.create(name="Foo")
 
     address_store = AddressStore(test_db)
     address_store.create("foo", Chain.ethereum, "0x123", entity.name)
@@ -107,7 +119,7 @@ def test_get_addresses(test_db):
 
 def test_create_address(test_db):
     entity_store = EntityStore(test_db)
-    entity = entity_store.create(name=ENTITY_NAME)
+    entity = entity_store.create(name="Foo")
     response = client.post(
         f"/addresses",
         json=dict(entity_id=entity.id, chain="ethereum", label="bar", address="0x4321"),
@@ -126,21 +138,21 @@ def test_create_address(test_db):
 
 def test_update_address(test_db):
     entity_store = EntityStore(test_db)
-    entity = entity_store.create(name=ENTITY_NAME)
+    entity = entity_store.create(name="Foo")
 
     address_store = AddressStore(test_db)
     address = address_store.create("foo", Chain.ethereum, "0x123", entity_id=entity.id)
 
     address.label = "updated"
     updated_json = jsonable_encoder(address)
-    response = client.put(f"/addresses", json=updated_json)
+    response = client.put(f"/addresses/{address.id}", json=updated_json)
     assert response.json() == updated_json
     assert response.status_code == 200
 
 
 def test_delete_address(test_db):
     entity_store = EntityStore(test_db)
-    entity = entity_store.create(name=ENTITY_NAME)
+    entity = entity_store.create(name="Foo")
 
     address_store = AddressStore(test_db)
     address = address_store.create("foo", Chain.ethereum, "0x123", entity_id=entity.id)
@@ -154,7 +166,7 @@ def make_tx_ledger(direction: str, tx_ledger_type: str, **kw):
     return TxLedger(
         id=f"test_tx_ledger__{uuid.uuid4()}",
         chain=kw.get("chain") or Chain.ethereum.value,
-        address=TEST_ADDRESS,
+        address="test_address",
         hash=f"test_hash__{uuid.uuid4()}",
         from_address=kw.get("from_address") or f"from__{uuid.uuid4()}",
         to_address=kw.get("to_address") or f"from__{uuid.uuid4()}",
@@ -177,7 +189,7 @@ def make_tx_logical(tx_ledgers: List[TxLedger], tx_logical_type: TX_LOGICAL_TYPE
         timestamp=kw.get("timestamp") or 1,
         tx_ledgers=tx_ledgers,
         tx_logical_type=tx_logical_type.value,
-        address=kw.get("address") or TEST_ADDRESS,
+        address=kw.get("address") or "test_address",
     )
     tx_logical._group_ledgers()
     return tx_logical
@@ -185,7 +197,7 @@ def make_tx_logical(tx_ledgers: List[TxLedger], tx_logical_type: TX_LOGICAL_TYPE
 
 def test_list_tx_logicals(test_db):
     entity_store = EntityStore(test_db)
-    entity = entity_store.create(name=ENTITY_NAME)
+    entity = entity_store.create(name="Foo")
 
     address_store = AddressStore(test_db)
     address = address_store.create("foo", Chain.ethereum, "0x123", entity_id=entity.id)

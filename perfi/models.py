@@ -1,8 +1,9 @@
 import time
+from abc import ABC
 
 from .constants import assets
 from .db import db, DB
-from typing import Optional, List, Dict, Type
+from typing import Optional, List, Dict, Type, Protocol, TypeVar, Generic
 
 import logging
 from datetime import datetime
@@ -15,6 +16,7 @@ import jsonpickle
 from devtools import debug
 from pydantic import BaseModel
 
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -725,8 +727,13 @@ class RecordNotFoundException(Exception):
     pass
 
 
-class BaseStore:
-    def __init__(self, db: DB, table_name: str, model_class: Type[BaseModel]):
+class StoreProtocol(Protocol):
+    def find(self, **kwargs):
+        pass
+
+
+class BaseStore(ABC, Generic[T]):
+    def __init__(self, db: DB, table_name: str, model_class: Type[T]):
         self.db = db
         self.table_name = table_name
         self.model_class = model_class
@@ -735,7 +742,7 @@ class BaseStore:
     def _add_param_mapping(self, attr, mapping_func):
         self.param_mappings[attr] = mapping_func
 
-    def find(self, **kwargs):
+    def find(self, **kwargs) -> List[T]:
         where = " AND ".join([f"{arg} = ?" for arg in kwargs])
         sql = f"""SELECT *
                   FROM {self.table_name}
@@ -743,14 +750,12 @@ class BaseStore:
                """
         params = [kwargs[arg] for arg in kwargs]
         result = self.db.query(sql, params)
-        print(sql)
-        print(params)
         return [self.model_class(**r) for r in result]
 
     def _model_field_names(self):
         return list(self.model_class.schema(False).get("properties").keys())
 
-    def update_or_create(self, record):
+    def update_or_create(self, record) -> T:
         attrs = self._model_field_names()
         sql = ""
         if record.id:
@@ -775,7 +780,7 @@ class BaseStore:
         return record
 
 
-class EntityStore(BaseStore):
+class EntityStore(BaseStore[Entity]):
     def __init__(self, db):
         super().__init__(db, "entity", Entity)
 
@@ -799,8 +804,19 @@ class EntityStore(BaseStore):
         sql = """SELECT * FROM entity order by name ASC"""
         return self.db.query(sql)
 
+    def delete(self, id):
+        address_store = AddressStore(self.db)
+        for address in address_store.find(entity_id=id):
+            address_store.delete(address.id)
 
-class AddressStore(BaseStore):
+        sql = """DELETE FROM entity where id = ?"""
+        params = [id]
+        self.db.execute(sql, params)
+
+        return dict(deleted=True)
+
+
+class AddressStore(BaseStore[Address]):
     def __init__(self, db):
         super().__init__(db, "address", Address)
         super()._add_param_mapping("chain", lambda c: c.value)
