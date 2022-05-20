@@ -13,6 +13,8 @@ from perfi.models import (
     TxLogical,
     Entity,
     TX_LOGICAL_TYPE,
+    SettingStore,
+    Setting,
 )
 
 from fastapi.encoders import jsonable_encoder
@@ -37,7 +39,9 @@ def test_list_entities(test_db):
     entity_bar = entity_store.create(name="Entity Bar")
 
     response = client.get(f"/entities/")
-    assert response.json() == jsonable_encoder([entity_bar, entity_foo])
+    assert response.json() == jsonable_encoder(
+        [entity_bar, entity_foo]
+    )  # Expected in name order
     assert response.status_code == 200
 
 
@@ -160,6 +164,51 @@ def test_delete_address(test_db):
     response = client.delete(f"/addresses/{address.id}")
     assert response.json() == dict(deleted=True)
     assert response.status_code == 200
+
+
+def test_list_setting(test_db):
+    setting_store = SettingStore(test_db)
+    setting_foo = setting_store.create(key="foo", value="bar")
+    setting_baz = setting_store.create(key="baz", value="qux")
+    response = client.get(f"/settings")
+    assert response.status_code == 200
+    assert response.json() == jsonable_encoder(
+        [setting_baz, setting_foo]
+    )  # Alphabetized by key
+
+
+def test_create_setting(test_db):
+    setting_store = SettingStore(test_db)
+    setting = Setting(key="my_setting", value="123")
+    response = client.post(
+        f"/settings",
+        json=dict(key="my_setting", value="123"),
+    )
+    assert response.status_code == 200
+    assert response.json() == jsonable_encoder(setting)
+    assert setting_store.find(key=setting.key) == [setting]
+
+
+def test_update_setting(test_db):
+    setting_store = SettingStore(test_db)
+    setting = setting_store.create(key="foo", value="bar")
+    updated_setting = Setting(key=setting.key, value="updated")
+    response = client.put(
+        f"/settings/{setting.key}",
+        json=setting.copy(update={"value": "updated"}).dict(),
+    )
+    assert response.status_code == 200
+    assert response.json() == jsonable_encoder(updated_setting)
+    assert setting_store.find(key=setting.key) == [updated_setting]
+
+
+def test_delete_setting(test_db):
+    setting_store = SettingStore(test_db)
+    setting_1 = setting_store.create(key="foo", value="bar")
+    setting_2 = setting_store.create(key="baz", value="qux")
+    response = client.delete(f"/settings/{setting_1.key}")
+    assert response.status_code == 200
+    assert setting_store.list() == [setting_2]
 
 
 def make_tx_ledger(direction: str, tx_ledger_type: str, **kw):

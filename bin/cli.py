@@ -95,13 +95,13 @@ entity_app = typer.Typer()
 
 @entity_app.command("create")
 def entity_create(name: str):
-    try:
-        entity_store.get_by_name(name=name)
+    results = entity_store.find(name=name)
+    if len(results) != 0:
         print(
             f"ERROR: Failed to create entity. An entity with name {name} already exists."
         )
         return
-    except RecordNotFoundException as err:
+    else:
         entity = entity_store.create(name=name)
         print(f"Created entity {entity}")
 

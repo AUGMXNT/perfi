@@ -129,6 +129,11 @@ class Address(BaseModel):
     entity_id: int
 
 
+class Setting(BaseModel):
+    key: str
+    value: str
+
+
 Entity.update_forward_refs()
 
 
@@ -733,14 +738,20 @@ class StoreProtocol(Protocol):
 
 
 class BaseStore(ABC, Generic[T]):
-    def __init__(self, db: DB, table_name: str, model_class: Type[T]):
+    def __init__(
+        self, db: DB, table_name: str, model_class: Type[T], primary_key: str = "id"
+    ):
         self.db = db
         self.table_name = table_name
         self.model_class = model_class
+        self.primary_key = primary_key
         self.param_mappings = {}
 
     def _add_param_mapping(self, attr, mapping_func):
         self.param_mappings[attr] = mapping_func
+
+    def _model_field_names(self):
+        return list(self.model_class.schema(False).get("properties").keys())
 
     def find(self, **kwargs) -> List[T]:
         where = " AND ".join([f"{arg} = ?" for arg in kwargs])
@@ -752,17 +763,14 @@ class BaseStore(ABC, Generic[T]):
         result = self.db.query(sql, params)
         return [self.model_class(**r) for r in result]
 
-    def _model_field_names(self):
-        return list(self.model_class.schema(False).get("properties").keys())
-
     def update_or_create(self, record) -> T:
         attrs = self._model_field_names()
         sql = ""
-        if record.id:
+        if getattr(record, self.primary_key):
             sql += "REPLACE INTO "
         else:
             sql += "INSERT INTO "
-            attrs.remove("id")
+            attrs.remove(self.primary_key)
         sql += f"{self.table_name} "
         sql += f"""({", ".join(attrs)}) VALUES ({", ".join("?" * len(attrs))})"""
 
@@ -775,9 +783,32 @@ class BaseStore(ABC, Generic[T]):
             else:
                 params.append(record_dict[attr])
         self.db.execute(sql, params)
-        if not record.id:
+        if not getattr(record, self.primary_key) and self.primary_key == "id":
             record.id = db.cur.lastrowid
         return record
+
+    def list(self, order_by: str = None) -> List[T]:
+        order_by = order_by or f"{self.primary_key} ASC"
+        sql = f"""SELECT * FROM {self.table_name} order by {order_by}"""
+        return [self.model_class(**r) for r in self.db.query(sql)]
+
+    def delete(self, key: str):
+        sql = f"""DELETE FROM {self.table_name} where {self.primary_key} = ?"""
+        params = [key]
+        self.db.execute(sql, params)
+        return dict(deleted=True)
+
+    def save(self, record: T):
+        return self.update_or_create(record)
+
+
+class SettingStore(BaseStore[Setting]):
+    def __init__(self, db):
+        super().__init__(db, "setting", Setting, primary_key="key")
+
+    def create(self, key: str, value: str) -> Setting:
+        setting = Setting(key=key, value=value)
+        return self.update_or_create(setting)
 
 
 class EntityStore(BaseStore[Entity]):
@@ -788,52 +819,21 @@ class EntityStore(BaseStore[Entity]):
         entity = Entity(name=name, note=note)
         return self.update_or_create(entity)
 
-    def save(self, entity):
-        return self.update_or_create(entity)
-
-    def get_by_name(self, name: str):
-        sql = """SELECT * FROM entity WHERE name = ?"""
-        params = [name]
-        result = self.db.query(sql, params)
-        if len(result) == 1:
-            return result[0]
-        else:
-            raise RecordNotFoundException(f"No entity found matching name: {name}")
-
-    def list(self):
-        sql = """SELECT * FROM entity order by name ASC"""
-        return self.db.query(sql)
+    def list(self, order_by: str = "name ASC"):
+        return super().list(order_by=order_by)
 
     def delete(self, id):
         address_store = AddressStore(self.db)
         for address in address_store.find(entity_id=id):
             address_store.delete(address.id)
 
-        sql = """DELETE FROM entity where id = ?"""
-        params = [id]
-        self.db.execute(sql, params)
-
-        return dict(deleted=True)
+        return super().delete(id)
 
 
 class AddressStore(BaseStore[Address]):
     def __init__(self, db):
         super().__init__(db, "address", Address)
         super()._add_param_mapping("chain", lambda c: c.value)
-
-    def list(self):
-        sql = """SELECT a.*, e.name as entity_name FROM address a JOIN entity e on e.id = a.entity_id"""
-        rows = self.db.query(sql)
-        addresses = []
-        for r in rows:
-            d = dict(**r)
-            d["chain"] = Chain[
-                d["chain"].replace("import.", "import_")
-            ]  # HACK: we use a `import.exchange_name` pattern but we can't use `.` in our Enum values...
-            entity = Entity(id=d["entity_id"], name=d["entity_name"])
-            d["entity"] = entity
-            addresses.append(Address(**d))
-        return addresses
 
     def get_by_chain_and_address(self, chain, address):
         sql = "SELECT * FROM address WHERE chain = ? and address = ?"
@@ -865,14 +865,8 @@ class AddressStore(BaseStore[Address]):
         )
         return self.update_or_create(address)
 
-    def save(self, address: Address):
-        return self.update_or_create(address)
-
     def delete(self, address_id):
-        sql = """DELETE FROM address where id = ?"""
-        params = [address_id]
-        self.db.execute(sql, params)
-        return dict(deleted=True)
+        return super().delete(address_id)
 
 
 class TxLogicalStore:

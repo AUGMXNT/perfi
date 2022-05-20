@@ -12,6 +12,8 @@ from perfi.models import (
     TxLogicalStore,
     BaseStore,
     StoreProtocol,
+    SettingStore,
+    Setting,
 )
 from typing import List, Dict, Type
 
@@ -50,6 +52,7 @@ class Stores:
     def __init__(self, db: DB):
         self.entity: EntityStore = EntityStore(db)
         self.address: AddressStore = AddressStore(db)
+        self.setting: SettingStore = SettingStore(db)
 
 
 def stores():
@@ -100,6 +103,8 @@ def list_entities(store: EntityStore = Depends(entity_store)):
     return store.list()
 
 
+# ENTITIES =================================================================================
+
 # Get Entity
 @app.get("/entities/{id}")
 def list_addresses_for_entity(entity: Entity = Depends(EnsureRecord("entity"))):
@@ -125,6 +130,8 @@ def delete_entity(id: int, store: EntityStore = Depends(entity_store)):
     return store.delete(id)
 
 
+# ADDRESSES =================================================================================
+
 # List Addresses
 @app.get("/addresses/")
 def list_addresses(store: AddressStore = Depends(address_store)):
@@ -148,6 +155,34 @@ def update_address(address: Address, store: AddressStore = Depends(address_store
 def delete_address(id: int, store: AddressStore = Depends(address_store)):
     return store.delete(id)
 
+
+# SETTINGS =================================================================================
+
+# List Settings
+@app.get("/settings")
+def list_settingss(stores: Stores = Depends(stores)):
+    return stores.setting.list()
+
+
+# Create Setting
+@app.post("/settings")
+def create_setting(setting: Setting, stores: Stores = Depends(stores)):
+    return stores.setting.create(**setting.dict())
+
+
+# Update Setting
+@app.put("/settings/{key}")
+def update_setting(setting: Setting, stores: Stores = Depends(stores)):
+    return stores.setting.save(setting)
+
+
+# Delete Setting
+@app.delete("/settings/{key}")
+def delete_setting(key: str, stores: Stores = Depends(stores)):
+    return stores.setting.delete(key)
+
+
+# TX LOGICALS =================================================================================
 
 # List TxLogicals
 @app.get("/tx_logicals/", response_model=List[TxLogicalOut])
