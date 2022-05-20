@@ -753,6 +753,11 @@ class BaseStore(ABC, Generic[T]):
     def _model_field_names(self):
         return list(self.model_class.schema(False).get("properties").keys())
 
+    def find_by_primary_key(self, key):
+        args = {}
+        args[self.primary_key] = key
+        return self.find(**args)
+
     def find(self, **kwargs) -> List[T]:
         where = " AND ".join([f"{arg} = ?" for arg in kwargs])
         sql = f"""SELECT *
@@ -815,7 +820,7 @@ class EntityStore(BaseStore[Entity]):
     def __init__(self, db):
         super().__init__(db, "entity", Entity)
 
-    def create(self, name: str, note: str = None) -> Entity:
+    def create(self, name: str, note: str = None, **kwargs) -> Entity:
         entity = Entity(name=name, note=note)
         return self.update_or_create(entity)
 

@@ -17,7 +17,7 @@ from perfi.models import (
 )
 from typing import List, Dict, Type
 
-from fastapi import Depends, FastAPI, Response, HTTPException
+from fastapi import Depends, FastAPI, Response, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 
@@ -78,12 +78,14 @@ class TxLogicalOut(BaseModel):
 
 
 class EnsureRecord:
-    def __init__(self, store_name: str):
+    def __init__(self, store_name: str, primary_key: str = "id"):
         self.store_name = store_name
+        self.primary_key = primary_key
 
-    def __call__(self, id: int, stores: Stores = Depends(stores)):
-        print(builtins.id(stores.entity.db))
-        record = getattr(stores, self.store_name).find(id=id)
+    def __call__(self, request: Request, stores: Stores = Depends(stores)):
+        record = getattr(stores, self.store_name).find_by_primary_key(
+            request.path_params[self.primary_key]
+        )
         if not record:
             raise HTTPException(status_code=404, detail=f"No record found for id {id}")
         return record[0]
@@ -117,6 +119,12 @@ def list_addresses_for_entity(
     stores: Stores = Depends(stores), entity: Entity = Depends(EnsureRecord("entity"))
 ):
     return stores.address.find(entity_id=entity.id)
+
+
+# Create entity
+@app.post("/entities/")
+def create_entity(entity: Entity, stores: Stores = Depends(stores)):
+    return stores.entity.create(**entity.dict())
 
 
 @app.put("/entities/{id}", dependencies=[Depends(EnsureRecord("entity"))])
@@ -171,13 +179,19 @@ def create_setting(setting: Setting, stores: Stores = Depends(stores)):
 
 
 # Update Setting
-@app.put("/settings/{key}")
+@app.put(
+    "/settings/{key}",
+    dependencies=[Depends(EnsureRecord("setting", primary_key="key"))],
+)
 def update_setting(setting: Setting, stores: Stores = Depends(stores)):
     return stores.setting.save(setting)
 
 
 # Delete Setting
-@app.delete("/settings/{key}")
+@app.delete(
+    "/settings/{key}",
+    dependencies=[Depends(EnsureRecord("setting", primary_key="key"))],
+)
 def delete_setting(key: str, stores: Stores = Depends(stores)):
     return stores.setting.delete(key)
 

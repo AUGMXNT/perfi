@@ -21,6 +21,12 @@ from fastapi.encoders import jsonable_encoder
 from tests.helpers import *
 
 
+def without(d, key):
+    new_d = d.copy()
+    new_d.pop(key)
+    return new_d
+
+
 @pytest.fixture(scope="function", autouse=True)
 def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     def test_db_returner(**kwargs):
@@ -64,13 +70,23 @@ def test_list_addresses_for_entity(test_db):
 
 
 def test_get_entity(test_db):
-    print(id(test_db))
     entity_store = EntityStore(test_db)
     entity = entity_store.create(name="Original Name", note="Original Note")
 
     response = client.get(f"/entities/{entity.id}")
     assert response.json() == jsonable_encoder(entity)
     assert response.status_code == 200
+
+
+def test_create_entity(test_db):
+    entity_store = EntityStore(test_db)
+    response = client.post(f"/entities/", json=dict(name="my name", note="some note"))
+    assert response.status_code == 200
+    results = entity_store.find(name="my name")
+    assert len(results) == 1
+    assert without(results[0].dict(), "id") == without(
+        Entity(name="my name", note="some note").dict(), "id"
+    )
 
 
 def test_update_entity(test_db):
