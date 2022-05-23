@@ -276,11 +276,10 @@ class EventStore:
         to_tx_logical_id = data["to_tx_logical_id"]
 
         sql = """UPDATE tx_rel_ledger_logical
-               SET tx_ledger_id = ?, tx_logical_id = ?
-               WHERE tx_ledger_id = ?
-               AND tx_logical_id = ?
+               SET tx_logical_id = ?
+               WHERE tx_ledger_id = ? AND tx_logical_id = ?
             """
-        params = [tx_ledger_id, to_tx_logical_id, tx_ledger_id, from_tx_logical_id]
+        params = [to_tx_logical_id, tx_ledger_id, from_tx_logical_id]
         self.db.execute(sql, params)
 
         # Update tx count and last updated

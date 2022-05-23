@@ -899,8 +899,9 @@ class TxLogicalStore(BaseStore[TxLogical]):
         super()._add_param_mapping("tx_logical_type", lambda c: c.value)
 
     def find_by_primary_key(self, key):
-        sql = """SELECT id from tx_logical ORDER BY timestamp ASC"""
-        results = self.db.query(sql)
+        sql = """SELECT id from tx_logical WHERE id = ? ORDER BY timestamp ASC"""
+        params = [key]
+        results = self.db.query(sql, params)
         return [TxLogical.from_id(r["id"]) for r in results]
 
     def list(self, order_by="timestamp ASC"):

@@ -10,6 +10,7 @@ from bin.cli import (
     ledger_update_price,
     ledger_flag_logical,
     ledger_remove_flag_logical,
+    ledger_move_tx_ledger,
 )
 from perfi.costbasis import regenerate_costbasis_lots
 from perfi.db import DB
@@ -320,7 +321,18 @@ def update_tx_ledger_price(
     return stores.tx_ledger.find_by_primary_key(tx_ledger.id)
 
 
-# Move Ledger to new Logical
+@app.put("/tx_ledgers/{id}/tx_logical_id/{updated_tx_logical_id}")
+def reparent_tx_ledger_to_tx_logical(
+    updated_tx_logical_id: str,
+    tx_ledger: TxLedger = Depends(EnsureRecord("tx_ledger")),
+    stores: Stores = Depends(stores),
+):
+    tx_logical = stores.tx_logical.find_by_primary_key(tx_ledger.tx_logical_id)[0]
+    new_tx_logical = stores.tx_logical.find_by_primary_key(updated_tx_logical_id)[0]
+    ledger_move_tx_ledger(
+        tx_logical.entity, tx_ledger.id, new_tx_logical.id, auto_refresh_state=False
+    )
+    return stores.tx_ledger.find_by_primary_key(tx_ledger.id)
 
 
 @app.post("/entities/{id}/regenerate_costbasis")

@@ -290,7 +290,9 @@ def ledger_remove_flag_logical(
 
 
 @ledger_app.command("move")
-def ledger_move_tx_ledger(entity_name: str, tx_ledger_id: str, new_tx_logical_id: str):
+def ledger_move_tx_ledger(
+    entity_name: str, tx_ledger_id: str, new_tx_logical_id: str, auto_refresh_state=True
+):
     old_tx_logical = TxLogical.get_by_tx_ledger_id(tx_ledger_id)
     new_tx_logical = TxLogical.from_id(new_tx_logical_id)
     event = event_store.create_tx_ledger_moved(
@@ -300,7 +302,8 @@ def ledger_move_tx_ledger(entity_name: str, tx_ledger_id: str, new_tx_logical_id
     print(
         f"Moved tx_ledger {tx_ledger_id} - from tx_logical_id {old_tx_logical.id} to tx_logical_id {new_tx_logical.id}"
     )
-    _refresh_state(entity_name, event.action)
+    if auto_refresh_state:
+        _refresh_state(entity_name, event.action)
 
 
 app = typer.Typer(add_completion=False)

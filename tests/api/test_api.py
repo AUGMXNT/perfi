@@ -420,3 +420,40 @@ def test_add_and_remove_flag_to_logical(test_db):
     response = client.delete(f"/tx_logicals/{tx_logical.id}/flag/{flag.value}")
     assert response.status_code == 200
     assert flag.value not in [f.name for f in TxLogical.from_id(tx_logical.id).flags]
+
+
+def test_reparent_tx_ledger(test_db):
+    entity_store = EntityStore(test_db)
+    entity = entity_store.create(name="Foo")
+
+    address_store = AddressStore(test_db)
+    address = address_store.create("foo", Chain.ethereum, "0x123", entity_id=entity.id)
+
+    tx_logical_store = TxLogicalStore(test_db)
+    tx_logical = make_tx_logical(
+        entity_name=entity.name,
+        address=address.address,
+        tx_ledgers=[
+            make_tx_ledger(address.address, "OUT", "send"),
+        ],
+        tx_logical_type=TX_LOGICAL_TYPE.send,
+    )
+    tx_logical = tx_logical_store._create_for_tests(tx_logical)
+
+    tx_logical_2 = make_tx_logical(
+        entity_name=entity.name,
+        address=address.address,
+        tx_ledgers=[
+            make_tx_ledger(address.address, "IN", "receive"),
+        ],
+        tx_logical_type=TX_LOGICAL_TYPE.receive,
+    )
+    tx_logical_2 = tx_logical_store._create_for_tests(tx_logical_2)
+
+    tx_ledger = TxLogical.from_id(tx_logical.id).tx_ledgers[0]
+    response = client.put(f"/tx_ledgers/{tx_ledger.id}/tx_logical_id/{tx_logical_2.id}")
+    assert response.status_code == 200
+
+    tx_ledger_store = TxLedgerStore(test_db)
+    updated_ledger = tx_ledger_store.find_by_primary_key(tx_ledger.id)[0]
+    assert updated_ledger.tx_logical_id == tx_logical_2.id
