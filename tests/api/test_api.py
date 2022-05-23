@@ -1,9 +1,12 @@
 import uuid
+from decimal import Decimal
 from typing import List
 
 import pytest
+from _pytest.python_api import approx
 from starlette.testclient import TestClient
 from perfi.api import app, TxLogicalOut
+from perfi.events import EventStore
 from perfi.models import (
     AddressStore,
     Chain,
@@ -15,6 +18,8 @@ from perfi.models import (
     TX_LOGICAL_TYPE,
     SettingStore,
     Setting,
+    TxLedgerStore,
+    TX_LOGICAL_FLAG,
 )
 
 from fastapi.encoders import jsonable_encoder
@@ -29,11 +34,17 @@ def without(d, key):
 
 @pytest.fixture(scope="function", autouse=True)
 def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
+    event_store = EventStore(test_db, TxLogical, TxLedger)
+
     def test_db_returner(**kwargs):
         return test_db
 
     monkeysession.setattr("perfi.api.DB", test_db_returner)
     monkeysession.setattr("perfi.models.db", test_db)
+    monkeysession.setattr("bin.cli.db", test_db)
+    monkeysession.setattr("perfi.transaction.ledger_to_logical.db", test_db)
+    monkeysession.setattr("perfi.costbasis.db", test_db)
+    monkeysession.setattr("bin.cli.event_store", event_store)
 
 
 client = TestClient(app)
@@ -227,11 +238,11 @@ def test_delete_setting(test_db):
     assert setting_store.list() == [setting_2]
 
 
-def make_tx_ledger(direction: str, tx_ledger_type: str, **kw):
+def make_tx_ledger(address: str, direction: str, tx_ledger_type: str, **kw):
     return TxLedger(
         id=f"test_tx_ledger__{uuid.uuid4()}",
         chain=kw.get("chain") or Chain.ethereum.value,
-        address="test_address",
+        address=address,
         hash=f"test_hash__{uuid.uuid4()}",
         from_address=kw.get("from_address") or f"from__{uuid.uuid4()}",
         to_address=kw.get("to_address") or f"from__{uuid.uuid4()}",
@@ -247,7 +258,9 @@ def make_tx_ledger(direction: str, tx_ledger_type: str, **kw):
     )
 
 
-def make_tx_logical(tx_ledgers: List[TxLedger], tx_logical_type: TX_LOGICAL_TYPE, **kw):
+def make_tx_logical(
+    entity_name: str, tx_ledgers: List[TxLedger], tx_logical_type: TX_LOGICAL_TYPE, **kw
+):
     tx_logical = TxLogical(
         id=f"test_tx_logical__{uuid.uuid4()}",
         count=len(tx_ledgers),
@@ -255,6 +268,7 @@ def make_tx_logical(tx_ledgers: List[TxLedger], tx_logical_type: TX_LOGICAL_TYPE
         tx_ledgers=tx_ledgers,
         tx_logical_type=tx_logical_type.value,
         address=kw.get("address") or "test_address",
+        entity=entity_name,
     )
     tx_logical._group_ledgers()
     return tx_logical
@@ -269,21 +283,23 @@ def test_list_tx_logicals(test_db):
 
     tx_logical_store = TxLogicalStore(test_db)
     tx_logical1 = make_tx_logical(
+        entity_name=entity.name,
         address=address.address,
         tx_ledgers=[
-            make_tx_ledger("OUT", "send"),
+            make_tx_ledger(address.address, "OUT", "send"),
         ],
         tx_logical_type=TX_LOGICAL_TYPE.send,
     )
-    tx_logical1 = tx_logical_store.create(tx_logical1)
+    tx_logical1 = tx_logical_store._create_for_tests(tx_logical1)
 
     tx_logical2 = make_tx_logical(
+        entity_name=entity.name,
         tx_ledgers=[
-            make_tx_ledger("IN", "receive"),
+            make_tx_ledger(address.address, "IN", "receive"),
         ],
         tx_logical_type=TX_LOGICAL_TYPE.receive,
     )
-    tx_logical2 = tx_logical_store.create(tx_logical2)
+    tx_logical2 = tx_logical_store._create_for_tests(tx_logical2)
 
     response = client.get(f"/tx_logicals/")
     assert response.json() == jsonable_encoder(
@@ -300,22 +316,107 @@ def test_update_tx_logical_type(test_db):
     address = address_store.create("foo", Chain.ethereum, "0x123", entity_id=entity.id)
 
     tx_logical_store = TxLogicalStore(test_db)
-    tx_logical1 = make_tx_logical(
+    tx_logical = make_tx_logical(
+        entity_name=entity.name,
         address=address.address,
         tx_ledgers=[
-            make_tx_ledger("OUT", "send"),
+            make_tx_ledger(address.address, "OUT", "send"),
         ],
         tx_logical_type=TX_LOGICAL_TYPE.send,
     )
-    tx_logical1 = tx_logical_store.create(tx_logical1)
+    tx_logical = TxLogical.from_id(tx_logical_store._create_for_tests(tx_logical).id)
+    print(tx_logical.id)
 
     updated_type = TX_LOGICAL_TYPE.receive.value
     response = client.put(
-        f"/tx_logicals/{tx_logical1.id}/tx_logical_type/{updated_type}"
+        f"/tx_logicals/{tx_logical.id}/tx_logical_type/{updated_type}"
     )
     assert response.json() == jsonable_encoder(
         TxLogicalOut(
-            **tx_logical1.copy(update={"tx_logical_type": updated_type}).dict()
+            **tx_logical.copy(
+                deep=True, update={"tx_logical_type": updated_type}
+            ).dict()
         )
     )
     assert response.status_code == 200
+    assert tx_logical_store.find(id=tx_logical.id)[0].tx_logical_type == updated_type
+    assert TxLogical.from_id(tx_logical.id).outs == tx_logical.outs
+
+
+def test_update_tx_ledger_type(test_db):
+    entity_store = EntityStore(test_db)
+    entity = entity_store.create(name="Foo")
+
+    address_store = AddressStore(test_db)
+    address = address_store.create("foo", Chain.ethereum, "0x123", entity_id=entity.id)
+
+    tx_logical_store = TxLogicalStore(test_db)
+    tx_logical = make_tx_logical(
+        entity_name=entity.name,
+        address=address.address,
+        tx_ledgers=[
+            make_tx_ledger(address.address, "OUT", "send"),
+        ],
+        tx_logical_type=TX_LOGICAL_TYPE.send,
+    )
+    tx_logical = tx_logical_store._create_for_tests(tx_logical)
+
+    tx_ledger = tx_logical.outs[0]
+    updated_type = TX_LOGICAL_TYPE.receive.value
+    response = client.put(f"/tx_ledgers/{tx_ledger.id}/tx_ledger_type/{updated_type}")
+    assert response.status_code == 200
+    tx_ledger_store = TxLedgerStore(test_db)
+    assert tx_ledger_store.find(id=tx_ledger.id)[0].tx_ledger_type == updated_type
+
+
+def test_update_tx_ledger_price(test_db):
+    entity_store = EntityStore(test_db)
+    entity = entity_store.create(name="Foo")
+
+    address_store = AddressStore(test_db)
+    address = address_store.create("foo", Chain.ethereum, "0x123", entity_id=entity.id)
+
+    tx_logical_store = TxLogicalStore(test_db)
+    tx_logical = make_tx_logical(
+        entity_name=entity.name,
+        address=address.address,
+        tx_ledgers=[
+            make_tx_ledger(address.address, "OUT", "send"),
+        ],
+        tx_logical_type=TX_LOGICAL_TYPE.send,
+    )
+    tx_logical = tx_logical_store._create_for_tests(tx_logical)
+
+    tx_ledger = tx_logical.outs[0]
+    updated_price = Decimal(99.87)
+    response = client.put(f"/tx_ledgers/{tx_ledger.id}/tx_ledger_price/{updated_price}")
+    assert response.status_code == 200
+    tx_ledger_store = TxLedgerStore(test_db)
+    assert tx_ledger_store.find(id=tx_ledger.id)[0].price_usd == approx(Decimal(99.87))
+
+
+def test_add_and_remove_flag_to_logical(test_db):
+    entity_store = EntityStore(test_db)
+    entity = entity_store.create(name="Foo")
+
+    address_store = AddressStore(test_db)
+    address = address_store.create("foo", Chain.ethereum, "0x123", entity_id=entity.id)
+
+    tx_logical_store = TxLogicalStore(test_db)
+    tx_logical = make_tx_logical(
+        entity_name=entity.name,
+        address=address.address,
+        tx_ledgers=[
+            make_tx_ledger(address.address, "OUT", "send"),
+        ],
+        tx_logical_type=TX_LOGICAL_TYPE.send,
+    )
+    tx_logical = tx_logical_store._create_for_tests(tx_logical)
+    flag = TX_LOGICAL_FLAG.hidden_from_8949
+
+    response = client.post(f"/tx_logicals/{tx_logical.id}/flag/{flag.value}")
+    assert response.status_code == 200
+
+    response = client.delete(f"/tx_logicals/{tx_logical.id}/flag/{flag.value}")
+    assert response.status_code == 200
+    assert flag.value not in [f.name for f in TxLogical.from_id(tx_logical.id).flags]

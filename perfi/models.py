@@ -16,6 +16,7 @@ import jsonpickle
 from devtools import debug
 from pydantic import BaseModel
 
+
 T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
@@ -156,6 +157,7 @@ class TxLedger(BaseModel):
     symbol: Optional[str] = None
     price_usd: Optional[Decimal] = None
     price_source: Optional[str] = None
+    tx_logical_id: Optional[int] = None
 
     def __eq__(self, other):
         if not isinstance(other, TxLedger):
@@ -249,7 +251,7 @@ class TxLogical(BaseModel):
     addresses: List[str] = []
     tx_logical_type: str = ""  # replace with enum?
     entity: Optional[str] = None
-    flags: List[Flag] = []
+    flags: Optional[List[Flag]] = []
     ins: List[TxLedger] = []
     outs: List[TxLedger] = []
     fee: Optional[TxLedger] = None
@@ -335,6 +337,22 @@ class TxLogical(BaseModel):
             return cls(id=result[0][0], entity=entity_name)
         else:
             return cls(id=result[0][0], entity=None)
+
+    def load_entity_name(self):
+        # Assuming that this TxLogical has TxLedgers, we can take the entity from the address of any of the TxLedgers since
+        # we certainly don't support a TxLogical comprised of TxLedgers from addressess belonging to different entities
+        if len(self.tx_ledgers) == 0:
+            return None
+        else:
+            sql = """SELECT name
+                     FROM entity e
+                     JOIN address a on e.id = a.entity_id
+                     WHERE a.address = ?"""
+            params = self.tx_ledgers[0].address
+            results = db.query(sql, params)
+            if results:
+                self.entity = results[0]["name"]
+        return self.entity
 
     def auto_description(self):
         datestamp = datetime.fromtimestamp(self.timestamp).isoformat() + "Z"
@@ -890,25 +908,10 @@ class TxLogicalStore(BaseStore[TxLogical]):
         tx_logicals: List[TxLogical] = []
         for row in self.db.query(sql):
             txl = TxLogical.from_id(row["id"])
-
-            # # Now load the ledgers
-            # sql = """
-            #     SELECT *
-            #     FROM tx_ledger t
-            #     JOIN tx_rel_ledger_logical trll on t.id = trll.tx_ledger_id
-            #     WHERE trll.tx_logical_id = ?
-            # """
-            # params = [txl.id]
-            # for ledger_row in self.db.query(sql, params):
-            #     tx_ledger = TxLedger(**ledger_row)
-            #     txl.tx_ledgers.append(tx_ledger)
-            #
-            # txl._group_ledgers()
-
             tx_logicals.append(txl)
         return tx_logicals
 
-    def create(self, tx_logical: TxLogical):
+    def _create_for_tests(self, tx_logical: TxLogical):
         """
         IMPORTANT: This method is only intended to make our tests easier to write (rather than requiring constructing TxLedgers and TxLogicals from chain data)
         """
@@ -953,12 +956,33 @@ class TxLogicalStore(BaseStore[TxLogical]):
             tx_logical.tx_logical_type,
         ]
         self.db.execute(sql, params)
+        TxLogical.from_id.cache_clear()
         return tx_logical
 
+    def find(self, **kwargs):
+        return [TxLogical.from_id(txl.id) for txl in super().find(**kwargs)]
 
-class TxLedgerStore:
+
+class TxLedgerStore(BaseStore[TxLedger]):
     def __init__(self, db):
-        self.db = db
+        super().__init__(db, "tx_ledger", TxLedger)
+        super()._add_param_mapping("tx_ledger_type", lambda c: c.value)
+
+    def find_by_primary_key(self, key):
+        ledger: TxLedger = super().find_by_primary_key(key)[0]
+
+        # Also load in the tx_logical_id as a convenience in case we want to know which logical this belongs to
+        sql = (
+            """SELECT tx_logical_id FROM tx_rel_ledger_logical where tx_ledger_id = ?"""
+        )
+        params = [ledger.id]
+        results = self.db.query(sql, params)
+        if len(results) == 1:
+            return [ledger.copy(update={"tx_logical_id": results[0]["tx_logical_id"]})]
+        else:
+            raise Exception(
+                "Every TX Ledger should belong to a TxLogical. What happened here for tx_ledger id {ledger.id}"
+            )
 
     def save(self, tx: TxLedger):
         sql = """REPLACE INTO tx_ledger

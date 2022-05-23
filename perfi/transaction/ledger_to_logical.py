@@ -204,3 +204,4 @@ class TransactionLogicalGrouper:
                 )
 
         logger.debug(tbl_logicals)
+        print(tbl_logicals)

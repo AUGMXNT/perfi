@@ -1,9 +1,19 @@
 # Run this server like this: uvicorn api:app --reload
 import builtins
+import time
 
 import pytz
 
+from bin.cli import (
+    ledger_update_logical_type,
+    ledger_update_ledger_type,
+    ledger_update_price,
+    ledger_flag_logical,
+    ledger_remove_flag_logical,
+)
+from perfi.costbasis import regenerate_costbasis_lots
 from perfi.db import DB
+from perfi.events import EventStore
 from perfi.models import (
     TxLogical,
     TxLedger,
@@ -17,6 +27,8 @@ from perfi.models import (
     SettingStore,
     Setting,
     TX_LOGICAL_TYPE,
+    TxLedgerStore,
+    TX_LOGICAL_FLAG,
 )
 from typing import List, Dict, Type
 
@@ -24,6 +36,7 @@ from fastapi import Depends, FastAPI, Response, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 
+from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
 
 """
 -------------------------
@@ -51,12 +64,22 @@ def tx_logical_store(db=Depends(db)):
     return TxLogicalStore(db)
 
 
+def tx_ledger_store(db=Depends(db)):
+    return TxLedgerStore(db)
+
+
+def event_store(db=Depends(db)):
+    return EventStore(db, TxLogical, TxLedger)
+
+
 class Stores:
     def __init__(self, db: DB):
         self.entity: EntityStore = EntityStore(db)
         self.address: AddressStore = AddressStore(db)
         self.setting: SettingStore = SettingStore(db)
         self.tx_logical: TxLogicalStore = TxLogicalStore(db)
+        self.tx_ledger: TxLedgerStore = TxLedgerStore(db)
+        self.event_store: EventStore = event_store(db)
 
 
 def stores():
@@ -224,22 +247,90 @@ def list_tx_logicals(store: TxLogicalStore = Depends(tx_logical_store)):
     "/tx_logicals/{id}/tx_logical_type/{updated_type_name}", response_model=TxLogicalOut
 )
 def update_tx_logical_type(
+    id: str,
     updated_type_name: str,
     tx_logical: TxLogical = Depends(EnsureRecord("tx_logical")),
+):
+    # TODO: For some reason, refreshing state after this update causes
+    # TxLogical.from_id() to load with no TxLedgers. This is probably because
+    #  the API tests don't set up a TxLedger the same way that our real imports do
+    #  and this causes the problem with costbasis regeneration.
+    #  So, we should check this later with a full e2e test to see if we can reproduce with a manual rebuild of state later...
+    tx_logical.load_entity_name()
+    ledger_update_logical_type(
+        tx_logical.entity, tx_logical.id, updated_type_name, auto_refresh_state=False
+    )
+    return TxLogical.from_id(id)
+
+
+@app.post("/tx_logicals/{id}/flag/{flag_name}")
+def add_flag_to_logical(
+    flag_name: str, tx_logical: TxLogical = Depends(EnsureRecord("tx_logical"))
+):
+    tx_logical.load_entity_name()
+    ledger_flag_logical(
+        tx_logical.entity,
+        tx_logical.id,
+        TX_LOGICAL_FLAG[flag_name],
+        auto_refresh_state=False,
+    )
+    return TxLogical.from_id(tx_logical.id)
+
+
+@app.delete("/tx_logicals/{id}/flag/{flag_name}")
+def remove_flag_from_logical(
+    flag_name: str, tx_logical: TxLogical = Depends(EnsureRecord("tx_logical"))
+):
+    tx_logical.load_entity_name()
+    ledger_remove_flag_logical(
+        tx_logical.entity,
+        tx_logical.id,
+        TX_LOGICAL_FLAG[flag_name],
+        auto_refresh_state=False,
+    )
+    return TxLogical.from_id(tx_logical.id)
+
+
+# TX LEDGERS =================================================================================
+
+
+@app.put("/tx_ledgers/{id}/tx_ledger_type/{updated_type_name}")
+def update_tx_ledger_type(
+    updated_type_name: str,
+    tx_ledger: TxLedger = Depends(EnsureRecord("tx_ledger")),
     stores: Stores = Depends(stores),
 ):
-    updated = tx_logical.copy(
-        update={"tx_logical_type": TX_LOGICAL_TYPE[updated_type_name].value}
+    tx_logical = stores.tx_logical.find_by_primary_key(tx_ledger.tx_logical_id)[0]
+    ledger_update_ledger_type(
+        tx_logical.entity, tx_ledger.id, updated_type_name, auto_refresh_state=False
     )
-    return stores.tx_logical.save(updated)
+    return stores.tx_ledger.find_by_primary_key(tx_ledger.id)
 
 
-# Update Logical Type
-# Update Ledger Type
-# Update Ledger Price
-# Create Flag for Logical
-# Delete Flag for Logical
+@app.put("/tx_ledgers/{id}/tx_ledger_price/{updated_price}")
+def update_tx_ledger_price(
+    updated_price: float,
+    tx_ledger: TxLedger = Depends(EnsureRecord("tx_ledger")),
+    stores: Stores = Depends(stores),
+):
+    tx_logical = stores.tx_logical.find_by_primary_key(tx_ledger.tx_logical_id)[0]
+    ledger_update_price(
+        tx_logical.entity, tx_ledger.id, updated_price, auto_refresh_state=False
+    )
+    return stores.tx_ledger.find_by_primary_key(tx_ledger.id)
+
+
 # Move Ledger to new Logical
+
+
+@app.post("/entities/{id}/regenerate_costbasis")
+def regenerate_costbasis(
+    entity: Entity = Depends(EnsureRecord("entity")), stores: Stores = Depends(stores)
+):
+    tlg = TransactionLogicalGrouper(entity.name, stores.event_store)
+    tlg.update_entity_transactions()
+    regenerate_costbasis_lots(entity.name, args=None, quiet=True)
+    return {"ok": True}
 
 
 if __name__ == "__main__":

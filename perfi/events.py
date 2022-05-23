@@ -16,6 +16,7 @@ class EVENT_ACTION(Enum):
     tx_ledger_price_updated = "tx_ledger_price_updated"
     tx_logical_type_updated = "tx_logical_type_updated"
     tx_logical_flag_added = "tx_logical_flag_added"
+    tx_logical_flag_removed = "tx_logical_flag_removed"
 
 
 @dataclass
@@ -72,6 +73,7 @@ class EventStore:
             EVENT_ACTION.tx_ledger_type_updated: self.handle_tx_ledger_type_updated_event,
             EVENT_ACTION.tx_ledger_price_updated: self.handle_tx_ledger_price_updated_event,
             EVENT_ACTION.tx_logical_flag_added: self.handle_tx_logical_flag_added_event,
+            EVENT_ACTION.tx_logical_flag_removed: self.handle_tx_logical_flag_removed_event,
             EVENT_ACTION.tx_logical_type_updated: self.handle_tx_logical_type_updated_event,
         }
         if event.action not in handlers.keys():
@@ -239,6 +241,34 @@ class EventStore:
         TxLogical.from_id.cache_clear()
         return Event(id, source, action, data, timestamp)
 
+    def create_tx_logical_flag_removed(
+        self, tx_logical_id: str, flag, source: str = "perfi"
+    ):
+        id = self.new_id()
+        source = source
+        action = EVENT_ACTION.tx_logical_flag_removed
+        data = {
+            "version": 1,
+            "tx_logical_id": tx_logical_id,
+            "flag_value": flag.value,
+        }
+        timestamp = int(time.time())
+        sql = """INSERT INTO event
+           (id, source, action, data, timestamp)
+           VALUES
+           (?, ?, ?, ?, ?)
+        """
+        params = [
+            id,
+            source,
+            action.value,
+            json.dumps(data),
+            timestamp,
+        ]
+        self.db.execute(sql, params)
+        TxLogical.from_id.cache_clear()
+        return Event(id, source, action, data, timestamp)
+
     def handle_tx_ledger_moved_event(self, event: Event):
         data = event.data
         tx_ledger_id = data["tx_ledger_id"]
@@ -301,5 +331,11 @@ class EventStore:
         tx: TxLogical = self.TxLogical.from_id(event.data["tx_logical_id"])
         new_flag = Flag(source="manual", name=event.data["flag_value"])
         updated_flags = tx.flags + [new_flag]
+        replace_flags(TxLogical.__name__, tx.id, updated_flags)
+        TxLogical.from_id.cache_clear()
+
+    def handle_tx_logical_flag_removed_event(self, event: Event):
+        tx: TxLogical = self.TxLogical.from_id(event.data["tx_logical_id"])
+        updated_flags = [f for f in tx.flags if f.name != event.data["flag_value"]]
         replace_flags(TxLogical.__name__, tx.id, updated_flags)
         TxLogical.from_id.cache_clear()

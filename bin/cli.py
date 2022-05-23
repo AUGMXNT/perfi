@@ -203,7 +203,10 @@ def _refresh_state(entity_name: str, trigger_action: EVENT_ACTION):
 
 @ledger_app.command("update_logical_type")
 def ledger_update_logical_type(
-    entity_name: str, tx_logical_id: str, new_tx_logical_type: str
+    entity_name: str,
+    tx_logical_id: str,
+    new_tx_logical_type: str,
+    auto_refresh_state: bool = True,
 ):
     allowed_values = [e.value for e in TX_LOGICAL_TYPE]
     if new_tx_logical_type not in allowed_values:
@@ -217,12 +220,16 @@ def ledger_update_logical_type(
     print(
         f"Updated tx_logical {tx_logical_id} - set tx_logical_type to {new_tx_logical_type}"
     )
-    _refresh_state(entity_name, event.action)
+    if auto_refresh_state:
+        _refresh_state(entity_name, event.action)
 
 
 @ledger_app.command("update_ledger_type")
 def ledger_update_ledger_type(
-    entity_name: str, tx_ledger_id: str, new_tx_ledger_type: str
+    entity_name: str,
+    tx_ledger_id: str,
+    new_tx_ledger_type: str,
+    auto_refresh_state: bool = True,
 ):
     allowed_values = [e.value for e in TX_LOGICAL_TYPE]
     if new_tx_ledger_type not in allowed_values:
@@ -236,11 +243,14 @@ def ledger_update_ledger_type(
     print(
         f"Updated tx_ledger {tx_ledger_id} - set tx_ledger_type to {new_tx_ledger_type}"
     )
-    _refresh_state(entity_name, event.action)
+    if auto_refresh_state:
+        _refresh_state(entity_name, event.action)
 
 
 @ledger_app.command("update_price")
-def ledger_update_price(entity_name: str, tx_ledger_id: str, new_price_usd: float):
+def ledger_update_price(
+    entity_name: str, tx_ledger_id: str, new_price_usd: float, auto_refresh_state=True
+):
     event = event_store.create_tx_ledger_price_updated(
         tx_ledger_id,
         new_price_usd,
@@ -249,17 +259,34 @@ def ledger_update_price(entity_name: str, tx_ledger_id: str, new_price_usd: floa
     )
     event_store.apply_event(event)
     print(f"Updated tx_ledger {tx_ledger_id} - set price to {new_price_usd}")
-    _refresh_state(entity_name, event.action)
+    if auto_refresh_state:
+        _refresh_state(entity_name, event.action)
 
 
 @ledger_app.command("add_flag_to_logical")
-def ledger_flag_logical(entity_name: str, tx_logical_id: str, flag: TX_LOGICAL_FLAG):
+def ledger_flag_logical(
+    entity_name: str, tx_logical_id: str, flag: TX_LOGICAL_FLAG, auto_refresh_state=True
+):
     event = event_store.create_tx_logical_flag_added(
         tx_logical_id, flag, source="manual"
     )
     event_store.apply_event(event)
     print(f"Updated tx_logical {tx_logical_id} - added flag {flag.value}")
-    _refresh_state(entity_name, event.action)
+    if auto_refresh_state:
+        _refresh_state(entity_name, event.action)
+
+
+@ledger_app.command("delete_flag_from_logical")
+def ledger_remove_flag_logical(
+    entity_name: str, tx_logical_id: str, flag: TX_LOGICAL_FLAG, auto_refresh_state=True
+):
+    event = event_store.create_tx_logical_flag_removed(
+        tx_logical_id, flag, source="manual"
+    )
+    event_store.apply_event(event)
+    print(f"Updated tx_logical {tx_logical_id} - added flag {flag.value}")
+    if auto_refresh_state:
+        _refresh_state(entity_name, event.action)
 
 
 @ledger_app.command("move")
