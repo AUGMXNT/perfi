@@ -12,9 +12,13 @@ from bin.cli import (
     ledger_remove_flag_logical,
     ledger_move_tx_ledger,
 )
+from bin.import_from_exchange import do_import
+from bin.map_assets import generate_constants
+from perfi.asset import update_assets_from_txchain
 from perfi.costbasis import regenerate_costbasis_lots
 from perfi.db import DB
 from perfi.events import EventStore
+from perfi.ingest.chain import scrape_entity_transactions
 from perfi.models import (
     TxLogical,
     TxLedger,
@@ -33,11 +37,13 @@ from perfi.models import (
 )
 from typing import List, Dict, Type
 
-from fastapi import Depends, FastAPI, Response, HTTPException, Request
+from fastapi import Depends, FastAPI, Response, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from typing import Optional
 
 from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
+
+from bin.update_coingecko_pricelist import main as update_coingecko_pricelist_main
 
 """
 -------------------------
@@ -335,10 +341,37 @@ def reparent_tx_ledger_to_tx_logical(
     return stores.tx_ledger.find_by_primary_key(tx_ledger.id)
 
 
+# BIN TRIGGERS ===========================================================
+@app.post("/update_coingecko_pricelist")
+def update_coingecko_pricelist():
+    update_coingecko_pricelist_main()
+    return {"ok": True}
+
+
+@app.post("/entities/{id}/import_chain_transactions")
+def import_chain_transactions(entity: Entity = Depends(EnsureRecord("entity"))):
+    scrape_entity_transactions(entity)
+    return {"ok": True}
+
+
+@app.post("/entities/{id}/import_from_exchange/{exchange_type}/{exchange_account_id}")
+def import_chain_transactions(
+    file: UploadFile,
+    exchange_type: str,
+    exchange_account_id: str,
+    entity: Entity = Depends(EnsureRecord("entity")),
+):
+    do_import(entity.id, exchange_type, exchange_account_id, file)
+    return {"ok": True}
+
+
 @app.post("/entities/{id}/regenerate_costbasis")
 def regenerate_costbasis(
     entity: Entity = Depends(EnsureRecord("entity")), stores: Stores = Depends(stores)
 ):
+    update_assets_from_txchain()
+    generate_constants()
+
     tlg = TransactionLogicalGrouper(entity.name, stores.event_store)
     tlg.update_entity_transactions()
     regenerate_costbasis_lots(entity.name, args=None, quiet=True)

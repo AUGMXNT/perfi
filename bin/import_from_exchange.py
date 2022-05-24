@@ -52,8 +52,12 @@ def main():
     except:
         raise Exception(f"Entity name {args.entity_name} not found in database!")
 
+    do_import(entity_id, args.exchange, args.exchange_account_id, args.file)
+
+
+def do_import(entity_id: int, exchange: str, exchange_account_id: str, file):
     # See if our entity_address we want to use exists yet. If not, create it.
-    entity_address_for_imports = f"{args.exchange}.{args.exchange_account_id}"
+    entity_address_for_imports = f"{exchange}.{exchange_account_id}"
     sql = """SELECT a.address from address a where a.address = ?"""
     params = [entity_address_for_imports]
     result = db.query(sql, params)
@@ -67,8 +71,8 @@ def main():
             (?, ?, ?, ?, ?, ?, ?)
         """
         params = [
-            f"{args.exchange}",
-            f"import.{args.exchange}",
+            f"{exchange}",
+            f"import.{exchange}",
             entity_address_for_imports,
             "account",
             "imported",
@@ -86,18 +90,25 @@ def main():
         "kraken": KrakenImporter,
         "gemini": GeminiImporter,
     }
-    importer_class = importer_mapping[args.exchange]
+    importer_class = importer_mapping[exchange]
 
     # Do the import
     logger.debug("Importing...")
     importer = importer_class()
-    filemode = "rb" if args.exchange == "gemini" else "r"
+    filemode = "rb" if exchange == "gemini" else "r"
 
-    with open(args.file, filemode) as file:
+    if type(file) is str:
+        with open(file, filemode) as file:
+            importer.do_import(
+                file,
+                entity_address_for_imports=entity_address_for_imports,
+                exchange_account_id=exchange_account_id,
+            )
+    else:
         importer.do_import(
             file,
             entity_address_for_imports=entity_address_for_imports,
-            exchange_account_id=args.exchange_account_id,
+            exchange_account_id=exchange_account_id,
         )
 
     logger.debug("Done.")
