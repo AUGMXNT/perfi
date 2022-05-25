@@ -5,6 +5,8 @@ import EntityForm from '@/components/EntityForm.vue'
 import type { Entity } from '@/model_types'
 import { useRouter, useRoute } from 'vue-router'
 import { RouterLink } from 'vue-router';
+import CrudTable from '@/components/CrudTable.vue'
+import AddressForm from '@/components/AddressForm.vue'
 
 const props = defineProps<{
   entity: Entity
@@ -83,6 +85,9 @@ watchEffect(() => {
       <q-btn flat v-if="!isEditing" @click="handleDelete">Delete</q-btn>
     </q-card-actions>
   </q-card>
+
+  <CrudTable v-if="entity.addresses" :records="entity.addresses" :form="AddressForm">
+  </CrudTable>
 
   <q-table
     title="Addresses"

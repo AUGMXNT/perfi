@@ -17,6 +17,7 @@ app.use(router)
 
 app.use(Quasar, {
   plugins: {},
+  supportTS: true,
 })
 
 app.mount('#app')
