@@ -40,4 +40,17 @@ type TxLogical = {
   others: TxLedger[]
 }
 
-export type { Flag, TxLogical, TxLedger }
+type Label = {
+  id: number
+  name: string
+  description: string
+}
+
+type Entity = {
+  id: number
+  name: string
+  note: string
+}
+
+
+export type { Flag, TxLogical, TxLedger, Label, Entity }
