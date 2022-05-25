@@ -1,41 +1,41 @@
 <script setup lang="ts">
 import { ref, reactive, nextTick, watchEffect, computed } from "vue"
 import axios from "axios";
-import type { Label } from '@/model_types'
+import type { Entity } from '@/model_types'
 
 const props = defineProps<{
-  label?: Label
+  entity?: Entity
 }>()
 
 const emit = defineEmits<{
-  (e: 'updated', id: number, name: string, description: string): void
-  (e: 'created', label: Label): void
+  (e: 'updated', id: number, name: string, note: string): void
+  (e: 'created', entity: Entity): void
   (e: 'canceled'): void
 }>()
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
-const formLabel = computed(() => { return props.label ? 'Edit Label' : 'Add Label' })
+const formLabel = computed(() => { return props.entity ? 'Edit Entity' : 'Add Entity' })
 
-const submitLabel = computed(() => { return props.label ? 'Update Label' : 'Submit Label' })
+const submitLabel = computed(() => { return props.entity ? 'Update Entity' : 'Submit Entity' })
 
 let form = ref(null)
-let formData = ref<{name: string, description: string}>({
-  name: props.label?.name || '',
-  description: props.label?.description || ''
+let formData = ref<{name: string, note: string}>({
+  name: props.entity?.name || '',
+  note: props.entity?.note || ''
 })
 
 const handleSubmit = async () => {
-  if (props.label) {
-    const updateUrl = `${BACKEND_URL}/labels/${props.label.id}`
-    const result = await axios.put(updateUrl, { name: formData.value.name, description: formData.value.description }, { withCredentials: true })
-    emit('updated', props.label.id, formData.value.name, formData.value.description)
+  if (props.entity) {
+    const updateUrl = `${BACKEND_URL}/entities/${props.entity.id}`
+    const result = await axios.put(updateUrl, { name: formData.value.name, note: formData.value.note }, { withCredentials: true })
+    emit('updated', props.entity.id, formData.value.name, formData.value.note)
   }
   else {
-    const createUrl = `${BACKEND_URL}/labels`
-    const result = await axios.post(createUrl, { name: formData.value.name, description: formData.value.description }, { withCredentials: true })
+    const createUrl = `${BACKEND_URL}/entities`
+    const result = await axios.post(createUrl, { name: formData.value.name, note: formData.value.note }, { withCredentials: true })
     emit('created', result.data)
-    formData.value = { name: '', description: '' }
+    formData.value = { name: '', note: '' }
 
     // Need to wait until next tick to reset the form validation
     setTimeout(()=>(form.value as any).resetValidation(), 0)
@@ -60,13 +60,12 @@ const handleSubmit = async () => {
         dense
         outlined
         type="text"
-        v-model="formData.description"
+        v-model="formData.note"
         label="Notes"
-        :rules="[val => !!val || 'Description can\'t be empty']"
       />
 
-      <q-btn :label="label?.id ? 'Update' : 'Add'" type="submit" color="primary" />
-      <q-btn flat label="Cancel" color="black" @click="formData={name: '', description: ''}; emit('canceled')" />
+      <q-btn :label="entity?.id ? 'Update' : 'Add'" type="submit" color="primary" />
+      <q-btn flat label="Cancel" color="black" @click="formData={name: '', note: ''}; emit('canceled')" />
     </div>
   </q-form>
 </template>

@@ -61,6 +61,7 @@ const handleCanceled = () => {
     :columns="columns"
     row-key="name"
     data-test="entities"
+    hide-pagination
   >
 
     <template v-slot:top>
@@ -96,6 +97,27 @@ const handleCanceled = () => {
           </q-tr>
     </template>
   </q-table>
+
+  <q-list>
+    <q-item-label header>Entities</q-item-label>
+      <q-item v-for="entity in allEntities" :key="entity.id">
+        <q-item-section>
+          <q-item-label>{{ entity.name }}</q-item-label>
+          <q-item-label caption>{{ entity.note }}</q-item-label>
+        </q-item-section>
+        <q-item-section top side>
+          <div class="text-grey-8 q-gutter-xs">
+            <q-btn class="gt-xs" size="12px" flat dense round icon="edit" />
+            <q-btn class="gt-xs" size="12px" flat dense round icon="delete" />
+          </div>
+        </q-item-section>
+        <q-item-section top side>
+          <div class="text-grey-8 q-gutter-xs">
+            <q-btn size="12px" label="Manage Addresses" :to="`/settings/entity/${entity.id}`" flat dense />
+          </div>
+        </q-item-section>
+      </q-item>
+  </q-list>
 </template>
 
 <style scoped>
