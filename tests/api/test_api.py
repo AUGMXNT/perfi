@@ -292,19 +292,8 @@ def test_list_tx_logicals(test_db):
     )
     tx_logical1 = tx_logical_store._create_for_tests(tx_logical1)
 
-    tx_logical2 = make_tx_logical(
-        entity_name=entity.name,
-        tx_ledgers=[
-            make_tx_ledger(address.address, "IN", "receive"),
-        ],
-        tx_logical_type=TX_LOGICAL_TYPE.receive,
-    )
-    tx_logical2 = tx_logical_store._create_for_tests(tx_logical2)
-
-    response = client.get(f"/tx_logicals/")
-    assert response.json() == jsonable_encoder(
-        [TxLogicalOut(**tx_logical1.dict()), TxLogicalOut(**tx_logical2.dict())]
-    )
+    response = client.get(f"/tx_logicals/{entity.name}")
+    assert response.json() == jsonable_encoder([TxLogicalOut(**tx_logical1.dict())])
     assert response.status_code == 200
 
 

@@ -281,7 +281,7 @@ def get_settings_keys_used_list():
 
 # TX LOGICALS =================================================================================
 
-# List TxLogicals
+
 @app.get("/tx_logicals/{entity_name}", response_model=List[TxLogicalOut])
 def list_tx_logicals(
     entity_name: str,
@@ -292,12 +292,6 @@ def list_tx_logicals(
     return store.paginated_list(entity_name, items_per_page=limit, page_num=page)
 
 
-# Update Logical Type
-# Update Ledger Type
-# Update Ledger Price
-# Create Flag for Logical
-# Delete Flag for Logical
-# Move Ledger to new Logical
 @app.put(
     "/tx_logicals/{id}/tx_logical_type/{updated_type_name}", response_model=TxLogicalOut
 )

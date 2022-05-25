@@ -933,31 +933,10 @@ class TxLogicalStore(BaseStore[TxLogical]):
         results = self.db.query(sql, params)
         return [TxLogical.from_id(r["id"]) for r in results]
 
-    def list(self):
+    def list(self, order_by="timestamp ASC"):
         sql = """SELECT id from tx_logical ORDER BY timestamp ASC"""
         tx_logicals: List[TxLogical] = []
-        for row in self.db.query(sql, params):
-            txl = TxLogical.from_id(
-                row["id"]
-            )  # this is some sad n+1 querying but whatever
-            tx_logicals.append(txl)
-        return tx_logicals
-
-    def list(self, entity_name: str):
-        sql = """
-            SELECT id
-            FROM tx_logical
-             WHERE address IN (
-                 SELECT address
-                     FROM address, entity
-                     WHERE entity_id = entity.id
-                     AND entity.name = ?
-             )
-
-            ORDER BY timestamp ASC
-        """
-        tx_logicals: List[TxLogical] = []
-        for row in self.db.query(sql, entity_name):
+        for row in self.db.query(sql):
             txl = TxLogical.from_id(row["id"])
             tx_logicals.append(txl)
         return tx_logicals
