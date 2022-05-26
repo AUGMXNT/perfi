@@ -2,60 +2,41 @@
 import { ref, reactive, nextTick, onMounted, watchEffect, computed, onBeforeMount } from "vue"
 import axios from "axios";
 import EntityForm from '@/components/EntityForm.vue'
+import CrudTable from '@/components/CrudTable.vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import type { Entity } from "@/model_types";
 
-import { useEntitiesStore } from '@/stores/entities'
+import { useEntityStore } from '@/stores/entities'
 import { storeToRefs } from 'pinia'
 
 
 const router = useRouter()
 const route = useRoute()
 
-const store = useEntitiesStore()
-store.fetch()
-const allEntities = storeToRefs(store).all
+const entityStore = useEntityStore()
+entityStore.fetch()
+const allEntities = storeToRefs(entityStore).all
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
-let entities = ref<Entity[]>([])
-let loading = ref<boolean>(false)
-let isAdding = ref<boolean>(false)
-
-const columns = [
-  { name: 'name', align: 'left', label: 'Name', field: 'name', sortable: true },
-  { name: 'note', align: 'left', label: 'Note', field: 'note' }
-]
-
-const handleDeleted = (id: number) => {
-  store.delete(id)
-  entities.value = entities.value.filter(l => l.id !== id)
-}
-
-const handleSave = async (original: Entity, updatedPropName: string, updatedPropValue: string) => {
-  const updated = {...original, [updatedPropName]: updatedPropValue }
-  const url = `${BACKEND_URL}/entities/${original.id}`
-  const response = await axios.put(url, { ...updated }, { withCredentials: true })
-  store.update(original.id, updatedPropName, updatedPropValue)
-}
-
-const handleAdd = () => {
- isAdding.value = true
-}
-
-const handleCreated = (entity: Entity) => {
-  entities.value = [entity, ...entities.value]
-  isAdding.value = false;
-  store.add(entity)
-}
-
-const handleCanceled = () => {
-  isAdding.value = false;
-}
 
 </script>
 
 <template>
-  <q-table
+  <CrudTable
+    v-if="allEntities.length > 0"
+    title="Entities"
+    :records="allEntities"
+    :form="EntityForm"
+    :delete-url="r => `${BACKEND_URL}/entities/${r.id}`"
+    :store="entityStore"
+  >
+    <template #otherActions="otherActionsProps">
+      <q-btn flat @click="router.push({name: 'entity', params: {entityId: otherActionsProps.entityId}})" label="Manage Addresses"></q-btn>
+    </template>
+  </CrudTable>
+
+
+  <!-- <q-table
     title="Entities"
     :rows="allEntities"
     :columns="columns"
@@ -96,9 +77,9 @@ const handleCanceled = () => {
             </q-td>
           </q-tr>
     </template>
-  </q-table>
+  </q-table> -->
 
-  <q-list>
+  <!-- <q-list>
     <q-item-label header>Entities</q-item-label>
       <q-item v-for="entity in allEntities" :key="entity.id">
         <q-item-section>
@@ -117,7 +98,7 @@ const handleCanceled = () => {
           </div>
         </q-item-section>
       </q-item>
-  </q-list>
+  </q-list> -->
 </template>
 
 <style scoped>

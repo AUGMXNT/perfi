@@ -47,7 +47,7 @@ const handleDelete = async () => {
 
 let addressColumns = ref<{name: string, label: string}[] | null>([])
 watchEffect(() => {
-  if (!entity.value || !entity.value.addresses) return;
+  if (!entity.value || !entity.value.addresses || entity.value.addresses.length == 0) return;
   let address = entity.value.addresses[0];
 
   addressColumns.value = Object.keys(address).map(prop => { return {
@@ -86,10 +86,15 @@ watchEffect(() => {
     </q-card-actions>
   </q-card>
 
-  <CrudTable v-if="entity.addresses" :records="entity.addresses" :form="AddressForm">
-  </CrudTable>
+  <CrudTable
+    v-if="entity.addresses"
+    title="Addresses"
+    :records="entity.addresses"
+    :form="AddressForm"
+    :delete-url="r => `${BACKEND_URL}/addresses/${r.id}`"
+  />
 
-  <q-table
+  <!-- <q-table
     title="Addresses"
     :rows="entity.addresses"
     :columns="addressColumns"
@@ -101,5 +106,5 @@ watchEffect(() => {
         <q-btn dense round flat color="grey" @click="deleteRow(props)" icon="delete"></q-btn>
       </q-td>
     </template>
-  </q-table>
+  </q-table> -->
 </template>

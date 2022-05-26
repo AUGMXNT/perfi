@@ -4,70 +4,78 @@ import axios from "axios";
 import type { Entity } from '@/model_types'
 
 const props = defineProps<{
-  entity?: Entity
+  record: Entity
 }>()
 
 const emit = defineEmits<{
-  (e: 'updated', id: number, name: string, note: string): void
-  (e: 'created', entity: Entity): void
+  (e: 'updated', record: Entity): void
+  (e: 'created', record: Entity): void
   (e: 'canceled'): void
 }>()
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
-const formLabel = computed(() => { return props.entity ? 'Edit Entity' : 'Add Entity' })
+const formLabel = computed(() => { return props.record ? 'Edit' : 'Add' })
 
-const submitLabel = computed(() => { return props.entity ? 'Update Entity' : 'Submit Entity' })
+const submitLabel = computed(() => { return props.record ? 'Update' : 'Submit' })
 
 let form = ref(null)
-let formData = ref<{name: string, note: string}>({
-  name: props.entity?.name || '',
-  note: props.entity?.note || ''
-})
+let formData = ref(props.record)
 
 const handleSubmit = async () => {
-  if (props.entity) {
-    const updateUrl = `${BACKEND_URL}/entities/${props.entity.id}`
-    const result = await axios.put(updateUrl, { name: formData.value.name, note: formData.value.note }, { withCredentials: true })
-    emit('updated', props.entity.id, formData.value.name, formData.value.note)
+  if (props.record.id) {
+    const updateUrl = `${BACKEND_URL}/entities/${props.record.id}`
+    const result = await axios.put(updateUrl, { ...formData.value }, { withCredentials: true })
+    emit('updated', Object.assign({}, formData.value))
   }
   else {
     const createUrl = `${BACKEND_URL}/entities`
-    const result = await axios.post(createUrl, { name: formData.value.name, note: formData.value.note }, { withCredentials: true })
+    const result = await axios.post(createUrl, { ...formData.value }, { withCredentials: true })
     emit('created', result.data)
-    formData.value = { name: '', note: '' }
+    resetForm({nextTick: true})
+    // formData.value = {} as Entity
 
-    // Need to wait until next tick to reset the form validation
+    // // Need to wait until next tick to reset the form validation due to the submit
+    // setTimeout(()=>(form.value as any).resetValidation(), 0)
+  }
+}
+
+const resetForm = ({nextTick=false}={}) => {
+  formData.value = {} as Entity
+  if (nextTick) {
     setTimeout(()=>(form.value as any).resetValidation(), 0)
+  }
+  else {
+    (form.value as any).resetValidation()
   }
 }
 </script>
 
 <template>
+  <div padding>
+    <q-form ref="form" @submit="handleSubmit">
+      <div>
+        <q-input
+          outlined
+          type="text"
+          v-model="formData.name"
+          label="Label"
+          :rules="[val => !!val || 'Name can\'t be empty']"
+        />
 
-  <q-form ref="form" @submit="handleSubmit">
-    <div class="q-gutter-md row items-start">
-      <q-input
-        dense
-        outlined
-        type="text"
-        v-model="formData.name"
-        label="Name"
-        :rules="[val => !!val || 'Name can\'t be empty']"
-      />
+        <q-input
+          outlined
+          type="text"
+          v-model="formData.note"
+          label="Notes"
+          :rules="[val => !!val || 'Notes can\'t be empty']"
+        />
 
-      <q-input
-        dense
-        outlined
-        type="text"
-        v-model="formData.note"
-        label="Notes"
-      />
-
-      <q-btn :label="entity?.id ? 'Update' : 'Add'" type="submit" color="primary" />
-      <q-btn flat label="Cancel" color="black" @click="formData={name: '', note: ''}; emit('canceled')" />
-    </div>
-  </q-form>
+        <q-btn :label="record?.id ? 'Update' : 'Add'" type="submit" color="primary" />
+        <q-btn flat label="Cancel" color="black" @click="resetForm(); emit('canceled')" />
+      </div>
+    </q-form>
+  </div>
 </template>
 
 <style scoped>

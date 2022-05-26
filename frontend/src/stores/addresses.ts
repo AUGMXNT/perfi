@@ -1,18 +1,18 @@
 import { defineStore } from 'pinia'
-import type { Entity } from '@/model_types'
+import type { Address } from '@/model_types'
 import axios from 'axios'
 
-const fetchUrl = `${import.meta.env.VITE_BACKEND_URL}/entities`
+const fetchUrl = `${import.meta.env.VITE_BACKEND_URL}/addresses`
 
-export const useEntityStore = defineStore({
-  id: 'entities',
+export const useAddressStore = defineStore({
+  id: 'addresses',
 
   state: () => ({
-    items: <Entity[]>[]
+    items: <Address[]>[]
   }),
 
   getters: {
-    all: (state): Entity[] => { return state.items }
+    all: (state): Address[] => { return state.items }
   },
 
   actions: {
@@ -21,18 +21,18 @@ export const useEntityStore = defineStore({
       this.items = response.data
     },
 
-    add(item: Entity) {
+    add(item: Address) {
       this.items.push(item)
     },
 
-    updateAttribute(id: number, updatedProp: keyof Entity, updatedValue: string) {
+    updateAttribute(id: number, updatedProp: keyof Address, updatedValue: string) {
       let item = this.items.find(i => i.id == id)
       if (item) {
         item[updatedProp] = updatedValue
       }
     },
 
-    update(item: Entity) {
+    update(item: Address) {
       let index = this.items.findIndex(i => i.id === item.id)
       if (index != -1) {
         this.items[index] = item

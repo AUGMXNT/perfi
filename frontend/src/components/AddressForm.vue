@@ -23,7 +23,7 @@ let form = ref(null)
 let formData = ref(props.record)
 
 const handleSubmit = async () => {
-  if (props.record) {
+  if (props.record.id) {
     const updateUrl = `${BACKEND_URL}/addresses/${props.record.id}`
     const result = await axios.put(updateUrl, { ...formData.value }, { withCredentials: true })
     emit('updated', formData.value)
@@ -54,9 +54,8 @@ const resetForm = ({nextTick=false}={}) => {
 <template>
   <div padding>
     <q-form ref="form" @submit="handleSubmit">
-      <div class="q-gutter-md row items-start">
+      <div>
         <q-input
-          dense
           outlined
           type="text"
           v-model="formData.label"
@@ -65,12 +64,51 @@ const resetForm = ({nextTick=false}={}) => {
         />
 
         <q-input
-          dense
+          outlined
+          type="text"
+          v-model="formData.chain"
+          label="Chain"
+          :rules="[val => !!val || 'Chain can\'t be empty']"
+        />
+
+        <q-input
           outlined
           type="text"
           v-model="formData.address"
           label="Address"
           :rules="[val => !!val || 'Address can\'t be empty']"
+        />
+
+        <q-input
+          outlined
+          type="text"
+          v-model="formData.type"
+          label="Type"
+          :rules="[val => !!val || 'Type can\'t be empty']"
+        />
+
+        <q-input
+          outlined
+          type="text"
+          v-model="formData.source"
+          label="Source"
+          :rules="[val => !!val || 'Source can\'t be empty']"
+        />
+
+        <q-input
+          outlined
+          type="text"
+          v-model="formData.ord"
+          label="Order"
+          :rules="[val => !!val || 'Order can\'t be empty']"
+        />
+
+        <q-input
+          outlined
+          type="text"
+          v-model="formData.entity_id"
+          label="Entity ID"
+          :rules="[val => !!val || 'entity_id can\'t be empty']"
         />
 
         <q-btn :label="record?.id ? 'Update' : 'Add'" type="submit" color="primary" />
