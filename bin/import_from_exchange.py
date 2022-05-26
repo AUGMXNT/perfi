@@ -97,14 +97,7 @@ def do_import(entity_id: int, exchange: str, exchange_account_id: str, file):
     importer = importer_class()
     filemode = "rb" if exchange == "gemini" else "r"
 
-    if type(file) is str:
-        with open(file, filemode) as file:
-            importer.do_import(
-                file,
-                entity_address_for_imports=entity_address_for_imports,
-                exchange_account_id=exchange_account_id,
-            )
-    else:
+    with open(file, filemode) as file:
         importer.do_import(
             file,
             entity_address_for_imports=entity_address_for_imports,

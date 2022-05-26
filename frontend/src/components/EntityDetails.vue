@@ -27,6 +27,7 @@ const router = useRouter()
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 let entity = ref(props.entity)
+let exchangeImportForm = ref({fileType: '', file: '', accountId: ''})
 
 const handleUpdated = (updatedEntity: Entity) => {
   emit('updated', updatedEntity)
@@ -53,6 +54,20 @@ watchEffect(() => {
   .filter(o => ['id', 'entity_id', 'ord'].indexOf(o.name) == -1)
   .concat([{ name: 'actions', label: 'Actions', field: '', align:'center' }])
 })
+
+const handleExchangeFileUpload = async () => {
+  const formData = new FormData();
+  const file = exchangeImportForm.value.file
+  formData.append("file", file);
+  const url = `${BACKEND_URL}/entities/${entity.value.id}/import_from_exchange/${exchangeImportForm.value.fileType.toLowerCase().replace(' ', '')}/${exchangeImportForm.value.accountId}`
+  const result = await axios.post(url, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+  })
+  console.log(result)
+}
+
 </script>
 
 <template>
@@ -78,4 +93,44 @@ watchEffect(() => {
     :delete-url="r => `${BACKEND_URL}/addresses/${r.id}`"
     :store="addressStore"
   />
+
+  <q-card style="max-width: 550px;">
+    <q-card-section>
+        <div class="text-h6 text-weight-regular">Import Transactions from an Exchange</div>
+        <div class="text-subtitle q-mb-sm">If you have transactions from Coinbase, Coinbase Pro, Gemini, or Kraken, you can import them into perfi.</div>
+        <div class="text-subtitle">
+          For help learning about how to export the appropriate file for each supported exchange, <a href="">click here</a>.
+        </div>
+    </q-card-section>
+
+    <q-card-section class="col">
+      <q-file
+        class="q-mb-sm"
+        v-model="exchangeImportForm.file"
+        label="Select exchange export file"
+        outlined
+        dense
+      />
+      <q-select
+        class="q-mb-sm"
+        label="Exchange Export Type"
+        v-model="exchangeImportForm.fileType"
+        outlined
+        dense
+        :options="['Coinbase', 'Coinbase Pro', 'Gemini', 'Kraken']"
+      />
+      <q-input
+        class="q-mb-sm"
+        type="text"
+        v-model="exchangeImportForm.accountId"
+        label="Account ID"
+        hint="This can be any arbitrary string to identify your account uniquely. For example: 'Coinbase 1'"
+        outlined
+        dense
+      />
+      <q-btn label="Upload" color="secondary" icon="upload" @click="handleExchangeFileUpload" />
+    </q-card-section>
+  </q-card>
+  <div>
+  </div>
 </template>

@@ -1,8 +1,17 @@
 # Run this server like this: uvicorn api:app --reload
 import builtins
+import shutil
 import time
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
 import pytz
 import json
+
+from perfi.transaction.chain_to_ledger import (
+    update_entity_transactions as do_chain_to_ledger,
+)
+
 
 from perfi.db import DB
 from perfi.models import TxLogical, TxLedger, AddressStore, Address, TxLogicalStore
@@ -17,8 +26,9 @@ from fastapi import (
     status,
     Body,
     Request,
-    UploadFile,
+    File,
     HTTPException,
+    UploadFile,
 )
 from siwe import siwe
 from fastapi.middleware.cors import CORSMiddleware
@@ -408,14 +418,36 @@ def import_chain_transactions(entity: Entity = Depends(EnsureRecord("entity"))):
     return {"ok": True}
 
 
+def save_upload_file_tmp(upload_file: UploadFile) -> Path:
+    try:
+        suffix = Path(upload_file.filename).suffix
+        with NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            shutil.copyfileobj(upload_file.file, tmp)
+            tmp_path = Path(tmp.name)
+    finally:
+        upload_file.file.close()
+    return tmp_path
+
+
 @app.post("/entities/{id}/import_from_exchange/{exchange_type}/{exchange_account_id}")
 def import_chain_transactions(
-    file: UploadFile,
     exchange_type: str,
     exchange_account_id: str,
+    file: UploadFile,
     entity: Entity = Depends(EnsureRecord("entity")),
+    stores: Stores = Depends(stores),
 ):
-    do_import(entity.id, exchange_type, exchange_account_id, file)
+    tmp_path = save_upload_file_tmp(file)
+    try:
+        do_import(entity.id, exchange_type, exchange_account_id, tmp_path)
+        update_assets_from_txchain()
+        generate_constants()
+        do_chain_to_ledger(entity.name)
+        tlg = TransactionLogicalGrouper(entity.name, stores.event_store)
+        tlg.update_entity_transactions()
+    finally:
+        tmp_path.unlink()
+
     return {"ok": True}
 
 
@@ -425,7 +457,7 @@ def regenerate_costbasis(
 ):
     update_assets_from_txchain()
     generate_constants()
-
+    do_chain_to_ledger(entity.name)
     tlg = TransactionLogicalGrouper(entity.name, stores.event_store)
     tlg.update_entity_transactions()
     regenerate_costbasis_lots(entity.name, args=None, quiet=True)
@@ -436,4 +468,4 @@ if __name__ == "__main__":
     # Use this for debugging purposes only
     import uvicorn
 
-    uvicorn.run("api:app", host="0.0.0.0", port=8001, log_level="debug", reload=True)
+    uvicorn.run("api:app", host="0.0.0.0", port=8001, log_level="debug", reload=False)

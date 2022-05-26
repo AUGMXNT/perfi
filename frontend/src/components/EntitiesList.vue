@@ -31,7 +31,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
     :store="entityStore"
   >
     <template #otherActions="otherActionsProps">
-      <q-btn flat @click="router.push({name: 'entity', params: {entityId: otherActionsProps.entityId}})" label="Manage Addresses"></q-btn>
+      <q-btn flat @click="router.push({name: 'entity', params: {entityId: otherActionsProps.entityId}})" label="Manage"></q-btn>
       <q-btn flat @click="router.push({name: 'transactions', params: {entityId: otherActionsProps.entityId}})" label="View Transactions"></q-btn>
     </template>
   </CrudTable>
