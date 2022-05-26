@@ -14,12 +14,17 @@ import { RouterLink, RouterView } from 'vue-router'
           </q-avatar>
           perfi
         </q-toolbar-title>
-        <!-- <SignInWithEthereum /> -->
       </q-toolbar>
 
+        <q-toolbar>
+          <q-breadcrumbs active-color="primary" style="font-size: 16px">
+            <q-breadcrumbs-el label="Entities" icon="people" :to="{name: 'entities'}" />
+          </q-breadcrumbs>
+        </q-toolbar>
+
       <q-tabs align="left">
-        <q-route-tab to="/" label="Transactions" />
-        <q-route-tab to="/settings" label="Settings" />
+        <!-- <q-route-tab to="/" label="Transactions" />
+        <q-route-tab to="/settings" label="Settings" /> -->
       </q-tabs>
     </q-header>
 

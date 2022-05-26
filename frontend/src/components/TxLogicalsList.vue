@@ -3,16 +3,16 @@ import axios from "axios";
 import { ref, reactive, nextTick, watchEffect } from "vue"
 import TxLogicalListItem from '@/components/TxLogicalListItem.vue'
 import { displayAddress, displayTimestamp, txIconUrl } from '@/utils.ts'
-
+import type { Entity } from "@/model_types";
 
 const props = defineProps<{
-  entity: string
+  entity: Entity
 }>()
 
 let page_num = ref(0)
 let items_per_page = ref(100)
 
-let fetch_url = `http://localhost:8001/tx_logicals/${props.entity}`
+let fetch_url = `http://localhost:8001/entities/${props.entity.id}/tx_logicals`
 let tx_logicals = ref([])
 let loading = ref(false)
 

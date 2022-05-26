@@ -282,6 +282,18 @@ def get_settings_keys_used_list():
 # TX LOGICALS =================================================================================
 
 
+@app.get("/entities/{id}/tx_logicals/", response_model=List[TxLogicalOut])
+def list_tx_logicals(
+    page: Optional[int] = 0,
+    limit: Optional[int] = 100,
+    stores: Stores = Depends(stores),
+    entity: Entity = Depends(EnsureRecord("entity")),
+):
+    return stores.tx_logical.paginated_list(
+        entity.name, items_per_page=limit, page_num=page
+    )
+
+
 @app.get("/tx_logicals/{entity_name}", response_model=List[TxLogicalOut])
 def list_tx_logicals(
     entity_name: str,

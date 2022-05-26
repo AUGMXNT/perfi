@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import EntityView from '@/views/EntityView.vue'
+import TransactionsView from '@/views/TransactionsView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -12,14 +13,19 @@ const router = createRouter({
       component: HomeView
     },
     {
-      path: '/settings/entity/:entityId',
+      path: '/entity/:entityId',
       name: 'entity',
       component: EntityView
     },
     {
-      path: '/settings',
-      name: 'settings',
+      path: '/entities',
+      name: 'entities',
       component: SettingsView
+    },
+    {
+      path: '/entities/:entityId/transactions',
+      name: 'transactions',
+      component: TransactionsView
     },
     {
       path: '/about',

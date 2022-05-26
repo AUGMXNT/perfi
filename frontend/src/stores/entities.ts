@@ -21,6 +21,13 @@ export const useEntityStore = defineStore({
       this.items = response.data
     },
 
+    getById(id: any) {
+      let index = this.items.findIndex(i => i.id.toString() === id.toString())
+      if (index != -1) {
+        return this.items[index]
+      }
+    },
+
     add(item: Entity) {
       this.items.push(item)
     },
