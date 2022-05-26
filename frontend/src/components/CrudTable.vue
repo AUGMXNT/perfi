@@ -10,6 +10,7 @@ const props = defineProps<{
   form: any,
   store: any,
   deleteUrl: (record: any) => string,
+  hideAddButton?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -71,34 +72,35 @@ const columns = !props.records || props.records.length == 0 ? [] : Object.keys(p
 </script>
 
 <template>
-  <q-table
-    title="Addresses"
-    :rows="props.records"
-    :columns="columns"
-    hide-pagination
-  >
+  <div class="q-mb-lg">
+    <q-table
+      title="Addresses"
+      :rows="props.records"
+      :columns="columns"
+      hide-pagination
+    >
+      <template v-slot:top>
+        <div class="q-table__title">{{props.title}}</div>
+        <q-space/>
+        <q-btn v-if="!showForm && !props.hideAddButton" data-test="addRecord" outline color="primary" icon="add" label="Add" @click="handleAdd" />
 
-    <template v-slot:top>
-      <div class="q-table__title">{{props.title}}</div>
-      <q-space/>
-      <q-btn v-if="!showForm" data-test="addRecord" outline color="primary" icon="add" label="Add" @click="handleAdd" />
+      </template>
 
-    </template>
+      <template v-slot:body-cell-actions="props">
+        <q-td :props="props">
+          <q-btn dense round flat color="grey" @click="handleEdit(props)" icon="edit"></q-btn>
+          <q-btn dense round flat color="grey" @click="handleDelete(props)" icon="delete"></q-btn>
+          <slot name="otherActions" :entityId="props.row.id" />
+        </q-td>
+      </template>
+    </q-table>
 
-    <template v-slot:body-cell-actions="props">
-      <q-td :props="props">
-        <q-btn dense round flat color="grey" @click="handleEdit(props)" icon="edit"></q-btn>
-        <q-btn dense round flat color="grey" @click="handleDelete(props)" icon="delete"></q-btn>
-        <slot name="otherActions" :entityId="props.row.id" />
-      </q-td>
-    </template>
-  </q-table>
-
-  <q-dialog full-width v-model="showForm">
-    <q-card>
-      <q-card-section>
-        <component :is="props.form" :record="formRecord" @canceled="showForm=false" @created="handleCreated" @updated="handleUpdated" />
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+    <q-dialog full-width v-model="showForm">
+      <q-card>
+        <q-card-section>
+          <component :is="props.form" :record="formRecord" @canceled="showForm=false" @created="handleCreated" @updated="handleUpdated" />
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+  </div>
 </template>
