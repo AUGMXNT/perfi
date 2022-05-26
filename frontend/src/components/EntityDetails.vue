@@ -23,6 +23,8 @@ const emit = defineEmits<{
 const entityStore = useEntityStore()
 const addressStore = useEntityStore()
 
+const router = useRouter()
+
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 let entity = ref(props.entity)
 
@@ -62,7 +64,11 @@ watchEffect(() => {
     :store="entityStore"
     hide-add-button
     @updated="handleUpdated"
-  />
+    >
+      <template #otherActions="otherActionsProps">
+        <q-btn flat @click="router.push({name: 'transactions', params: {entityId: otherActionsProps.entityId}})" label="View Transactions"></q-btn>
+      </template>
+  </CrudTable>
 
   <CrudTable
     v-if="entity.addresses"
