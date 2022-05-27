@@ -28,6 +28,7 @@ const router = useRouter()
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 let entity = ref(props.entity)
 let exchangeImportForm = ref({fileType: '', file: '', accountId: ''})
+let exchangeFileUploadInProgress = ref(false)
 
 const handleUpdated = (updatedEntity: Entity) => {
   emit('updated', updatedEntity)
@@ -60,12 +61,13 @@ const handleExchangeFileUpload = async () => {
   const file = exchangeImportForm.value.file
   formData.append("file", file);
   const url = `${BACKEND_URL}/entities/${entity.value.id}/import_from_exchange/${exchangeImportForm.value.fileType.toLowerCase().replace(' ', '')}/${exchangeImportForm.value.accountId}`
+  exchangeFileUploadInProgress.value = true
   const result = await axios.post(url, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
   })
-  console.log(result)
+  exchangeFileUploadInProgress.value = false
 }
 
 </script>
@@ -130,6 +132,13 @@ const handleExchangeFileUpload = async () => {
       />
       <q-btn label="Upload" color="secondary" icon="upload" @click="handleExchangeFileUpload" />
     </q-card-section>
+
+    <q-inner-loading
+      :showing="exchangeFileUploadInProgress"
+      label="Please wait. This may take a minute..."
+      xlabel-class="text-teal"
+      label-style="font-weight: bold"
+    />
   </q-card>
   <div>
   </div>
