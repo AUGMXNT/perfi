@@ -241,11 +241,6 @@ COSTBASIS_LIKEKIND = {
     "fantom:0x328a7b4d538a2b3942653a9983fda3c12c571141": "usd-coin",  # crUSDC
     # PolyFRAX
     "polygon:0x104592a158490a9228070e0a8e5343b499e125d0": "frax",
-    # Manual Mappings (for tests)
-    "avalanche:avax": "avalanche-2",
-    "ethereum:eth": "ethereum",
-    "fantom:ftm": "fantom",
-    "polygon:matic": "matic",
 }
 
 

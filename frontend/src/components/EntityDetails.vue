@@ -29,6 +29,8 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 let entity = ref(props.entity)
 let exchangeImportForm = ref({fileType: '', file: '', accountId: ''})
 let exchangeFileUploadInProgress = ref(false)
+let calculateTaxInfoForm = ref({year: ''})
+let taxCalculationInProgress = ref(false)
 
 const handleUpdated = (updatedEntity: Entity) => {
   emit('updated', updatedEntity)
@@ -70,6 +72,24 @@ const handleExchangeFileUpload = async () => {
   exchangeFileUploadInProgress.value = false
 }
 
+const handleCalculateTaxes = async () => {
+  const url = `${BACKEND_URL}/entities/${entity.value.id}/calculateTaxInfo/${calculateTaxInfoForm.value.year}`
+  taxCalculationInProgress.value = true
+  const result = await axios.post(url, { withCredentials: true, responseType: 'blob' })
+  await fetchListOfGeneratedTaxFiles()
+  taxCalculationInProgress.value = false
+}
+
+let generatedTaxFiles = ref([])
+const fetchListOfGeneratedTaxFiles = async () => {
+  const url = `${BACKEND_URL}/entities/${entity.value.id}/calculateTaxInfo/`
+  const result = await axios.get(url, { withCredentials: true })
+  generatedTaxFiles.value = result.data
+}
+watchEffect(async () => {
+  await fetchListOfGeneratedTaxFiles()
+})
+
 </script>
 
 <template>
@@ -96,7 +116,8 @@ const handleExchangeFileUpload = async () => {
     :store="addressStore"
   />
 
-  <q-card style="max-width: 550px;">
+  <!-- Import From Exchange -->
+  <q-card style="max-width: 550px;" class="q-mb-lg">
     <q-card-section>
         <div class="text-h6 text-weight-regular">Import Transactions from an Exchange</div>
         <div class="text-subtitle q-mb-sm">If you have transactions from Coinbase, Coinbase Pro, Gemini, or Kraken, you can import them into perfi.</div>
@@ -136,10 +157,51 @@ const handleExchangeFileUpload = async () => {
     <q-inner-loading
       :showing="exchangeFileUploadInProgress"
       label="Please wait. This may take a minute..."
-      xlabel-class="text-teal"
       label-style="font-weight: bold"
     />
   </q-card>
-  <div>
-  </div>
+
+  <!-- Regenerate Cost Basis -->
+  <q-card style="max-width: 550px;">
+    <q-card-section>
+        <div class="text-h6 text-weight-regular">Calculate Tax Info</div>
+        <div class="text-subtitle q-mb-sm">
+          <p>After you have added all of your wallet addresses and imported any transactions from exchanges, you're ready to calculate your tax info.</p>
+          <p>perfi will crawl all of the on-chain data from the Ethereum, Avalanche, Fantom, and Polygon networks and then calculate your short/long-term capital gains/losses and income for a given calendar year.</p>
+        </div>
+        <div class="row">
+        <div class="col-5">
+          <q-input
+            class="q-mb-sm"
+            type="text"
+            v-model="calculateTaxInfoForm.year"
+            label="Year"
+            hint="Enter a 4-digit year. For example: 2021"
+            outlined
+            dense
+            float-left
+          />
+        </div>
+        <div class="col q-ml-sm">
+          <q-btn label="Calculate Tax Info" color="secondary" icon="calculate" @click="handleCalculateTaxes" />
+        </div>
+        </div>
+    </q-card-section>
+    <q-card-section v-if="generatedTaxFiles.length > 0">
+      <div class="text-subtitle2">Generarted Files</div>
+      <div class="text-subtitle q-mb-sm">
+        <p>Here's a list of all of your generated tax reports:</p>
+      </div>
+      <ul>
+        <li v-for="file in generatedTaxFiles" :key="file">
+          <a :href="`${BACKEND_URL}/static/${entity.id}/${file}`">{{file}}</a>
+        </li>
+      </ul>
+    </q-card-section>
+    <q-inner-loading
+      :showing="taxCalculationInProgress"
+      label="Please wait. This may take _several minutes_..."
+      label-style="font-weight: bold"
+    />
+  </q-card>
 </template>

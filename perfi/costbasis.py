@@ -1757,12 +1757,12 @@ class LotMatcher:
 
 
 class Form8949:
-    def __init__(self, entity, args=None):
+    def __init__(self, entity, year: int = None, output: str = None):
         self.entity = entity
 
         # Generate our 8949
-        if args and args.output:
-            self.filename = args.output
+        if output:
+            self.filename = output
         else:
             self.filename = (
                 f"{self.entity}-8949-{get_active_branch_name().lower()}.xlsx"
@@ -1825,8 +1825,8 @@ class Form8949:
 
         self.lot_row = {}
 
-        if args and args.year:
-            self.year = int(args.year)
+        if year:
+            self.year = year
         else:
             self.year = arrow.now().year - 1
 

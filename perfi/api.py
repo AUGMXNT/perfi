@@ -1,12 +1,17 @@
 # Run this server like this: uvicorn api:app --reload
 import builtins
+import os
 import shutil
 import time
 from pathlib import Path
-from tempfile import NamedTemporaryFile
+from perfi.constants.paths import DATA_DIR
 
+from os import listdir
+from os.path import isfile, join
 import pytz
 import json
+
+from devtools import debug
 
 from perfi.transaction.chain_to_ledger import (
     update_entity_transactions as do_chain_to_ledger,
@@ -16,6 +21,8 @@ from perfi.transaction.chain_to_ledger import (
 from perfi.db import DB
 from perfi.models import TxLogical, TxLedger, AddressStore, Address, TxLogicalStore
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.background import BackgroundTasks
+
 from typing import List, Dict
 from fastapi import (
     Cookie,
@@ -30,12 +37,15 @@ from fastapi import (
     HTTPException,
     UploadFile,
 )
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from siwe import siwe
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 
 from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
+from bin.generate_8949 import generate_file as generate_8949_file
 
 from bin.update_coingecko_pricelist import main as update_coingecko_pricelist_main
 
@@ -172,6 +182,13 @@ app.add_middleware(
 app.add_middleware(
     SessionMiddleware,
     secret_key="change_me",  # pragma: allowlist secret
+)
+
+GENERATED_FILES_PATH = f"{DATA_DIR}/generated_files"
+app.mount(
+    "/static",
+    StaticFiles(directory=GENERATED_FILES_PATH),
+    name="generated_files_static",
 )
 
 
@@ -451,17 +468,60 @@ def import_chain_transactions(
     return {"ok": True}
 
 
-@app.post("/entities/{id}/regenerate_costbasis")
-def regenerate_costbasis(
-    entity: Entity = Depends(EnsureRecord("entity")), stores: Stores = Depends(stores)
+def remove_file(path: str) -> None:
+    os.unlink(path)
+
+
+@app.get("/entities/{id}/calculateTaxInfo")
+def list_generated_tax_reports(
+    entity: Entity = Depends(EnsureRecord("entity")),
 ):
+    try:
+        path = f"{GENERATED_FILES_PATH}/{entity.id}"
+        files = [f for f in listdir(path) if isfile(join(path, f))]
+    except:
+        files = []
+    return files
+
+
+@app.post("/entities/{id}/calculateTaxInfo/{year}")
+def generate_tax_report(
+    year: str,
+    background_tasks: BackgroundTasks,
+    entity: Entity = Depends(EnsureRecord("entity")),
+    stores: Stores = Depends(stores),
+):
+    update_coingecko_pricelist_main()
+    scrape_entity_transactions(entity.name)
+
     update_assets_from_txchain()
     generate_constants()
+
     do_chain_to_ledger(entity.name)
     tlg = TransactionLogicalGrouper(entity.name, stores.event_store)
     tlg.update_entity_transactions()
     regenerate_costbasis_lots(entity.name, args=None, quiet=True)
-    return {"ok": True}
+
+    filename = f"8949_{entity.name}_{year}.xlsx"
+    dir = f"{GENERATED_FILES_PATH}/{entity.id}"
+    try:
+        os.mkdir(dir)
+    except:
+        pass
+    output = f"{dir}/{filename}"
+    generate_8949_file(entity.name, int(year), output)
+    # background_tasks.add_task(remove_file, output)
+    return {"path": f"/static/{entity.id}/{filename}"}
+
+    # tmp_dir = None
+    # try:
+    #     tmp_dir = TemporaryDirectory(prefix=f"8949_{entity.name}_{year}")
+    #     output = f"{tmp_dir}/8949_{entity.name}_{year}.xlsx"
+    #     generate_8949_file(entity.name, int(year), output)
+    #     return FileResponse(output)
+    # finally:
+    #     tmp_dir.cleanup()
+    #
 
 
 if __name__ == "__main__":

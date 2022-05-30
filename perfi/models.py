@@ -58,7 +58,7 @@ class Chain(Enum):
     # fantom = "fantom"
     # polygon = "polygon"
     import_coinbasepro = "import.coinbasepro"
-    import_coinbase = "import.coinbasepro"
+    import_coinbase = "import.coinbase"
     import_kraken = "import.kraken"
     import_gemini = "import.gemini"
     import_bitcointax = "import.bitcointax"

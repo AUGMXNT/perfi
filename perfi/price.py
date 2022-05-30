@@ -157,8 +157,9 @@ class PriceFeed:
             except Exception as ex:
                 print("* * * * * ** * * ")
                 print(f"Failed to get symbol for {canonical_key}")
-                print("all rows in asset_price:")
-                print([dict(**r) for r in db.query("SELECT * FROM asset_price")])
+                print(f"tx_key: {tx_key}")
+                # print("all rows in asset_price:")
+                # print([dict(**r) for r in db.query("SELECT * FROM asset_price")])
                 print("* * * * * ** * * ")
                 raise ex
         else:

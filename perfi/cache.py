@@ -21,7 +21,7 @@ class CacheGet404Exception(Exception):
 
 class Cache:
     def __init__(self, noproxy=False, use_mem=True):
-        self.db = DB(CACHEDB_PATH)
+        self.db = DB(CACHEDB_PATH, same_thread=False)
 
         # If a new cache db we'll load the cache schema
         cache_is_empty = len(self.db.query("select * from sqlite_master")) == 0
