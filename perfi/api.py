@@ -21,7 +21,6 @@ from perfi.transaction.chain_to_ledger import (
 from perfi.db import DB
 from perfi.models import TxLogical, TxLedger, AddressStore, Address, TxLogicalStore
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.background import BackgroundTasks
 
 from typing import List, Dict
 from fastapi import (
@@ -487,7 +486,6 @@ def list_generated_tax_reports(
 @app.post("/entities/{id}/calculateTaxInfo/{year}")
 def generate_tax_report(
     year: str,
-    background_tasks: BackgroundTasks,
     entity: Entity = Depends(EnsureRecord("entity")),
     stores: Stores = Depends(stores),
 ):
@@ -510,7 +508,6 @@ def generate_tax_report(
         pass
     output = f"{dir}/{filename}"
     generate_8949_file(entity.name, int(year), output)
-    # background_tasks.add_task(remove_file, output)
     return {"path": f"/static/{entity.id}/{filename}"}
 
     # tmp_dir = None
