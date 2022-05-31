@@ -350,6 +350,11 @@ def update_tx_logical_type(
     return TxLogical.from_id(id)
 
 
+@app.get("/tx_logical_types")
+def get_tx_logical_types():
+    return [t.value for t in TX_LOGICAL_TYPE]
+
+
 @app.post("/tx_logicals/{id}/flag/{flag_name}")
 def add_flag_to_logical(
     flag_name: str, tx_logical: TxLogical = Depends(EnsureRecord("tx_logical"))

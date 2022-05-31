@@ -16,14 +16,19 @@ const quasar = useQuasar()
 let page_num = ref(0)
 let items_per_page = ref(100)
 
-let fetch_url = `http://localhost:8001/entities/${props.entity.id}/tx_logicals`
+let fetch_url = `${BACKEND_URL}/entities/${props.entity.id}/tx_logicals`
 let tx_logicals = ref<TxLogical[]>([])
 let loading = ref(false)
+let txLogicalTypes = ref<string[]>([])
 
 watchEffect(async () => {
   loading.value = true
   let response = await axios.get(fetch_url, { params: { page: page_num.value, limit: items_per_page.value } })
   tx_logicals.value = tx_logicals.value.concat(response.data)
+
+  response = await axios.get(`${BACKEND_URL}/tx_logical_types`)
+  txLogicalTypes.value = response.data
+
   loading.value = false
 })
 
@@ -42,7 +47,9 @@ const columns = [
 
 const rows = tx_logicals
 
-let showForm = ref(false)
+let showEditPriceForm = ref(false)
+let showEditTxLogicalTypeForm = ref(false)
+let editingTxLogical = ref<TxLogical>(null)
 let editingTxLedgerLogical = ref<TxLogical>(null)
 let editingTxLedger = ref({} as TxLedger)
 
@@ -53,7 +60,13 @@ const handleEditClick = (txLogicalId, txLedgerId) => {
   const txLedger = [...txLogical.ins, ...txLogical.outs].find(tle => tle.id == txLedgerId)
   editingTxLedger.value = Object.assign({}, txLedger)
   editingTxLedger.value.txLogical = txLogical
-  showForm.value = true
+  showEditPriceForm.value = true
+}
+
+const handleEditTxLogicalTypeClick = (txLogicalId) => {
+  const txLogical = tx_logicals.value.find(tlo => tlo.id == txLogicalId)
+  editingTxLogical.value = Object.assign({}, txLogical)
+  showEditTxLogicalTypeForm.value = true
 }
 
 const updateLedgerPrice = async () => {
@@ -74,7 +87,26 @@ const updateLedgerPrice = async () => {
 
   // Reset form
   editingTxLedger.value = null
-  showForm.value = false
+  showEditPriceForm.value = false
+}
+
+const updateLogicalType = async () => {
+  const txLogical = editingTxLogical.value
+  const url = `${BACKEND_URL}/tx_logicals/${txLogical.id}/tx_logical_type/${txLogical.tx_logical_type}`
+  const result = await axios.put(url, {}, { withCredentials: true })
+  quasar.notify({
+    type: 'positive',
+    message: 'Logical type updated.'
+  })
+
+  // Find the logical and update it's type
+  const index = tx_logicals.value.findIndex(tlo => tlo.id == txLogical.id)
+  const updatedTxLogical = Object.assign(tx_logicals.value[index], {tx_logical_type: txLogical.tx_logical_type})
+  tx_logicals.value[index] = updatedTxLogical
+
+  // Reset form
+  editingTxLogical.value = null
+  showEditTxLogicalTypeForm.value = false
 }
 
 
@@ -90,7 +122,6 @@ const updateLedgerPrice = async () => {
   >
     <template v-slot:header="props">
       <q-tr :props="props">
-        <!-- <q-th auto-width> Toggle </q-th> -->
         <q-th key="date"> Date </q-th>
         <q-th key="type"> Type </q-th>
         <q-th key="transactions"> Transactions </q-th>
@@ -99,10 +130,6 @@ const updateLedgerPrice = async () => {
 
     <template v-slot:body="props">
       <q-tr :props="props">
-        <!-- <q-td auto-width>
-          <q-btn size="sm" color="accent" round dense @click="props.expand = !props.expand" :icon="props.expand ? 'remove' : 'add'" />
-        </q-td> -->
-
         <q-td key="date_and_time" :props="props">
           <div>
             {{dateAndTime(props.row)[0]}} <br/> {{dateAndTime(props.row)[1]}}
@@ -111,6 +138,7 @@ const updateLedgerPrice = async () => {
 
         <q-td key="type" :props="props">
           {{props.row.tx_logical_type}}
+          <q-btn class="hoverEdit" flat size="xs" label="Edit" @click="handleEditTxLogicalTypeClick(props.row.id)" color="secondary" />
         </q-td>
 
 
@@ -157,68 +185,7 @@ const updateLedgerPrice = async () => {
 
         </q-td>
       </q-tr>
-
-      <!-- <q-tr v-show="props.expand" :props="props">
-        <q-td colspan="100%">
-          <div class="text-left row inline">
-              <span>Unit prices:</span>
-              <q-input type="text" v-model="props.row.foo" label="foo" stacked />
-              <q-btn label="Update" color="secondary" />
-          </div>
-        </q-td>
-      </q-tr> -->
     </template>
-
-
-    <!-- <template v-slot:body-cell-date_and_time="props">
-      <q-td :props="props">
-        <div>
-          {{props.value[0]}} <br/> {{props.value[1]}}
-        </div>
-      </q-td>
-    </template>
-
-    <template v-slot:body-cell-type="props">
-      <q-td :props="props">
-        {{props.value}}
-      </q-td>
-    </template>
-
-    <template v-slot:body-cell-transactions="props">
-      <q-td :props="props">
-        <div class="logicalOut row items-center q-pb-sm" v-for="tx_ledger in props.value.outs">
-          <img class="txIcon" :src="txIconUrl(tx_ledger)" />
-          &nbsp;-
-          &nbsp;{{tx_ledger.amount.toFixed(2)}}
-          &nbsp;<span class="text-weight-bold">{{tx_ledger.symbol}}</span>
-          &nbsp;<span>
-            to {{displayAddress(tx_ledger, 'to')}}
-            <q-tooltip anchor="bottom middle" self="center middle">
-              {{tx_ledger.to_address}}
-            </q-tooltip>
-          </span>
-          &nbsp;<span v-if="tx_ledger.price_usd">
-            @ {{tx_ledger.price_usd?.toFixed(2)}} per
-          </span>
-        </div>
-
-        <div class="logicalIn row items-center q-pb-sm" v-for="tx_ledger in props.value.ins">
-          <img class="txIcon" :src="txIconUrl(tx_ledger)" />
-          &nbsp;+
-          &nbsp;{{tx_ledger.amount.toFixed(2)}}
-          &nbsp;<span class="text-weight-bold">{{tx_ledger.symbol}}</span>
-          &nbsp;<span>
-            from {{displayAddress(tx_ledger, 'from')}}
-            <q-tooltip anchor="bottom middle" self="center middle">
-              {{tx_ledger.from_address}}
-            </q-tooltip>
-          </span>
-          &nbsp;<span v-if="tx_ledger.price_usd">
-            @ {{tx_ledger.price_usd?.toFixed(2)}} per
-          </span>
-        </div>
-      </q-td>
-    </template> -->
 
     <template v-slot:bottom>
       <q-btn style="background: #efefef; color: black" @click="loadNextPage">
@@ -228,7 +195,7 @@ const updateLedgerPrice = async () => {
 
   </q-table>
 
-  <q-dialog v-model="showForm">
+  <q-dialog v-model="showEditPriceForm">
     <q-card>
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">Edit price for ledger entry</div>
@@ -260,14 +227,26 @@ const updateLedgerPrice = async () => {
     </q-card>
   </q-dialog>
 
-
-  <!-- <q-list separator>
-    <TxLogicalListItem
-      v-for="tx_logical in tx_logicals"
-      :tx_logical="tx_logical"
-      :key="tx_logical.id"
-    />
-  </q-list> -->
+  <q-dialog v-model="showEditTxLogicalTypeForm">
+    <q-card>
+      <q-card-section class="row items-center q-pb-none">
+        <div class="text-h6">Edit logical type</div>
+        <q-space />
+        <q-btn icon="close" flat round dense v-close-popup />
+      </q-card-section>
+      <q-card-section>
+        <div>
+            <div> {{dateAndTime(editingTxLogical)[0]}} at {{dateAndTime(editingTxLogical)[1]}} </div>
+        </div>
+        <q-select
+          label="Type"
+          v-model="editingTxLogical.tx_logical_type"
+          :options="txLogicalTypes"
+        />
+        <q-btn label="Save Logical Type" type="submit" color="primary" @click="updateLogicalType" />
+      </q-card-section>
+    </q-card>
+  </q-dialog>
 
 </template>
 
