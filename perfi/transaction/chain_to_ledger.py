@@ -242,6 +242,7 @@ class LedgerTx:
         self.asset_price_id = None
         self.symbol = None
         self.price = None
+        self.price_source = None
         self.debank_name = None
 
         self.TxTyper = TxTyper()
@@ -263,6 +264,7 @@ class LedgerTx:
              asset_price_id : {self.asset_price_id }
              symbol : {self.symbol }
              price : {self.price }
+             price_source : {self.price_source }
              debank_name : {self.debank_name or '__None__'}
              """
 
@@ -482,6 +484,7 @@ class LedgerTx:
             coin_price = price_feed.get(self.asset_price_id, self.timestamp)
             if coin_price:
                 self.price = coin_price.price
+                self.price_source = coin_price.source
 
     def as_tx_ledger(self):
         args = dict(
@@ -502,6 +505,7 @@ class LedgerTx:
             asset_price_id=self.asset_price_id,
             symbol=self.symbol,
             price_usd=self.price,
+            price_source=self.price_source,
         )
         return TxLedger(**args)
 

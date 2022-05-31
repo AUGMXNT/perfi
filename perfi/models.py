@@ -304,7 +304,7 @@ class TxLogical(BaseModel):
         txl.flags = load_flags(cls.__name__, id)
 
         # load the tx ledgers
-        sql = """SELECT id, chain, address, hash, from_address, to_address, from_address_name, to_address_name, asset_tx_id, isfee, amount, timestamp, direction, tx_ledger_type, asset_price_id, symbol, price_usd
+        sql = """SELECT id, chain, address, hash, from_address, to_address, from_address_name, to_address_name, asset_tx_id, isfee, amount, timestamp, direction, tx_ledger_type, asset_price_id, symbol, price_usd, price_source
              FROM tx_rel_ledger_logical rel
              JOIN tx_ledger led on led.id = rel.tx_ledger_id
              WHERE rel.tx_logical_id = ?
@@ -1016,9 +1016,9 @@ class TxLedgerStore(BaseStore[TxLedger]):
 
     def save(self, tx: TxLedger):
         sql = """REPLACE INTO tx_ledger
-             (id, chain, address, hash, from_address, to_address, from_address_name, to_address_name, asset_tx_id, isfee, amount, timestamp, direction, tx_ledger_type, asset_price_id, symbol, price_usd)
+             (id, chain, address, hash, from_address, to_address, from_address_name, to_address_name, asset_tx_id, isfee, amount, timestamp, direction, tx_ledger_type, asset_price_id, symbol, price_usd, price_source)
              VALUES
-             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           """
         params = [
             tx.id,
@@ -1038,6 +1038,7 @@ class TxLedgerStore(BaseStore[TxLedger]):
             tx.asset_price_id,
             tx.symbol,
             tx.price_usd,
+            tx.price_source,
         ]
         self.db.execute(sql, params)
         return tx
