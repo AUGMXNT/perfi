@@ -77,6 +77,7 @@ const updateLedgerPrice = async () => {
   showForm.value = false
 }
 
+
 </script>
 
 <template>
@@ -89,7 +90,7 @@ const updateLedgerPrice = async () => {
   >
     <template v-slot:header="props">
       <q-tr :props="props">
-        <q-th auto-width> Toggle </q-th>
+        <!-- <q-th auto-width> Toggle </q-th> -->
         <q-th key="date"> Date </q-th>
         <q-th key="type"> Type </q-th>
         <q-th key="transactions"> Transactions </q-th>
@@ -98,9 +99,9 @@ const updateLedgerPrice = async () => {
 
     <template v-slot:body="props">
       <q-tr :props="props">
-        <q-td auto-width>
+        <!-- <q-td auto-width>
           <q-btn size="sm" color="accent" round dense @click="props.expand = !props.expand" :icon="props.expand ? 'remove' : 'add'" />
-        </q-td>
+        </q-td> -->
 
         <q-td key="date_and_time" :props="props">
           <div>
@@ -131,7 +132,7 @@ const updateLedgerPrice = async () => {
             &nbsp;<span v-if="tx_ledger.price_source">
               via {{tx_ledger.price_source }}
             </span>
-            <q-btn flat size="xs" label="Edit" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
+            <q-btn class="hoverEdit" flat size="xs" label="Edit" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
           </div>
 
           <div class="logicalIn row items-center q-pb-sm" v-for="tx_ledger in props.row.ins">
@@ -151,13 +152,13 @@ const updateLedgerPrice = async () => {
             &nbsp;<span v-if="tx_ledger.price_source">
               via {{tx_ledger.price_source }}
             </span>
-            <q-btn flat size="xs" label="Edit" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
+            <q-btn class="hoverEdit" flat size="xs" label="Edit" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
           </div>
 
         </q-td>
       </q-tr>
 
-      <q-tr v-show="props.expand" :props="props">
+      <!-- <q-tr v-show="props.expand" :props="props">
         <q-td colspan="100%">
           <div class="text-left row inline">
               <span>Unit prices:</span>
@@ -165,7 +166,7 @@ const updateLedgerPrice = async () => {
               <q-btn label="Update" color="secondary" />
           </div>
         </q-td>
-      </q-tr>
+      </q-tr> -->
     </template>
 
 
@@ -284,5 +285,12 @@ img.txIcon::before {
  }
 .q-table th {
   text-align:left;
+}
+.q-table tbody td:hover .hoverEdit {
+  display: inherit;
+}
+
+.hoverEdit {
+  display: none;
 }
 </style>
