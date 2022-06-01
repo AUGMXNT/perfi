@@ -5,6 +5,7 @@ import TxLogicalListItem from '@/components/TxLogicalListItem.vue'
 import { displayAddress, displayTimestamp, txIconUrl } from '@/utils.ts'
 import type { Entity } from "@/model_types";
 import { useQuasar } from 'quasar'
+import { copyToClipboard } from 'quasar'
 
 const props = defineProps<{
   entity: Entity
@@ -21,15 +22,19 @@ let tx_logicals = ref<TxLogical[]>([])
 let loading = ref(false)
 let txLogicalTypes = ref<string[]>([])
 
-watchEffect(async () => {
+const loadTxLogicals = async () => {
   loading.value = true
   let response = await axios.get(fetch_url, { params: { page: page_num.value, limit: items_per_page.value } })
-  tx_logicals.value = tx_logicals.value.concat(response.data)
+  tx_logicals.value = response.data
 
   response = await axios.get(`${BACKEND_URL}/tx_logical_types`)
   txLogicalTypes.value = response.data
 
   loading.value = false
+}
+
+watchEffect(async () => {
+  loadTxLogicals()
 })
 
 const loadNextPage = () => {
@@ -52,14 +57,20 @@ let showEditTxLogicalTypeForm = ref(false)
 let editingTxLogical = ref<TxLogical>(null)
 let editingTxLedgerLogical = ref<TxLogical>(null)
 let editingTxLedger = ref({} as TxLedger)
+let showMoveTransactionForm = ref(false)
+let newTxLogicalId = ref('')
 
-const handleEditClick = (txLogicalId, txLedgerId) => {
+const setEditingTxLedger = (txLogicalId, txLedgerId) => {
   // Find the tx ledger
   const txLogical = tx_logicals.value.find(tlo => tlo.id == txLogicalId)
   editingTxLedgerLogical.value = txLogical
   const txLedger = [...txLogical.ins, ...txLogical.outs].find(tle => tle.id == txLedgerId)
   editingTxLedger.value = Object.assign({}, txLedger)
   editingTxLedger.value.txLogical = txLogical
+}
+
+const handleEditClick = (txLogicalId, txLedgerId) => {
+  setEditingTxLedger(txLogicalId, txLedgerId)
   showEditPriceForm.value = true
 }
 
@@ -67,6 +78,14 @@ const handleEditTxLogicalTypeClick = (txLogicalId) => {
   const txLogical = tx_logicals.value.find(tlo => tlo.id == txLogicalId)
   editingTxLogical.value = Object.assign({}, txLogical)
   showEditTxLogicalTypeForm.value = true
+}
+
+const handleCopyId = (txLogicalId) => {
+  copyToClipboard(txLogicalId)
+  quasar.notify({
+    type: 'positive',
+    message: `Logical ID ${txLogicalId} copied to clipboard.`
+  })
 }
 
 const updateLedgerPrice = async () => {
@@ -80,7 +99,7 @@ const updateLedgerPrice = async () => {
 
   // Find the txLedger inside the txLogical it belongs to, and update it's price_usd
   const txLogical = txLedger.txLogical
-  const txLedgers = txLedger.direction == 'in' ? txLogical.ins : txLogical.outs
+  const txLedgers = txLedger.direction.toLowerCase() == 'in' ? txLogical.ins : txLogical.outs
   const index = txLedgers.findIndex(tle => tle.id == txLedger.id)
   const updatedTxLedger = Object.assign(txLedgers[index], {price_usd: Number(txLedger.price_usd)})
   txLedgers[index] = updatedTxLedger
@@ -109,6 +128,27 @@ const updateLogicalType = async () => {
   showEditTxLogicalTypeForm.value = false
 }
 
+const handleMoveClick = (txLogicalId, txLedgerId) => {
+  showMoveTransactionForm.value = true
+  setEditingTxLedger(txLogicalId, txLedgerId)
+}
+
+const moveTxLedger = async (txLedgerId, txLogicalId) => {
+  const url = `${BACKEND_URL}/tx_ledgers/${txLedgerId}/tx_logical_id/${txLogicalId}`
+  const result = await axios.put(url, {}, { withCredentials: true })
+  quasar.notify({
+    type: 'positive',
+    message: `Transaction moved to logical group ${txLogicalId}.`
+  })
+
+  // Reload the list of TxLogicals
+  await loadTxLogicals()
+
+  // Reset form
+  newTxLogicalId.value = ''
+  showMoveTransactionForm.value = false
+}
+
 
 </script>
 
@@ -130,59 +170,74 @@ const updateLogicalType = async () => {
 
     <template v-slot:body="props">
       <q-tr :props="props">
-        <q-td key="date_and_time" :props="props">
-          <div>
-            {{dateAndTime(props.row)[0]}} <br/> {{dateAndTime(props.row)[1]}}
+        <q-td key="date_and_time" :props="props" style="width: 200px;">
+          <div class="row items-center">
+            <div class="col">
+              {{dateAndTime(props.row)[0]}} <br/> {{dateAndTime(props.row)[1]}}
+            </div>
+
+            <div class="col">
+              <q-btn class="hoverEdit" flat size="xs" label="Copy ID" @click="handleCopyId(props.row.id)" color="secondary" />
+            </div>
           </div>
         </q-td>
 
-        <q-td key="type" :props="props">
-          {{props.row.tx_logical_type}}
-          <q-btn class="hoverEdit" flat size="xs" label="Edit" @click="handleEditTxLogicalTypeClick(props.row.id)" color="secondary" />
+        <q-td key="type" :props="props" style="width: 200px;">
+          <div class="row items-center">
+            <div class="col">
+              {{props.row.tx_logical_type}}
+            </div>
+
+            <div class="col">
+              <q-btn class="hoverEdit" flat size="xs" label="Edit Type" @click="handleEditTxLogicalTypeClick(props.row.id)" color="secondary" />
+            </div>
+          </div>
         </q-td>
 
 
         <q-td key="transactions" :props="props">
-          <div class="logicalOut row items-center q-pb-sm" v-for="tx_ledger in props.row.outs">
-            <img class="txIcon" :src="txIconUrl(tx_ledger)" />
-            &nbsp;-
-            &nbsp;{{tx_ledger.amount.toFixed(2)}}
-            &nbsp;<span class="text-weight-bold">{{tx_ledger.symbol}}</span>
-            &nbsp;<span>
-              to {{displayAddress(tx_ledger, 'to')}}
-              <q-tooltip anchor="bottom middle" self="center middle">
-                {{tx_ledger.to_address}}
-              </q-tooltip>
-            </span>
-            &nbsp;<span v-if="tx_ledger.price_usd">
-              @ {{tx_ledger.price_usd?.toFixed(2)}} per
-            </span>
-            &nbsp;<span v-if="tx_ledger.price_source">
-              via {{tx_ledger.price_source }}
-            </span>
-            <q-btn class="hoverEdit" flat size="xs" label="Edit" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
-          </div>
+            <div class="logicalOut row items-center q-pb-sm" v-for="tx_ledger in props.row.outs" :key="tx_ledger.id">
+              <img class="txIcon" :src="txIconUrl(tx_ledger)" />
+              &nbsp;-
+              &nbsp;{{tx_ledger.amount.toFixed(2)}}
+              &nbsp;<span class="text-weight-bold">{{tx_ledger.symbol}}</span>
+              &nbsp;<span>
+                to {{displayAddress(tx_ledger, 'to')}}
+                <q-tooltip anchor="bottom middle" self="center middle">
+                  {{tx_ledger.to_address}}
+                </q-tooltip>
+              </span>
+              &nbsp;<span v-if="tx_ledger.price_usd">
+                @ {{tx_ledger.price_usd?.toFixed(2)}} per
+              </span>
+              &nbsp;<span v-if="tx_ledger.price_source">
+                via {{tx_ledger.price_source }}
+              </span>
+              <q-btn class="hoverEdit on-right" flat size="xs" label="Edit Price" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
+              <q-btn class="hoverEdit on-right" flat size="xs" label="Move" @click="handleMoveClick(props.row.id, tx_ledger.id)" color="secondary" />
+            </div>
 
-          <div class="logicalIn row items-center q-pb-sm" v-for="tx_ledger in props.row.ins">
-            <img class="txIcon" :src="txIconUrl(tx_ledger)" />
-            &nbsp;+
-            &nbsp;{{tx_ledger.amount.toFixed(2)}}
-            &nbsp;<span class="text-weight-bold">{{tx_ledger.symbol}}</span>
-            &nbsp;<span>
-              from {{displayAddress(tx_ledger, 'from')}}
-              <q-tooltip anchor="bottom middle" self="center middle">
-                {{tx_ledger.from_address}}
-              </q-tooltip>
-            </span>
-            &nbsp;<span v-if="tx_ledger.price_usd">
-              @ {{tx_ledger.price_usd?.toFixed(2)}} per
-            </span>
-            &nbsp;<span v-if="tx_ledger.price_source">
-              via {{tx_ledger.price_source }}
-            </span>
-            <q-btn class="hoverEdit" flat size="xs" label="Edit" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
-          </div>
+            <div class="logicalIn row items-center q-pb-sm" v-for="tx_ledger in props.row.ins" :key="tx_ledger.id">
+              <img class="txIcon" :src="txIconUrl(tx_ledger)" />
+              &nbsp;+
+              &nbsp;{{tx_ledger.amount.toFixed(2)}}
+              &nbsp;<span class="text-weight-bold">{{tx_ledger.symbol}}</span>
+              &nbsp;<span>
+                from {{displayAddress(tx_ledger, 'from')}}
+                <q-tooltip anchor="bottom middle" self="center middle">
+                  {{tx_ledger.from_address}}
+                </q-tooltip>
+              </span>
+              &nbsp;<span v-if="tx_ledger.price_usd">
+                @ {{tx_ledger.price_usd?.toFixed(2)}} per
+              </span>
+              &nbsp;<span v-if="tx_ledger.price_source">
+                via {{tx_ledger.price_source }}
+              </span>
 
+              <q-btn class="hoverEdit on-right" flat size="xs" label="Edit Price" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
+              <q-btn class="hoverEdit on-right" flat size="xs" label="Move" @click="handleMoveClick(props.row.id, tx_ledger.id)" color="secondary" />
+            </div>
         </q-td>
       </q-tr>
     </template>
@@ -244,6 +299,38 @@ const updateLogicalType = async () => {
           :options="txLogicalTypes"
         />
         <q-btn label="Save Logical Type" type="submit" color="primary" @click="updateLogicalType" />
+      </q-card-section>
+    </q-card>
+  </q-dialog>
+
+
+  <q-dialog v-model="showMoveTransactionForm">
+    <q-card>
+      <q-card-section class="row items-center q-pb-none">
+        <div class="text-h6">Move transaction to a different logical group</div>
+        <q-space />
+        <q-btn icon="close" flat round dense v-close-popup />
+      </q-card-section>
+      <q-card-section>
+        <div>
+            <div> {{dateAndTime(editingTxLedgerLogical)[0]}} at {{dateAndTime(editingTxLedgerLogical)[1]}} </div>
+            <div> {{editingTxLedgerLogical.tx_logical_type}} </div>
+            <div>
+              <img class="txIcon" :src="txIconUrl(editingTxLedger)" />
+              &nbsp;+
+              &nbsp;{{editingTxLedger.amount.toFixed(2)}}
+              &nbsp;<span class="text-weight-bold">{{editingTxLedger.symbol}}</span>
+              &nbsp;<span>
+                from {{editingTxLedger.from_address}}
+              </span>
+            </div>
+        </div>
+        <q-input
+          label="Logical ID"
+          type="text"
+          v-model="newTxLogicalId"
+        /> <!-- TODO: Validation -->
+        <q-btn label="Move" type="submit" color="primary" @click="moveTxLedger(editingTxLedger.id, newTxLogicalId)" />
       </q-card-section>
     </q-card>
   </q-dialog>
