@@ -4,6 +4,8 @@ import os
 import shutil
 import time
 from pathlib import Path
+from tempfile import NamedTemporaryFile
+
 from perfi.constants.paths import DATA_DIR
 
 from os import listdir
