@@ -54,7 +54,7 @@ def test_swap_one_for_one_generates_3_ledger_txs(monkeypatch, test_db):
     ethereum.tx(
         ins=["1 DAI"],
         outs=[".1 ETH"],
-        fee=0.00123,
+        fee=0.0,
         timestamp=1,
         to_address="__MAKER_DAO",
     )

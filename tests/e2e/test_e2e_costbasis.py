@@ -45,6 +45,9 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     monkeysession.setattr("perfi.asset.db", test_db)
     monkeysession.setattr("perfi.price.db", test_db)
     monkeysession.setattr("perfi.costbasis.price_feed", price_feed)
+    monkeysession.setattr("perfi.transaction.chain_to_ledger.price_feed", price_feed)
+    yield
+    monkeysession.undo()
 
 
 def get_costbasis_lots(test_db, entity, address):
@@ -264,6 +267,55 @@ class TestCostbasisGeneral:
         assert foo_lots[0].history[0].amount == 10
 
 
+class TestCostbasisFees:
+    def test_all_gas_fees_are_disposals(self, test_db):
+        # Should not count because tx was not from us (we didnt spend the gas)
+        make.tx(ins=["5 AVAX"], fee=0.5, timestamp=1, from_address="A FRIEND")
+        price_feed.stub_price(1, "avalanche-2", 1.00)
+
+        # Should count because tx WAS from us
+        make.tx(outs=["1 AVAX"], fee=0.2, timestamp=2, to_address="ANOTHER FRIEND")
+        price_feed.stub_price(2, "avalanche-2", 5.00)
+
+        common(test_db)
+
+        disposals = get_disposals(test_db, "AVAX")
+        assert len(disposals) == 1
+        assert disposals[0].total_usd == 5 * 0.2
+
+    def test_fee_total_value_is_subtracted_from_costbasis_total_usd_for_new_lots(
+        self, test_db
+    ):
+        make.tx(ins=["5 AVAX"], timestamp=1, from_address="A FRIEND")
+        price_feed.stub_price(1, "avalanche-2", 1.00)
+
+        make.tx(
+            outs=["1 AVAX"],
+            ins=["10 JOE"],
+            debank_name="swapExactTokensForETH",
+            fee=0.25,
+            timestamp=2,
+            to_address="Some DEX",
+        )
+        price_feed.stub_price(2, "avalanche-2", 5.00)
+        price_feed.stub_price(2, "joe", 0.50)
+
+        common(test_db)
+
+        joe_lots = [
+            l
+            for l in get_costbasis_lots(test_db, entity_name, address)
+            if l.asset_price_id == "joe"
+        ]
+
+        assert len(joe_lots) == 1
+        # Total lot basis_usd should equal (asset_price at timestmap) * (amount of asset) - (value of fee paid)
+        expected_asset_price_at_timestamp = 0.5
+        expected_fee_value = 0.25 * 5.00
+        expected_basis_usd = expected_asset_price_at_timestamp * 10 - expected_fee_value
+        assert expected_basis_usd == joe_lots[0].basis_usd
+
+
 class TestCostbasisForm8949:
     def test_respects_ignored_from_costbasis_flag_on_tx_logicals(
         self, test_db, event_store
@@ -334,21 +386,6 @@ class TestCostbasisForm8949:
 
 
 class TestCostbasisDisposal:
-    def test_all_gas_fees_are_disposals(self, test_db):
-        # Should not count because tx was not from us (we didnt spend the gas)
-        make.tx(ins=["5 AVAX"], fee=0.5, timestamp=1, from_address="A FRIEND")
-        price_feed.stub_price(1, "avalanche-2", 1.00)
-
-        # Should count because tx WAS from us
-        make.tx(outs=["1 AVAX"], fee=0.2, timestamp=2, to_address="ANOTHER FRIEND")
-        price_feed.stub_price(2, "avalanche-2", 5.00)
-
-        common(test_db)
-
-        disposals = get_disposals(test_db, "AVAX")
-        assert len(disposals) == 1
-        assert disposals[0].total_usd == 5 * 0.2
-
     def test_simple_sends_are_not_treated_as_disposals(self, test_db):
         make.tx(ins=["5 AVAX"], timestamp=1, from_address="A FRIEND")
         price_feed.stub_price(1, "avalanche-2", 1.00)
@@ -631,7 +668,9 @@ class TestCostbasisPrice:
             to_address="Some DEX",
         )
         price_feed.stub_price(2, "avalanche-2", 5.00)
-        price_feed.stub_price(2, "joe", 0.50)
+        price_feed.stub_price(
+            2, "joe", 5.50
+        )  # Note, max_disposal defaults to in.price*in.amount so we need to make sure our JOE is priced high enough so that our max_disposal doesn't get clamped below when we override price
 
         common(test_db, event_store)
 

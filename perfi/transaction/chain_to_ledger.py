@@ -1,5 +1,6 @@
 from ..models import TxLedgerStore, TxLedger
 from ..db import db
+from ..cache import cache
 from ..ingest.chain import (
     EtherscanTransactionsFetcher,
     AvalancheTransactionsFetcher,
@@ -555,9 +556,24 @@ class LedgerTx:
         logger.debug(f'{self.hash} | {type or "__None__"}')
 
     def assign_price(self):
-        # This only works with chain imported assets...
+        # If we are looking at exchange import data
         if self.chain.startswith("import"):
-            return
+            # And this is asset is for FIAT, try to convert it to USD
+            if self.asset_tx_id.startswith("FIAT:"):
+                from_fiat_symbol = self.asset_tx_id.split(":")[1]
+                to_fiat_symbol = "USD"
+                if from_fiat_symbol == "USD":
+                    price_usd = Decimal(self.amount)
+                    price_source = "exchange_export_file"
+                else:
+                    price_usd, price_source = price_feed.convert_fiat(
+                        from_fiat_symbol,
+                        to_fiat_symbol,
+                        Decimal(self.amount),
+                        self.timestamp,
+                    )
+                self.price = price_usd
+                self.price_source = price_source
 
         asset_map = price_feed.map_asset(self.chain, self.asset_tx_id)
         if asset_map:

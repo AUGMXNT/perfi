@@ -200,7 +200,7 @@ def regenerate_costbasis_lots(entity, args=None, quiet=False):
                 )
                 logger.error(err, exc_info=True)
                 logger.error("TxLogical:")
-                logger.error(pformat(tx_logical))
+                logger.error(debug.format(tx_logical))
                 logger.error("-----------------")
 
     finished_cleanly = True
@@ -1189,8 +1189,11 @@ class CostbasisGenerator:
             asset_price_id = None
             symbol = None
 
-        # LATER: we should be considering TxLogical fees, approvals, etc...
-        basis_usd = decimal_mul(price, t.amount)
+        # Basis should equal the price * amount - value_of_fees
+        value_of_fee = 0
+        if self.fee and self.fee.amount > 0:
+            value_of_fee = self.fee.amount * self.fee.price_usd
+        basis_usd = decimal_mul(price, t.amount) - value_of_fee
 
         lot = CostbasisLot(
             tx_ledger_id=t.id,
@@ -1517,7 +1520,7 @@ class CostbasisGenerator:
 
         # 1.  If we have a price_usd on the tx_ledger, return that
         if tx.price_usd is not None:
-            return (Decimal(tx.price_usd), "tx_ledger")
+            return (Decimal(tx.price_usd), tx.price_source)
 
         # 2. Try to get the price from our mapped assets
         # tx_ledgers[] have chain, not tx_logical
