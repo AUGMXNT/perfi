@@ -93,10 +93,9 @@ class TxFactory:
         from_address = kwargs.get("from_address") or self.address
         to_address_name = kwargs.get("to_address_name")
         from_address_name = kwargs.get("from_address_name") or None
-        fee = kwargs.get("fee") or 0.001
-        fee = f"{fee} XYZ"  # Stored as a string in our DB
-        gas_price = kwargs.get("gas_price") or 1
-        gas_used = kwargs.get("gas_used") or 1
+        fee = kwargs.get("fee") or 0.0
+        gas_price = kwargs.get("gas_price") or 0
+        gas_used = kwargs.get("gas_used") or 0
         hash = kwargs.get("hash")
         if not hash:
             self.fake_hash_counter += 1
@@ -168,10 +167,25 @@ class TxFactory:
                 if "ins" not in kwargs and "outs" in kwargs:
                     debank_name = "send"
 
+            covalent_data = dict(
+                data=dict(
+                    items=[
+                        dict(
+                            from_address=from_address,
+                            to_address=to_address,
+                            fees_paid=fee * 1e18,  # convert ETH to WEI for example
+                            gas_spent=gas_used * 1e9,  # ignore this for now
+                            gas_price=gas_price,  # ignore for no
+                        )
+                    ]
+                )
+            )
+
             return dict(
                 tx=dict(name=debank_name),
                 receives=receives,
                 sends=sends,
+                _covalent=covalent_data,  # used for fees
             )
 
         tx = dict(

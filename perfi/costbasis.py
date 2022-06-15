@@ -595,6 +595,14 @@ class CostbasisGenerator:
             )
             # raise Exception(f"Trying to create disposal for unknown type: {self.tx_logical.tx_logical_type} \n{pformat(self.tx_logical)}")
 
+        # Finally, handle fees
+        if self.fee:
+            # Ignore fiat fees from exchanges, since a disposal for fiat doesn't make any sense
+            if not self.fee.asset_tx_id.startswith("FIAT:"):
+                # This is spending gas, so it's a disposal
+                lots = LotMatcher().get_lots(self.fee)
+                self.drawdown_from_lots(lots, self.fee, is_disposal=True)
+
     """
     Sort tx_ledger into basics...
     """
@@ -1236,7 +1244,7 @@ class CostbasisGenerator:
 
                 # Get the costbasis_lot's price if it's an ownership change, otherwise we don't care
                 lot_price = None
-                if self.is_ownership_change:
+                if self.is_ownership_change or t.isfee == 1:
                     # We will do a single unwind if receipt to get the original cost basis
                     # this will override any included lot_price (but is probably more accurate)
                     lot_price = Decimal(lot.price_usd)

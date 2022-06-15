@@ -118,7 +118,7 @@ class TransactionLogicalGrouper:
         self.assign_tx_perfi_type_for_logicals(address)
 
         # We are now done grouping. Printing here for dubugging pursposes.
-        self.print_groupings(address)
+        # self.print_groupings(address)
 
     def assign_tx_perfi_type_for_logicals(self, address):
         """

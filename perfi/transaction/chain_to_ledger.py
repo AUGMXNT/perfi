@@ -191,20 +191,26 @@ def update_wallet_ledger_transactions(address):
         # Get the fee tx only if we are the sender (otherwise it's not something we paid for)
         tx = LedgerTx(chain=chain, address=address, hash=hash, timestamp=timestamp)
         try:
-            from_address = tx.get_attr_from_explorer("from_address", raw_data)
+            # Right now we have DebankTransactionsFetcher also pulling covalent data into its entry
+            try:
+                from_address = raw_data["debank"]["_covalent"]["data"]["items"][0][
+                    "from_address"
+                ]
+            except:
+                from_address = tx.get_attr_from_explorer("from_address", raw_data)
         except:
             logger.debug(
-                f"ERROR: couldnt get from_address from explorer for: {tx.hash}"
+                f"ERROR: couldnt get from_address from covalent or explorer for: {tx.hash}"
             )
             from_address = None
 
-        if address == from_address:
+        if address.lower() == from_address.lower():
             tx = LedgerTx(chain=chain, address=address, hash=hash, timestamp=timestamp)
 
             ignore = False
             try:
-                tx.fee_from_chain(raw_data)
-            except (TokenApproveForOtherAddressException, UnscrapedChainError):
+                tx.fee_from_covalent(raw_data)
+            except (TokenApproveForOtherAddressException, UnscrapedChainError) as err:
                 ignore = True
 
             if not ignore:
@@ -379,6 +385,84 @@ class LedgerTx:
             # 'xdai': 'blockscout (xdai)',
         }
         return explorer_mapping.get(self.chain)
+
+    def fee_from_covalent(self, raw_data):
+        """
+        covalent_data shape:
+         {
+            'block_height': 13637090,
+            'block_signed_at': '2021-11-18T04:00:17Z',
+            'fees_paid': '2730000000000000',  IN WEI
+            'from_address': '0x7e96c999ee403ab32495f26dd80815bee4c4d982',
+            'from_address_label': None,
+            'gas_offered': 21000,
+            'gas_price': 130000000000,   IN GWEI
+            'gas_quote': 11.634334892578124,
+            'gas_quote_rate': 4261.6611328125,
+            'gas_spent': 21000,
+            'successful': True,
+            'to_address': '0x74b034e7ea99a8ee372644ef2d4b3642dbac53ab',
+            'to_address_label': None,
+            'tx_hash': '0x079120cb607c60ae199079089e1aa9a3777f8c9230f03ea3ba74767afcef24c4',
+            'tx_offset': 10,
+            'value': '1000000000000000',  IN WEI
+            'value_quote': 4.2616611328125,
+        },
+        """
+        try:
+            covalent_data = raw_data["debank"]["_covalent"]["data"]["items"][0]
+        except:
+            raise UnscrapedChainError(
+                f"Chain {self.chain} currently unsupported because we are looking for fee data from Covalent and we coldn't fetch covalent info for this transaction {self}"
+            )
+
+        self.direction = "OUT"
+        self.tx_ledger_type = "fee"
+
+        # Set asset_tx_id based on chain
+        asset_mapping = {
+            "ethereum": "eth",
+            "avalanche": "avax",
+            "polygon": "matic",
+            "fantom": "ftm",
+            "xdai": "xdai",
+        }
+        self.asset_tx_id = asset_mapping[self.chain]
+
+        # Assign addresses
+        try:
+            self.from_address = covalent_data["from_address"]
+            self.to_address = covalent_data["to_address"]
+        except:
+            # HACK: This is a fee so as long as it's assigned to our PK(chain, address, hash) we don't actually care...
+            self.from_address = raw_data["address"]
+            self.to_address = raw_data["address"]
+
+        try:
+            self.amount = Decimal(covalent_data["fees_paid"]) / Decimal(1e18)
+            self.isfee = 1
+            try:
+                self.debank_name = (
+                    raw_data["debank"]["tx"]["name"]
+                    if raw_data["debank"]["tx"]
+                    else None
+                )
+            except:
+                self.debank_name = None
+
+            # extra
+            self.extra = {}
+            self.extra["gas_price"] = Decimal(covalent_data["gas_price"]) / Decimal(
+                1e9
+            )  # convert to GWEI
+            self.extra["gas_used"] = Decimal(
+                covalent_data["gas_spent"]
+            )  # already in GWEI
+        except Exception as err:
+            pprint(raw_data)
+            raise Exception(
+                f"Error when trying to create fee from covalent data: {err} {raw_data}"
+            )
 
     def fee_from_chain(self, raw_data):
         """

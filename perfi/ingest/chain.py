@@ -126,6 +126,36 @@ class MyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
+def chain_id(normalized_chain_name):
+    vals = dict(
+        arbitrum=42161,
+        astar=592,
+        aurora=1313161554,
+        avalanche=43114,
+        binancesc=56,
+        btt=199,
+        boba=288,
+        ethereum=1,
+        celo=42220,
+        cro=25,
+        fantom=250,
+        fuse=122,
+        heco=128,
+        harmony=1666600000,
+        polygon=137,
+        metis=1088,
+        moonbeam=1284,
+        moonriver=1285,
+        optimism=10,
+        okc=66,
+        palm=11297108109,
+        smartbch=10000,
+        shiden=336,
+        xdai=100,
+    )
+    return vals[normalized_chain_name]
+
+
 def normalized_chain_value(chain):
     # LATER: update dynamically with https://openapi.debank.com/v1/chain/list
     vals = dict(
@@ -1999,8 +2029,14 @@ class DeBankTransactionsFetcher:
             t["_epoch_timestamp"] = int(t["time_at"])
             t["_id"] = t["id"].strip()
             t["_chain"] = normalized_chain_value(t["chain"])
+            t["_covalent"] = self.get_covalent_info(t["_id"], chain_id(t["_chain"]))
 
         return transactions
+
+    def get_covalent_info(self, hash, chain_id):
+        key = setting(db).get("COVALENT_KEY")
+        covalent_url = f"https://api.covalenthq.com/v1/{chain_id}/transaction_v2/{hash}/?quote-currency=USD&format=JSON&no-logs=true&key={key}"
+        return json.loads(cache.get(covalent_url)["value"])
 
 
 class TransactionsUnifier:

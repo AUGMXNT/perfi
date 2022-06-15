@@ -82,33 +82,22 @@ def get_costbasis_lots(test_db, entity, address):
     return lots_to_return
 
 
-def get_disposals(test_db, symbol, timestamp=None):
+def get_disposals(test_db, symbol, timestamp=None, only_fee=None, exclude_fee=None):
     sql = f"""SELECT
-                id,
-                entity,
-                address,
-                asset_price_id,
-                symbol,
-                amount,
-                timestamp,
-                duration_held,
-                basis_timestamp,
-                basis_tx_ledger_id,
-                basis_usd,
-                total_usd,
-                tx_ledger_id,
-                price_source
-             FROM costbasis_disposal
-             WHERE symbol = ?
-             {"AND timestamp = ?" if timestamp else ""}
-             ORDER BY timestamp ASC
+                cd.*
+             FROM costbasis_disposal cd
+             JOIN tx_ledger tl on cd.tx_ledger_id = tl.id
+             WHERE cd.symbol = ?
+             {"AND cd.timestamp = ?" if timestamp else ""}
+             {"AND tl.isfee = 0" if only_fee else ""}
+             {"AND tl.isfee != 1" if exclude_fee else ""}
+             ORDER BY cd.timestamp ASC
     """
     if timestamp:
         params = [symbol, timestamp]
     else:
         params = [symbol]
     results = test_db.query(sql, params)
-
     return [CostbasisDisposal(**r) for r in results]
 
 
@@ -163,7 +152,7 @@ class TestCostbasisGeneral:
             outs=["1 AVAX"],
             ins=["10 JOE"],
             debank_name="swapExactTokensForETH",
-            fee=0.00123,
+            fee=0.5,
             timestamp=2,
             to_address="Some DEX",
         )
@@ -177,7 +166,7 @@ class TestCostbasisGeneral:
             outs=["10 AVAX"],
             ins=["200 JOE"],
             debank_name="swapExactTokensForETH",
-            fee=0.00123,
+            fee=0,
             timestamp=3,
             to_address="Some DEX",
         )
@@ -208,17 +197,23 @@ class TestCostbasisGeneral:
         flag_names = [f.name for f in avax_zerocost_lot.flags]
         assert "auto_reconciled" in flag_names
         # We should make sure that we've properly drawndown the overdrawn balance
-        assert avax_zerocost_lot.original_amount == approx(Decimal(6))
+        assert avax_zerocost_lot.original_amount == approx(
+            Decimal(6.5)
+        )  # 6 leftover plus .5 gas from the second tx
         assert avax_zerocost_lot.current_amount == approx(Decimal(0))
         assert avax_zerocost_lot.basis_usd == approx(Decimal(0))
         assert avax_zerocost_lot.price_usd == approx(Decimal(0))
 
         # By the end, at timestamp 3, we should have a disposal for 1 at t1, 4 more avax from the first lot, then 6 more from a new zero cost lot
-        avax_disposals = get_disposals(test_db, "AVAX")
+        avax_disposals = get_disposals(test_db, "AVAX", exclude_fee=True)
         assert len(avax_disposals) == 3
         assert avax_disposals[0].amount == 1
-        assert avax_disposals[1].amount == 4
-        assert avax_disposals[2].amount == 6
+        assert (
+            avax_disposals[1].amount == 3.5
+        )  # would be 4, except we disposed .5 gas also
+        assert (
+            avax_disposals[2].amount == 6.5
+        )  # the .5 is carried over into this disposal which would otherwise be 6
         assert (
             avax_disposals[0].duration_held == 1
         )  # bought at time 1, disposed 1 at time 2, duration is 1
@@ -231,7 +226,7 @@ class TestCostbasisGeneral:
             disposal_from_reconcile.duration_held == 0
         )  # zerocost lot created to auto reconcile, duration is 0
         assert disposal_from_reconcile.basis_usd == 0
-        assert disposal_from_reconcile.total_usd == 6 * 10
+        assert disposal_from_reconcile.total_usd == 6 * 10 + 5  # extra 5 for the gas
         # LATER: once we have a `lots` attr on `costbasis_disposal` we can add assertions to be sure each disposal targeted the right lots
 
     def test_non_disposal_lots_have_history_ref_to_original_asset(self, test_db):
@@ -280,7 +275,7 @@ class TestCostbasisForm8949:
             outs=["1 AVAX"],
             ins=["10 JOE"],
             debank_name="swapExactTokensForETH",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             to_address="Some DEX",
         )
@@ -320,7 +315,7 @@ class TestCostbasisForm8949:
         assert avax_lots[0].current_amount == 5
 
         # No disposals should exist
-        disposals = get_disposals(test_db, "AVAX")
+        disposals = get_disposals(test_db, "AVAX", exclude_fee=True)
         assert len(disposals) == 0
 
     def test_receive_flags_costbasis_for_disposal(self, test_db):
@@ -339,17 +334,32 @@ class TestCostbasisForm8949:
 
 
 class TestCostbasisDisposal:
+    def test_all_gas_fees_are_disposals(self, test_db):
+        # Should not count because tx was not from us (we didnt spend the gas)
+        make.tx(ins=["5 AVAX"], fee=0.5, timestamp=1, from_address="A FRIEND")
+        price_feed.stub_price(1, "avalanche-2", 1.00)
+
+        # Should count because tx WAS from us
+        make.tx(outs=["1 AVAX"], fee=0.2, timestamp=2, to_address="ANOTHER FRIEND")
+        price_feed.stub_price(2, "avalanche-2", 5.00)
+
+        common(test_db)
+
+        disposals = get_disposals(test_db, "AVAX")
+        assert len(disposals) == 1
+        assert disposals[0].total_usd == 5 * 0.2
+
     def test_simple_sends_are_not_treated_as_disposals(self, test_db):
         make.tx(ins=["5 AVAX"], timestamp=1, from_address="A FRIEND")
         price_feed.stub_price(1, "avalanche-2", 1.00)
 
-        make.tx(outs=["1 AVAX"], fee=0.00123, timestamp=2, to_address="ANOTHER FRIEND")
+        make.tx(outs=["1 AVAX"], fee=0.0, timestamp=2, to_address="ANOTHER FRIEND")
         price_feed.stub_price(2, "avalanche-2", 5.00)
 
         common(test_db)
 
         # Check to make sure no CostbasisDisposal was generated since this was a send (and we will assume sends are not disposals)
-        disposals = get_disposals(test_db, "AVAX", 2)
+        disposals = get_disposals(test_db, "AVAX", 2, exclude_fee=True)
         assert len(disposals) == 0
 
     # Test that our costbasis lot and disposal mapping/matching algorithms are working properly
@@ -364,6 +374,7 @@ class TestCostbasisDisposal:
             ],
             timestamp=1,
             from_address="A Friend",
+            fee=0,
         )
         price_feed.stub_price(1, "usd-coin", 1.00)
 
@@ -379,6 +390,7 @@ class TestCostbasisDisposal:
             timestamp=2,
             debank_name="disposal",
             to_address="Other Person",
+            fee=0,
         )
         price_feed.stub_price(2, "usd-coin", 1.00)
 
@@ -411,11 +423,11 @@ class TestCostbasisDisposal:
         assert usdce_lots[0].current_amount == approx(Decimal(0))
         assert usdc_lots[0].current_amount == approx(Decimal(0.5))
 
-        disposals = get_disposals(test_db, "USDC", 2)
+        disposals = get_disposals(test_db, "USDC", 2, exclude_fee=True)
         assert len(disposals) == 2
-        assert disposals[0].amount == approx(Decimal(1))
+        assert disposals[0].amount == approx(Decimal(0.5))
         assert disposals[0].asset_price_id == "usd-coin"
-        assert disposals[1].amount == approx(Decimal(0.5))
+        assert disposals[1].amount == approx(Decimal(1))
         assert disposals[1].asset_price_id == "usd-coin"
 
     def test_changing_ownership_of_deposit_receipt_without_disposal(self, test_db):
@@ -429,7 +441,7 @@ class TestCostbasisDisposal:
             outs=["1 AVAX"],
             ins=["0.5 avWAVAX|0xavWAVAX"],
             debank_name="depositBNB",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             to_address="Aave",
         )
@@ -439,7 +451,7 @@ class TestCostbasisDisposal:
         make.tx(
             outs=["0.25 avWAVAX|0xavWAVAX"],
             debank_name="send",
-            fee=0.00123,
+            fee=0,
             timestamp=3,
             to_address="A FRIEND",
         )
@@ -452,13 +464,13 @@ class TestCostbasisDisposal:
             for l in get_costbasis_lots(test_db, entity_name, address)
             if l.asset_price_id == "avalanche-2"
         ]
-        avax_disposals = get_disposals(test_db, "AVAX", 3)
+        avax_disposals = get_disposals(test_db, "AVAX", 3, exclude_fee=True)
         avWAVAX_lots = [
             l
             for l in get_costbasis_lots(test_db, entity_name, address)
             if l.asset_tx_id == "0xavWAVAX"
         ]
-        avWAVAX_disposals = get_disposals(test_db, "0xavWAVAX", 3)
+        avWAVAX_disposals = get_disposals(test_db, "0xavWAVAX", 3, exclude_fee=True)
 
         # We should only have 4.5 AVAX left (subtracted by unwinding and multiplying by amount of receipt subtracted from original ratio)
         # 1 AVAX -> 0.5 avWAVAX; -0.25 avWAVAX -> -0.5 AVAX
@@ -489,7 +501,7 @@ class TestCostbasisDisposal:
             outs=["1 AVAX"],
             ins=["0.5 avWAVAX|0xavWAVAX"],
             debank_name="depositBNB",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             to_address="Aave",
         )
@@ -500,7 +512,7 @@ class TestCostbasisDisposal:
             ins=["3 USDC"],
             outs=["0.25 avWAVAX|0xavWAVAX"],
             debank_name="swap",
-            fee=0.00123,
+            fee=0,
             timestamp=3,
             to_address="A VENDOR",
         )
@@ -514,13 +526,13 @@ class TestCostbasisDisposal:
             for l in get_costbasis_lots(test_db, entity_name, address)
             if l.asset_price_id == "avalanche-2"
         ]
-        avax_disposals = get_disposals(test_db, "AVAX", 3)
+        avax_disposals = get_disposals(test_db, "AVAX", 3, exclude_fee=True)
         avWAVAX_lots = [
             l
             for l in get_costbasis_lots(test_db, entity_name, address)
             if l.asset_tx_id == "0xavWAVAX"
         ]
-        avWAVAX_disposals = get_disposals(test_db, "avWAVAX", 3)
+        avWAVAX_disposals = get_disposals(test_db, "avWAVAX", 3, exclude_fee=True)
 
         # We should only have 4.5 AVAX left (subtracted by unwinding and multiplying by amount of receipt subtracted from original ratio)
         # 1 AVAX -> 0.5 avWAVAX; -0.25 avWAVAX -> -0.5 AVAX
@@ -562,7 +574,7 @@ class TestCostbasisPrice:
             outs=["1 AVAX"],
             ins=["0.5 avWAVAX"],
             debank_name="depositBNB",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             to_address="Aave",
         )
@@ -603,7 +615,7 @@ class TestCostbasisPrice:
         assert avwl.history[0].asset_tx_id == "avax"
 
         # And, there should be no disposal records created
-        avax_disposals = get_disposals(test_db, "avax", 2)
+        avax_disposals = get_disposals(test_db, "avax", 2, exclude_fee=True)
         assert len(avax_disposals) == 0
 
     def test_lot_and_disposal_use_tx_ledger_price_if_set(self, test_db, event_store):
@@ -614,7 +626,7 @@ class TestCostbasisPrice:
             outs=["1 AVAX"],
             ins=["10 JOE"],
             debank_name="swapExactTokensForETH",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             to_address="Some DEX",
         )
@@ -665,7 +677,7 @@ class TestCostbasisPrice:
         assert lot.current_amount == 4
 
         # Check to make sure a CostbasisDisposal was generated with appropriate attrs (updated price)
-        disposals = get_disposals(test_db, "AVAX", 2)
+        disposals = get_disposals(test_db, "AVAX", 2, exclude_fee=True)
         assert len(disposals) == 1
         disposal = disposals[0]
         assert disposal.amount == 1
@@ -800,7 +812,7 @@ class TestCostbasisDeposit:
             outs=["1 AVAX"],
             ins=["5 mysteryTOK|0xWhoKnows"],
             debank_name="deposit",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             to_address="Mystery",
         )
@@ -832,7 +844,7 @@ class TestCostbasisDeposit:
         )  # The price_usd should be derived from the (total out * amount per out) / total amount in
 
         # And, there should be no disposal records created
-        avax_disposals = get_disposals(test_db, "avax", 2)
+        avax_disposals = get_disposals(test_db, "avax", 2, exclude_fee=True)
         assert len(avax_disposals) == 0
 
 
@@ -848,7 +860,7 @@ class TestCostbasisWithdraw:
             outs=["1 AVAX"],
             ins=["0.9 avWAVAX|0xavWAVAX"],
             debank_name="depositBNB",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             to_address="Aave",
         )
@@ -860,7 +872,7 @@ class TestCostbasisWithdraw:
             outs=["0.9 avWAVAX|0xavWAVAX"],
             ins=["1.1 AVAX"],
             debank_name="withdrawBNB",
-            fee=0.00123,
+            fee=0,
             timestamp=3,
             to_address="Aave",
         )
@@ -920,7 +932,7 @@ class TestCostbasisBorrow:
         make.tx(
             ins=["1 AVAX", "1.25 variableDebtWAVAX|0xvariableDebtWAVAX"],
             debank_name="borrow",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             from_address="Aave",
         )
@@ -967,7 +979,7 @@ class TestCostbasisRepay:
         make.tx(
             ins=["1 AVAX", "1.2 variableDebtWAVAX|0xvariableDebtWAVAX"],
             debank_name="borrow",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             from_address="Aave",
         )
@@ -979,7 +991,7 @@ class TestCostbasisRepay:
         make.tx(
             outs=["1.1 AVAX", "1.2 variableDebtWAVAX|0xvariableDebtWAVAX"],
             debank_name="repay",
-            fee=0.00123,
+            fee=0,
             timestamp=3,
             to_address="Aave",
         )
@@ -1051,7 +1063,7 @@ class TestCostbasisWrap:
         assert avax_lots[0].current_amount == 1
 
         # Check to make sure no CostbasisDisposal was generated since this was a wrap (and we will assume wraps are not disposals)
-        disposals = get_disposals(test_db, "AVAX", 2)
+        disposals = get_disposals(test_db, "AVAX", 2, exclude_fee=True)
         assert len(disposals) == 0
 
     def test_dispose_of_wrapped_asset(self, test_db):
@@ -1093,7 +1105,7 @@ class TestCostbasisWrap:
         ]
 
         # Check to make sure no CostbasisDisposal was generated when we wrap (and we will assume wraps are not disposals)
-        avax_disposals = get_disposals(test_db, "AVAX", 2)
+        avax_disposals = get_disposals(test_db, "AVAX", 2, exclude_fee=True)
         assert len(avax_disposals) == 0
 
         # We don't create a lot for a wrapped asset
@@ -1107,7 +1119,7 @@ class TestCostbasisWrap:
         )  # sanity check we're looking at our original deposit...
 
         # And created an AVAX disposal at timestamp=3
-        avax_disposals = get_disposals(test_db, "AVAX", 3)
+        avax_disposals = get_disposals(test_db, "AVAX", 3, exclude_fee=True)
         assert len(avax_disposals) == 1
         assert avax_disposals[0].amount == approx(Decimal(1.0))
         assert avax_disposals[0].basis_usd == approx(Decimal(1.0))  # price when bought
@@ -1116,7 +1128,7 @@ class TestCostbasisWrap:
         )  # price when disposed of
 
         # and no wavax disposal...
-        wavax_disposals = get_disposals(test_db, WAVAX, 3)
+        wavax_disposals = get_disposals(test_db, WAVAX, 3, exclude_fee=True)
         assert len(wavax_disposals) == 0
 
 
@@ -1134,7 +1146,7 @@ class TestCostbasisLP:
             outs=["1 AVAX", "100 DAI"],
             ins=["10 JLP|0xJoeLiquidity"],
             debank_name="addLiquidity",
-            fee=0.00123,
+            fee=0,
             timestamp=3,
             to_address="Some DEX",
         )
@@ -1148,7 +1160,7 @@ class TestCostbasisLP:
             outs=["10 JLP|0xJoeLiquidity"],
             ins=["0.5 AVAX", "200 DAI"],
             debank_name="removeLiquidity",
-            fee=0.00123,
+            fee=0,
             timestamp=3,
             to_address="Some DEX",
         )
@@ -1200,7 +1212,7 @@ class TestCostbasisLP:
         make.tx(
             ins=["1 AVAX", "1.2 variableDebtWAVAX|0xvariableDebtWAVAX"],
             debank_name="borrow",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             from_address="Aave",
         )
@@ -1211,7 +1223,7 @@ class TestCostbasisLP:
             ins=["1 LP|0xLP"],
             outs=["1 AVAX"],
             debank_name="provideLiquidity",
-            fee=0.00123,
+            fee=0,
             timestamp=3,
             to_address="Curve",
         )
@@ -1247,7 +1259,7 @@ class TestCostbasisSwap:
             outs=["1 AVAX"],
             ins=["10 JOE"],
             debank_name="swapExactTokensForETH",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             to_address="Some DEX",
         )
@@ -1277,7 +1289,7 @@ class TestCostbasisSwap:
         assert lot.current_amount == 4
 
         # Check to make sure a CostbasisDisposal was generated with appropriate attrs
-        disposals = get_disposals(test_db, "AVAX", 2)
+        disposals = get_disposals(test_db, "AVAX", 2, exclude_fee=True)
         assert len(disposals) == 1
         disposal = disposals[0]
         assert disposal.amount == 1
@@ -1294,7 +1306,7 @@ class TestCostbasisSwap:
             outs=["1.2 USDf|0xUSDf"],
             ins=["1 USDC"],
             debank_name="swapExactTokensForTokens",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             to_address="Some DEX",
         )
@@ -1328,7 +1340,7 @@ class TestCostbasisSwap:
         assert lot.current_amount == approx(0)
 
         # Check to make sure a CostbasisDisposal was generated with appropriate attrs
-        disposals = get_disposals(test_db, "USDf", 2)
+        disposals = get_disposals(test_db, "USDf", 2, exclude_fee=True)
         assert len(disposals) == 1
         disposal = disposals[0]
         assert disposal.amount == approx(Decimal(1.2))
@@ -1369,7 +1381,7 @@ class TODO:
             outs=["1 AVAX"],
             ins=["0.5 avWAVAX|0xavWAVAX"],
             debank_name="depositBNB",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             to_address="Aave",
         )
@@ -1379,7 +1391,7 @@ class TODO:
         make.tx(
             outs=["1 avWAVAX|0xavWAVAX"],
             debank_name="send",
-            fee=0.00123,
+            fee=0,
             timestamp=3,
             to_address="A FRIEND",
         )
@@ -1392,13 +1404,13 @@ class TODO:
             for l in get_costbasis_lots(test_db, entity_name, address)
             if l.asset_price_id == "avalanche-2"
         ]
-        avax_disposals = get_disposals(test_db, "AVAX", 3)
+        avax_disposals = get_disposals(test_db, "AVAX", 3, exclude_fee=True)
         avWAVAX_lots = [
             l
             for l in get_costbasis_lots(test_db, entity_name, address)
             if l.asset_tx_id == "0xavWAVAX"
         ]
-        avWAVAX_disposals = get_disposals(test_db, "0xavWAVAX", 3)
+        avWAVAX_disposals = get_disposals(test_db, "0xavWAVAX", 3, exclude_fee=True)
 
         # pprint(avax_lots)
         # print('---')

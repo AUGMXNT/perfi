@@ -367,9 +367,12 @@ class TxLogical(BaseModel):
         if len(self.outs) > 0:
             chain = self.outs[0].chain
             hash = self.outs[0].hash
-        if len(self.ins) > 0:
+        elif len(self.ins) > 0:
             chain = self.ins[0].chain
             hash = self.ins[0].hash
+        elif self.fee:
+            chain = self.fee.chain
+            hash = self.fee.hash
         return " | ".join(
             [
                 datestamp,
