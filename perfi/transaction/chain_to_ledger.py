@@ -582,7 +582,7 @@ class LedgerTx:
                 from_fiat_symbol = self.asset_tx_id.split(":")[1]
                 to_fiat_symbol = "USD"
                 if from_fiat_symbol == "USD":
-                    price_usd = Decimal(self.amount)
+                    price_usd = 1
                     price_source = "exchange_export_file"
                 else:
                     price_usd, price_source = price_feed.convert_fiat(
@@ -593,6 +593,7 @@ class LedgerTx:
                     )
                 self.price = price_usd
                 self.price_source = price_source
+                return
 
         asset_map = price_feed.map_asset(self.chain, self.asset_tx_id)
         if asset_map:
