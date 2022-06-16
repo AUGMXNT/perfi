@@ -114,7 +114,8 @@ def update_wallet_ledger_transactions(address):
                 tx.symbol = t["symbol"]
                 tx.from_address = t["from_address"]
                 tx.to_address = t["to_address"]
-
+                tx.proceeds_after_fees_usd = t.get("proceeds_after_fees_usd", None)
+                tx.price = t.get("price", None)
                 tx.isfee = 0
                 try:
                     if t["isfee"] == 1:
@@ -138,6 +139,10 @@ def update_wallet_ledger_transactions(address):
                 tx.symbol = t["symbol"]
                 tx.from_address = t["from_address"]
                 tx.to_address = t["to_address"]
+                tx.price = t.get("price", None)
+                tx.costbasis_including_fees_usd = t.get(
+                    "cost_basis_including_fees_usd", None
+                )
                 ledger_txs.append(tx)
 
             continue
@@ -223,6 +228,8 @@ class LedgerTx:
         self.isfee = 0
         self.amount = None
 
+        self.costbasis_including_fees_usd = None
+        self.proceeds_after_fees_usd = None
         self.timestamp = kwargs["timestamp"]
         self.direction = None
         self.tx_ledger_type = None
@@ -245,6 +252,8 @@ class LedgerTx:
              isfee : {self.isfee }
              amount : {self.amount }
 
+             costbasis_including_fees: {self.costbasis_including_fees_usd}
+             proceeds_after_fees_usd: {self.proceeds_after_fees_usd}
              timestamp: {self.timestamp}
              direction : {self.direction }
              tx_ledger_type : {self.tx_ledger_type }
@@ -577,7 +586,32 @@ class LedgerTx:
     def assign_price(self):
         # If we are looking at exchange import data
         if self.chain.startswith("import"):
-            # And this is asset is for FIAT, try to convert it to USD
+            # If we have explicit price from an import (e.g. coinbasepro), we'll use what we have, and just set the price_source here and return early.
+            if self.price:
+                self.price_source = "exchange_export_file_explicit_price"
+                return
+
+            # If we have explicit costbasis info for this asset already (from coinbase import), derive price from that
+            if (
+                self.direction == "IN"
+                and self.costbasis_including_fees_usd
+                and Decimal(self.costbasis_including_fees_usd) > 0
+            ):
+                self.price = Decimal(self.costbasis_including_fees_usd) / Decimal(
+                    self.amount
+                )
+                self.price_source = "exchange_export_file_explicit_costbasis"
+                return
+
+            # If we have explicit proceeds info for this asset already (from coinbase import), derive price from that
+            if self.direction == "OUT" and self.proceeds_after_fees_usd:
+                self.price = Decimal(self.proceeds_after_fees_usd) / Decimal(
+                    self.amount
+                )
+                self.price_source = "exchange_export_file_explicit_proceeds"
+                return
+
+            # If this asset is for FIAT, try to convert it to USD
             if self.asset_tx_id.startswith("FIAT:"):
                 from_fiat_symbol = self.asset_tx_id.split(":")[1]
                 to_fiat_symbol = "USD"

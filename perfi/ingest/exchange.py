@@ -624,6 +624,9 @@ class CoinbaseImporter:
                     last_row_transaction_type = (
                         f"Coinbase.{last_row_converted_from['Transaction Type']}"
                     )
+                    last_row_proceeds = last_row_converted_from[
+                        "Proceeds (excl. fees paid) (USD)"
+                    ]
                     tx = dict(
                         chain=chain,
                         address=entity_address_for_imports,
@@ -638,7 +641,7 @@ class CoinbaseImporter:
                                 symbol=symbol,
                                 from_address=default_from_to,
                                 to_address=default_from_to,
-                                cost_basis_usd=costbasis_usd,
+                                cost_basis_including_fees_usd=costbasis_usd,
                                 isfee=0,
                             )
                         ],
@@ -652,6 +655,7 @@ class CoinbaseImporter:
                                 from_address=default_from_to,
                                 to_address=default_from_to,
                                 isfee=0,
+                                proceeds_after_fees_usd=last_row_proceeds,
                             )
                         ],
                     )
@@ -675,6 +679,7 @@ class CoinbaseImporter:
                             from_address=default_from_to,
                             to_address=default_from_to,
                             is_fee=0,
+                            costbasis_including_fees_usd=costbasis_usd,
                         )
                     ],
                     sends=[
@@ -719,6 +724,7 @@ class CoinbaseImporter:
                             from_address=default_from_to,
                             to_address=default_from_to,
                             isfee=0,
+                            proceeds_after_fees_usd=proceeds_usd,
                         )
                     ],
                 )
@@ -748,8 +754,10 @@ class CoinbaseImporter:
                 isfee=0,
             )
             if r["Transaction Type"] in transaction_types_for_receive:
+                t["cost_basis_including_fees_usd"] = costbasis_usd
                 receives.append(t)
             elif r["Transaction Type"] in transaction_types_for_send:
+                t["proceeds_after_fees_usd"] = proceeds_usd
                 sends.append(t)
             else:
                 raise Exception(
@@ -1050,6 +1058,7 @@ class CoinbaseProImporter:
                 from_address=default_from_to,
                 to_address=default_from_to,
                 isfee=0,
+                price=price,
             )
 
             price_asset = dict(
