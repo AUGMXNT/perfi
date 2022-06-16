@@ -309,11 +309,35 @@ class TestCostbasisFees:
         ]
 
         assert len(joe_lots) == 1
-        # Total lot basis_usd should equal (asset_price at timestmap) * (amount of asset) - (value of fee paid)
+        # Total lot basis_usd should equal (asset_price at timestamp) * (amount of asset) - (value of fee paid)
         expected_asset_price_at_timestamp = 0.5
         expected_fee_value = 0.25 * 5.00
         expected_basis_usd = expected_asset_price_at_timestamp * 10 - expected_fee_value
         assert expected_basis_usd == joe_lots[0].basis_usd
+
+    def test_fee_total_value_is_subtracted_from_disposal_total_usd(self, test_db):
+        make.tx(ins=["5 AVAX"], timestamp=1, from_address="A FRIEND")
+        price_feed.stub_price(1, "avalanche-2", 1.00)
+
+        make.tx(
+            outs=["1 AVAX"],
+            ins=["10 JOE"],
+            debank_name="swapExactTokensForETH",
+            fee=0.25,
+            timestamp=2,
+            to_address="Some DEX",
+        )
+        price_feed.stub_price(2, "avalanche-2", 5.00)
+        price_feed.stub_price(2, "joe", 0.50)
+
+        common(test_db)
+
+        disposals = get_disposals(test_db, "AVAX", exclude_fee=True)
+        assert len(disposals) == 1
+        # When we swapped 1 avax away, it had a unit value of 5.00,
+        # but we also paid 0.25 avax in fees at a unit price of 5.00 for a total fee of 1.25
+        # So our total usd proceeds value should be 5.00 - 1.25 == 3.75
+        assert disposals[0].total_usd == 3.75
 
 
 class TestCostbasisForm8949:
