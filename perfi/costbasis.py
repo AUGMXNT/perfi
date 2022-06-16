@@ -1189,7 +1189,7 @@ class CostbasisGenerator:
             asset_price_id = None
             symbol = None
 
-        # Basis should equal the price * amount - value_of_fees
+        # Basis should equal the price * amount + value_of_fees
         value_of_fee = 0
         if self.fee and self.fee.amount > 0:
             value_of_fee = self.fee.amount * self.fee.price_usd
