@@ -1035,7 +1035,8 @@ class CoinbaseProImporter:
             default_from_to = f"CoinbasePro:{exchange_account_id}"
             fee_amount = Decimal(r["fee"])
             price_unit = r["price/fee/total unit"]
-            price_total = abs(Decimal(r["total"]))
+            price = Decimal(r["price"])
+            price_total = price * amount
             trade_id = r["trade id"]
             product = r["product"]
             portfolio = r["portfolio"]
