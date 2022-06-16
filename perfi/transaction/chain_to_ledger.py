@@ -189,33 +189,13 @@ def update_wallet_ledger_transactions(address):
                     raise Exception(f"Coudnt make ledger OUT for {debank_item}")
                     pass
 
-        # Get the fee tx only if we are the sender (otherwise it's not something we paid for)
-        tx = LedgerTx(chain=chain, address=address, hash=hash, timestamp=timestamp)
-        try:
-            # Right now we have DebankTransactionsFetcher also pulling covalent data into its entry
-            try:
-                from_address = raw_data["debank"]["_covalent"]["data"]["items"][0][
-                    "from_address"
-                ]
-            except:
-                from_address = tx.get_attr_from_explorer("from_address", raw_data)
-        except:
-            logger.debug(
-                f"ERROR: couldnt get from_address from covalent or explorer for: {tx.hash}"
-            )
-            from_address = None
-
-        if address.lower() == from_address.lower():
+            # Get the fee tx only if we are the sender (otherwise it's not something we paid for)
             tx = LedgerTx(chain=chain, address=address, hash=hash, timestamp=timestamp)
-
-            ignore = False
-            try:
-                tx.fee_from_covalent(raw_data)
-            except (TokenApproveForOtherAddressException, UnscrapedChainError) as err:
-                ignore = True
-
-            if not ignore:
-                ledger_txs.append(tx)
+            if debank_tx["tx"] is not None:
+                from_address = debank_tx["tx"]["from_addr"]
+                if address.lower() == from_address.lower():
+                    tx.fee_from_debank(raw_data)
+                    ledger_txs.append(tx)
 
     # Now we have all our ledger_txs, so lets put them into the tx_ledger table in the DB
     tx_ledger_store = TxLedgerStore(db)
@@ -387,6 +367,45 @@ class LedgerTx:
         }
         return explorer_mapping.get(self.chain)
 
+    def fee_from_debank(self, raw_data):
+        debank_tx_data = raw_data["debank"]["tx"]
+        self.direction = "OUT"
+        self.tx_ledger_type = "fee"
+
+        # Set asset_tx_id based on chain
+        asset_mapping = {
+            "ethereum": "eth",
+            "avalanche": "avax",
+            "polygon": "matic",
+            "fantom": "ftm",
+            "xdai": "xdai",
+        }
+        self.asset_tx_id = asset_mapping[self.chain]
+
+        # Assign addresses
+        self.from_address = debank_tx_data["from_addr"]
+        self.to_address = debank_tx_data["to_addr"]
+
+        try:
+            self.amount = Decimal(debank_tx_data["eth_gas_fee"])
+            self.isfee = 1
+            try:
+                self.debank_name = (
+                    raw_data["debank"]["tx"]["name"]
+                    if raw_data["debank"]["tx"]
+                    else None
+                )
+            except:
+                self.debank_name = None
+
+            # extra
+            self.extra = {}
+        except Exception as err:
+            pprint(raw_data)
+            raise Exception(
+                f"Error when trying to create fee from debank data: {err} {raw_data}"
+            )
+
     def fee_from_covalent(self, raw_data):
         """
         covalent_data shape:
@@ -465,7 +484,7 @@ class LedgerTx:
                 f"Error when trying to create fee from covalent data: {err} {raw_data}"
             )
 
-    def fee_from_chain(self, raw_data):
+    def fee_from_chain__UNUSED(self, raw_data):
         """
         TODO: For now we ignore the fees for chains we haven't scraped...
         """

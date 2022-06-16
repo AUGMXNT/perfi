@@ -2029,7 +2029,6 @@ class DeBankTransactionsFetcher:
             t["_epoch_timestamp"] = int(t["time_at"])
             t["_id"] = t["id"].strip()
             t["_chain"] = normalized_chain_value(t["chain"])
-            t["_covalent"] = self.get_covalent_info(t["_id"], chain_id(t["_chain"]))
 
         return transactions
 
