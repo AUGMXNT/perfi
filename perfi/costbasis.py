@@ -1193,7 +1193,7 @@ class CostbasisGenerator:
         value_of_fee = 0
         if self.fee and self.fee.amount > 0:
             value_of_fee = self.fee.amount * self.fee.price_usd
-        basis_usd = decimal_mul(price, t.amount) - value_of_fee
+        basis_usd = decimal_mul(price, t.amount) + value_of_fee
 
         lot = CostbasisLot(
             tx_ledger_id=t.id,
