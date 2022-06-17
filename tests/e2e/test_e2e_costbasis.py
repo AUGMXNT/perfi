@@ -50,89 +50,6 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     monkeysession.undo()
 
 
-def get_costbasis_lots(test_db, entity, address):
-    sql = """SELECT
-                 tx_ledger_id,
-                 entity,
-                 address,
-                 asset_price_id,
-                 symbol,
-                 asset_tx_id,
-                 original_amount,
-                 current_amount,
-                 price_usd,
-                 basis_usd,
-                 timestamp,
-                 history,
-                 receipt,
-                 price_source,
-                 chain
-             FROM costbasis_lot
-             WHERE entity = ?
-             AND address = ?
-             ORDER BY timestamp ASC
-    """
-    params = [entity, address]
-    results = test_db.query(sql, params)
-    lots_to_return = []
-    for r in results:
-        r = dict(**r)
-        r["history"] = jsonpickle.decode(r["history"])
-        flags = load_flags(CostbasisLot.__name__, r["tx_ledger_id"])
-        lot = CostbasisLot(flags=flags, **r)
-        lots_to_return.append(lot)
-
-    return lots_to_return
-
-
-def get_disposals(test_db, symbol, timestamp=None, only_fee=None, exclude_fee=None):
-    sql = f"""SELECT
-                cd.*
-             FROM costbasis_disposal cd
-             JOIN tx_ledger tl on cd.tx_ledger_id = tl.id
-             WHERE cd.symbol = ?
-             {"AND cd.timestamp = ?" if timestamp else ""}
-             {"AND tl.isfee = 0" if only_fee else ""}
-             {"AND tl.isfee != 1" if exclude_fee else ""}
-             ORDER BY cd.timestamp ASC
-    """
-    if timestamp:
-        params = [symbol, timestamp]
-    else:
-        params = [symbol]
-    results = test_db.query(sql, params)
-    return [CostbasisDisposal(**r) for r in results]
-
-
-def get_costbasis_incomes(test_db, entity, address):
-    sql = """SELECT id, entity, address, net_usd, symbol, timestamp, tx_ledger_id, price, amount, lots
-             FROM costbasis_income
-             WHERE entity = ?
-             AND address = ?
-             ORDER BY timestamp ASC
-    """
-    params = [entity, address]
-    results = test_db.query(sql, params)
-    incomes_to_return = []
-    for r in results:
-        r = dict(**r)
-        r["lots"] = jsonpickle.decode(r["lots"])
-        income = CostbasisIncome(**r)
-        incomes_to_return.append(income)
-
-    return incomes_to_return
-
-
-def get_tx_ledgers(db, chain, address):
-    sql = """SELECT id, chain, address, hash, from_address, to_address, from_address_name, to_address_name, asset_tx_id, isfee, amount, timestamp, direction, tx_ledger_type, asset_price_id, symbol, price_usd
-           FROM tx_ledger
-           WHERE chain = ? AND address = ?
-           ORDER BY timestamp ASC, isfee ASC
-        """
-    results = list(db.query(sql, [chain, address]))
-    return [TxLedger(**r) for r in results]
-
-
 def common(test_db, event_store=None):
     map_assets()
     update_entity_transactions(entity_name)
@@ -309,10 +226,10 @@ class TestCostbasisFees:
         ]
 
         assert len(joe_lots) == 1
-        # Total lot basis_usd should equal (asset_price at timestamp) * (amount of asset) - (value of fee paid)
+        # Total lot basis_usd should equal (asset_price at timestamp) * (amount of asset) + (value of fee paid)
         expected_asset_price_at_timestamp = 0.5
         expected_fee_value = 0.25 * 5.00
-        expected_basis_usd = expected_asset_price_at_timestamp * 10 - expected_fee_value
+        expected_basis_usd = expected_asset_price_at_timestamp * 10 + expected_fee_value
         assert expected_basis_usd == joe_lots[0].basis_usd
 
     def test_fee_total_value_is_subtracted_from_disposal_total_usd(self, test_db):

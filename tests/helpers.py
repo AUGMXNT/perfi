@@ -2,10 +2,18 @@ import lzma
 import json
 
 import arrow
+import jsonpickle
 
 from bin.map_assets import main as map_assets_main
 from perfi.ingest.chain import MyEncoder
 from perfi.asset import update_assets_from_txchain
+from perfi.models import (
+    load_flags,
+    CostbasisLot,
+    CostbasisDisposal,
+    TxLedger,
+    CostbasisIncome,
+)
 from perfi.price import CoinPrice, PriceFeed
 
 
@@ -167,25 +175,15 @@ class TxFactory:
                 if "ins" not in kwargs and "outs" in kwargs:
                     debank_name = "send"
 
-            covalent_data = dict(
-                data=dict(
-                    items=[
-                        dict(
-                            from_address=from_address,
-                            to_address=to_address,
-                            fees_paid=fee * 1e18,  # convert ETH to WEI for example
-                            gas_spent=gas_used * 1e9,  # ignore this for now
-                            gas_price=gas_price,  # ignore for no
-                        )
-                    ]
-                )
-            )
-
             return dict(
-                tx=dict(name=debank_name),
+                tx=dict(
+                    name=debank_name,
+                    from_addr=from_address,
+                    to_addr=to_address,
+                    eth_gas_fee=fee,
+                ),
                 receives=receives,
                 sends=sends,
-                _covalent=covalent_data,  # used for fees
             )
 
         tx = dict(
@@ -245,3 +243,86 @@ class TxFactory:
 
 def map_assets():
     map_assets_main()
+
+
+def get_costbasis_lots(test_db, entity, address):
+    sql = """SELECT
+                 tx_ledger_id,
+                 entity,
+                 address,
+                 asset_price_id,
+                 symbol,
+                 asset_tx_id,
+                 original_amount,
+                 current_amount,
+                 price_usd,
+                 basis_usd,
+                 timestamp,
+                 history,
+                 receipt,
+                 price_source,
+                 chain
+             FROM costbasis_lot
+             WHERE entity = ?
+             AND address = ?
+             ORDER BY timestamp ASC
+    """
+    params = [entity, address]
+    results = test_db.query(sql, params)
+    lots_to_return = []
+    for r in results:
+        r = dict(**r)
+        r["history"] = jsonpickle.decode(r["history"])
+        flags = load_flags(CostbasisLot.__name__, r["tx_ledger_id"])
+        lot = CostbasisLot(flags=flags, **r)
+        lots_to_return.append(lot)
+
+    return lots_to_return
+
+
+def get_disposals(test_db, symbol, timestamp=None, only_fee=None, exclude_fee=None):
+    sql = f"""SELECT
+                cd.*
+             FROM costbasis_disposal cd
+             JOIN tx_ledger tl on cd.tx_ledger_id = tl.id
+             WHERE cd.symbol = ?
+             {"AND cd.timestamp = ?" if timestamp else ""}
+             {"AND tl.isfee = 0" if only_fee else ""}
+             {"AND tl.isfee != 1" if exclude_fee else ""}
+             ORDER BY cd.timestamp ASC
+    """
+    if timestamp:
+        params = [symbol, timestamp]
+    else:
+        params = [symbol]
+    results = test_db.query(sql, params)
+    return [CostbasisDisposal(**r) for r in results]
+
+
+def get_costbasis_incomes(test_db, entity, address):
+    sql = """SELECT id, entity, address, net_usd, symbol, timestamp, tx_ledger_id, price, amount, lots
+             FROM costbasis_income
+             WHERE entity = ?
+             AND address = ?
+             ORDER BY timestamp ASC
+    """
+    params = [entity, address]
+    results = test_db.query(sql, params)
+    incomes_to_return = []
+    for r in results:
+        r = dict(**r)
+        r["lots"] = jsonpickle.decode(r["lots"])
+        income = CostbasisIncome(**r)
+        incomes_to_return.append(income)
+
+    return incomes_to_return
+
+
+def get_tx_ledgers(db, chain, address):
+    sql = """SELECT id, chain, address, hash, from_address, to_address, from_address_name, to_address_name, asset_tx_id, isfee, amount, timestamp, direction, tx_ledger_type, asset_price_id, symbol, price_usd
+           FROM tx_ledger
+           WHERE chain = ? AND address = ?
+           ORDER BY timestamp ASC, isfee ASC
+        """
+    results = list(db.query(sql, [chain, address]))
+    return [TxLedger(**r) for r in results]

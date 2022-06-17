@@ -592,16 +592,15 @@ class LedgerTx:
                 return
 
             # If we have explicit costbasis info for this asset already (from coinbase import), derive price from that
-            if (
-                self.direction == "IN"
-                and self.costbasis_including_fees_usd
-                and Decimal(self.costbasis_including_fees_usd) > 0
-            ):
-                self.price = Decimal(self.costbasis_including_fees_usd) / Decimal(
-                    self.amount
-                )
-                self.price_source = "exchange_export_file_explicit_costbasis"
-                return
+            if self.direction == "IN" and self.costbasis_including_fees_usd:
+                if Decimal(self.costbasis_including_fees_usd) > 0:
+                    self.price = Decimal(self.costbasis_including_fees_usd) / Decimal(
+                        self.amount
+                    )
+                    self.price_source = "exchange_export_file_explicit_costbasis"
+                    return
+                else:
+                    print("Received funds with costbasis 0 from exchange. Ignore this?")
 
             # If we have explicit proceeds info for this asset already (from coinbase import), derive price from that
             if self.direction == "OUT" and self.proceeds_after_fees_usd:
