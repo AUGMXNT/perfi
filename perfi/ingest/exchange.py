@@ -8,6 +8,10 @@ import io
 import openpyxl
 import re
 
+from ..price import PriceFeed
+
+price_feed = PriceFeed()
+
 
 def normalize_asset_tx_id(str):
     if str.upper() in FIAT_SYMBOLS:
@@ -1050,6 +1054,21 @@ class CoinbaseProImporter:
             portfolio = r["portfolio"]
             hash = f"{portfolio}_{trade_id}_{product}_{side}"
 
+            # NOTE: price is not always in USD, so we need to convert to USD if it's not USD...
+            price_usd = None
+            price_source = None
+            if price_unit == "USD":
+                price_usd = Decimal(r["price"])
+                price_source = "exchange_file_usd"
+            elif price_unit in FIAT_SYMBOLS:
+                price_usd = price_feed.convert_fiat(price_unit, "USD", price, timestamp)
+                price_source = "exchange_file_converted_from_fiat"
+            else:
+                mapped_asset = price_feed.map_asset("import", price_unit.lower(), True)
+                coin_price = price_feed.get(mapped_asset["asset_price_id"], timestamp)
+                price_usd = coin_price.price
+                price_source = coin_price.source
+
             side_asset = dict(
                 asset_tx_id=asset_tx_id,
                 amount=abs(amount),
@@ -1058,7 +1077,8 @@ class CoinbaseProImporter:
                 from_address=default_from_to,
                 to_address=default_from_to,
                 isfee=0,
-                price=price,
+                price_usd=price_usd,
+                price_source=price_source,
             )
 
             price_asset = dict(

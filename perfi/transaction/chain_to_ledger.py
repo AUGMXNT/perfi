@@ -115,7 +115,8 @@ def update_wallet_ledger_transactions(address):
                 tx.from_address = t["from_address"]
                 tx.to_address = t["to_address"]
                 tx.proceeds_after_fees_usd = t.get("proceeds_after_fees_usd", None)
-                tx.price = t.get("price", None)
+                tx.price_usd = t.get("price_usd", None)
+                tx.price_source = t.get("price_source", None)
                 tx.isfee = 0
                 try:
                     if t["isfee"] == 1:
@@ -139,7 +140,8 @@ def update_wallet_ledger_transactions(address):
                 tx.symbol = t["symbol"]
                 tx.from_address = t["from_address"]
                 tx.to_address = t["to_address"]
-                tx.price = t.get("price", None)
+                tx.price_usd = t.get("price_usd", None)
+                tx.price_source = t.get("price_source", None)
                 tx.costbasis_including_fees_usd = t.get(
                     "cost_basis_including_fees_usd", None
                 )
@@ -235,7 +237,8 @@ class LedgerTx:
         self.tx_ledger_type = None
         self.asset_price_id = None
         self.symbol = None
-        self.price = None
+        self.price_usd = None
+        self.price_source = None
         self.price_source = None
         self.debank_name = None
 
@@ -259,7 +262,8 @@ class LedgerTx:
              tx_ledger_type : {self.tx_ledger_type }
              asset_price_id : {self.asset_price_id }
              symbol : {self.symbol }
-             price : {self.price }
+             price_usd : {self.price_usd }
+             price_source : {self.price_source }
              price_source : {self.price_source }
              debank_name : {self.debank_name or '__None__'}
              """
@@ -587,24 +591,24 @@ class LedgerTx:
         # If we are looking at exchange import data
         if self.chain.startswith("import"):
             # If we have explicit price from an import (e.g. coinbasepro), we'll use what we have, and just set the price_source here and return early.
-            if self.price:
-                self.price_source = "exchange_export_file_explicit_price"
+            if self.price_usd:
+                self.price_source = (
+                    self.price_source or "exchange_export_file_explicit_price"
+                )
                 return
 
             # If we have explicit costbasis info for this asset already (from coinbase import), derive price from that
             if self.direction == "IN" and self.costbasis_including_fees_usd:
                 if Decimal(self.costbasis_including_fees_usd) > 0:
-                    self.price = Decimal(self.costbasis_including_fees_usd) / Decimal(
-                        self.amount
-                    )
+                    self.price_usd = Decimal(
+                        self.costbasis_including_fees_usd
+                    ) / Decimal(self.amount)
                     self.price_source = "exchange_export_file_explicit_costbasis"
                     return
-                else:
-                    print("Received funds with costbasis 0 from exchange. Ignore this?")
 
             # If we have explicit proceeds info for this asset already (from coinbase import), derive price from that
             if self.direction == "OUT" and self.proceeds_after_fees_usd:
-                self.price = Decimal(self.proceeds_after_fees_usd) / Decimal(
+                self.price_usd = Decimal(self.proceeds_after_fees_usd) / Decimal(
                     self.amount
                 )
                 self.price_source = "exchange_export_file_explicit_proceeds"
@@ -624,7 +628,7 @@ class LedgerTx:
                         Decimal(self.amount),
                         self.timestamp,
                     )
-                self.price = price_usd
+                self.price_usd = price_usd
                 self.price_source = price_source
                 return
 
@@ -636,7 +640,7 @@ class LedgerTx:
             self.asset_price_id = asset_map["asset_price_id"]
             coin_price = price_feed.get(self.asset_price_id, self.timestamp)
             if coin_price:
-                self.price = coin_price.price
+                self.price_usd = coin_price.price
                 self.price_source = coin_price.source
 
     def as_tx_ledger(self):
@@ -657,7 +661,7 @@ class LedgerTx:
             tx_ledger_type=self.tx_ledger_type,
             asset_price_id=self.asset_price_id,
             symbol=self.symbol,
-            price_usd=self.price,
+            price_usd=self.price_usd,
             price_source=self.price_source,
         )
         return TxLedger(**args)
