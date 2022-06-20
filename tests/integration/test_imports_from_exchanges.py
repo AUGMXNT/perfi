@@ -438,7 +438,7 @@ class TestCoinbaseImporter:
     def test_buy(self, test_db):
         txns = """
 | Transaction ID                       | Transaction Type | Date & time          | Asset Acquired | Quantity Acquired (Bought, Received, etc) | Cost Basis (incl. fees paid) (USD) | Data Source | Asset Disposed (Sold, Sent, etc) | Quantity Disposed | Proceeds (excl. fees paid) (USD) |
-| aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Buy              | 2017-03-14T05:56:39Z | ETH            | 50                                        | 1031.71                            | Coinbase    |                                  |                   |                                  |
+| aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Buy              | 2017-03-14T05:56:39Z | ETH            | 50                                        | 1000.00                            | Coinbase    |                                  |                   |                                  |
 """.lstrip(
             "\n"
         )
@@ -468,7 +468,7 @@ class TestCoinbaseImporter:
             to_address="Coinbase:SomeCoinbaseAccountId",
             asset_tx_id="FIAT:USD",
             symbol="USD",
-            amount=Decimal("1031.71"),
+            amount=Decimal("1000"),
             price_usd=Decimal("1"),
             timestamp=int(arrow.get("2017-03-14T05:56:39Z").timestamp()),
             direction="OUT",
@@ -487,10 +487,10 @@ class TestCoinbaseImporter:
             from_address="Coinbase:SomeCoinbaseAccountId",
             to_address="Coinbase:SomeCoinbaseAccountId",
             asset_tx_id="eth",
-            asset_price_id="ethereum",
+            asset_price_id=None,
             symbol="ETH",
             amount=Decimal("50.0"),
-            price_usd=Decimal("28.5366645912769700"),
+            price_usd=Decimal("20.0"),
             timestamp=int(arrow.get("2017-03-14T05:56:39Z").timestamp()),
             direction="IN",
             tx_ledger_type="Coinbase.Buy",
@@ -502,8 +502,8 @@ class TestCoinbaseImporter:
     def test_converted_from_to(self, test_db):
         txns = """
 | Transaction ID                       | Transaction Type | Date & time          | Asset Acquired | Quantity Acquired (Bought, Received, etc) | Cost Basis (incl. fees paid) (USD) | Data Source | Asset Disposed (Sold, Sent, etc) | Quantity Disposed | Proceeds (excl. fees paid) (USD) |
-| aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Converted from   | 2020-01-11T00:00:01Z |                |                                           |                                    |             | ETH                              | 5.38952815        | 1000.32337228075                 |
-| baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Converted to     | 2020-01-11T00:00:02Z | XLM            | 650.1690543                               | 207.734763516                      | Coinbase    |                                  |                   |                                  |
+| aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Converted from   | 2020-01-11T00:00:01Z |                |                                           |                                    |             | ETH                              | 5.00000000        | 1000.00000000000                 |
+| baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Converted to     | 2020-01-11T00:00:02Z | XLM            | 650.0000000                               | 250.000000000                      | Coinbase    |                                  |                   |                                  |
 """.lstrip(
             "\n"
         )
@@ -532,10 +532,10 @@ class TestCoinbaseImporter:
             from_address="Coinbase:SomeCoinbaseAccountId",
             to_address="Coinbase:SomeCoinbaseAccountId",
             asset_tx_id="eth",
-            asset_price_id="ethereum",
+            asset_price_id=None,
             symbol="ETH",
-            amount=Decimal("5.3895281500000000"),
-            price_usd=Decimal("144.6047743464792000"),
+            amount=Decimal("5.0000000000000000"),
+            price_usd=Decimal("200.00"),
             timestamp=int(arrow.get("2020-01-11T00:00:02Z").timestamp()),
             direction="OUT",
             tx_ledger_type="Coinbase.ConvertedFromTo",
@@ -555,7 +555,7 @@ class TestCoinbaseImporter:
             asset_tx_id="xlm",
             asset_price_id="stellar",
             symbol="XLM",
-            amount=Decimal("650.1690543000000000"),
+            amount=Decimal("650.0000000000000000"),
             price_usd=Decimal("0.0480570609573961"),
             timestamp=int(arrow.get("2020-01-11T00:00:02Z").timestamp()),
             direction="IN",
