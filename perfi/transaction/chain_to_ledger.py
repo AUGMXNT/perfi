@@ -143,7 +143,7 @@ def update_wallet_ledger_transactions(address):
                 tx.price_usd = t.get("price_usd", None)
                 tx.price_source = t.get("price_source", None)
                 tx.costbasis_including_fees_usd = t.get(
-                    "cost_basis_including_fees_usd", None
+                    "costbasis_including_fees_usd", None
                 )
                 ledger_txs.append(tx)
 
@@ -626,7 +626,7 @@ class LedgerTx:
                         from_fiat_symbol,
                         to_fiat_symbol,
                         Decimal(self.amount),
-                        self.timestamp,
+                        int(self.timestamp),
                     )
                 self.price_usd = price_usd
                 self.price_source = price_source
@@ -638,7 +638,7 @@ class LedgerTx:
             if not self.symbol:
                 self.symbol = asset_map["symbol"]
             self.asset_price_id = asset_map["asset_price_id"]
-            coin_price = price_feed.get(self.asset_price_id, self.timestamp)
+            coin_price = price_feed.get(self.asset_price_id, int(self.timestamp))
             if coin_price:
                 self.price_usd = coin_price.price
                 self.price_source = coin_price.source
