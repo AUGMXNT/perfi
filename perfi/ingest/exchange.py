@@ -1041,20 +1041,20 @@ class CoinbaseProImporter:
             side = r["side"]
             asset_tx_id = r["size unit"].lower()
             amount = Decimal(r["size"])
-            timestamp = arrow.get(r["created at"]).timestamp()
+            timestamp = int(arrow.get(r["created at"]).timestamp())
             tx_ledger_type = f"CoinbasePro.{r['side']}"
             symbol = r["size unit"].upper()
             default_from_to = f"CoinbasePro:{exchange_account_id}"
             fee_amount = Decimal(r["fee"])
             price_unit = r["price/fee/total unit"]
             price = Decimal(r["price"])
-            price_total = price * amount
             trade_id = r["trade id"]
             product = r["product"]
             portfolio = r["portfolio"]
             hash = f"{portfolio}_{trade_id}_{product}_{side}"
 
             # NOTE: price is not always in USD, so we need to convert to USD if it's not USD...
+            # price_usd should represent the unit price for the asset
             price_usd = None
             price_source = None
             if price_unit == "USD":
@@ -1066,7 +1066,7 @@ class CoinbaseProImporter:
             else:
                 mapped_asset = price_feed.map_asset("import", price_unit.lower(), True)
                 coin_price = price_feed.get(mapped_asset["asset_price_id"], timestamp)
-                price_usd = coin_price.price
+                price_usd = Decimal(coin_price.price) * price
                 price_source = coin_price.source
 
             side_asset = dict(
@@ -1083,7 +1083,7 @@ class CoinbaseProImporter:
 
             price_asset = dict(
                 asset_tx_id=normalize_asset_tx_id(price_unit),
-                amount=abs(price_total),
+                amount=abs(price * amount),
                 tx_ledger_type=tx_ledger_type,
                 symbol=price_unit.upper(),
                 from_address=default_from_to,
