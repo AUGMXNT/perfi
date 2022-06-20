@@ -596,10 +596,10 @@ class CostbasisGenerator:
             # raise Exception(f"Trying to create disposal for unknown type: {self.tx_logical.tx_logical_type} \n{pformat(self.tx_logical)}")
 
         # Finally, handle fees
-        if self.fee is not None and not self.fee.chain.startswith("import"):
-            # Ignore fiat fees from exchanges, since a disposal for fiat doesn't make any sense
+        if self.fee:
+            # Ignore fiat fees, since a disposal for fiat doesn't make any sense
             if not self.fee.asset_tx_id.startswith("FIAT:"):
-                # This is spending gas, so it's a disposal
+                # This is spending gas or it's an exchange fee, so it's a disposal
                 lots = LotMatcher().get_lots(self.fee)
                 self.drawdown_from_lots(lots, self.fee, is_disposal=True)
 
