@@ -595,6 +595,14 @@ class CostbasisGenerator:
             )
             # raise Exception(f"Trying to create disposal for unknown type: {self.tx_logical.tx_logical_type} \n{pformat(self.tx_logical)}")
 
+        # Finally, handle fees
+        if self.fee:
+            # Ignore fiat fees, since a disposal for fiat doesn't make any sense
+            if not self.fee.asset_tx_id.startswith("FIAT:"):
+                # Gas is treated as a fee, which is not a disposal. But we still want to drawdown the appropriate asset because we no longer have that much of it.
+                lots = LotMatcher().get_lots(self.fee)
+                self.drawdown_from_lots(lots, self.fee, is_disposal=False)
+
     """
     Sort tx_ledger into basics...
     """
@@ -1182,7 +1190,11 @@ class CostbasisGenerator:
             symbol = None
 
         # LATER: we should be considering TxLogical fees, approvals, etc...
-        basis_usd = decimal_mul(price, t.amount)
+        # Basis should equal the price * amount + value_of_fees
+        value_of_fee = 0
+        if self.fee and self.fee.amount > 0:
+            value_of_fee = self.fee.amount * self.fee.price_usd
+        basis_usd = decimal_mul(price, t.amount) + value_of_fee
 
         lot = CostbasisLot(
             tx_ledger_id=t.id,
@@ -1276,7 +1288,12 @@ class CostbasisGenerator:
                     )
 
                     # Attrs for new Costbasis disposal row
-                    total_usd = decimal_mul(amount, sale_price)
+                    # If this is not a disposal for a fee (because all fees are their own disposal events), and if this transaction has a fee...
+                    fee_value_usd = 0
+                    if not t.isfee and self.fee and self.fee.amount > 0:
+                        # Subtract total fee value from the total_usd of this disposal
+                        fee_value_usd = self.fee.amount * self.fee.price_usd
+                    total_usd = decimal_mul(amount, sale_price) - fee_value_usd
                     basis_usd = decimal_mul(amount, lot_price)
 
                     # max_disposal guard simple - note, this should be less if we were multi-out aware

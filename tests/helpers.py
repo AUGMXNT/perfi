@@ -93,8 +93,8 @@ class TxFactory:
         from_address = kwargs.get("from_address") or self.address
         to_address_name = kwargs.get("to_address_name")
         from_address_name = kwargs.get("from_address_name") or None
-        fee = kwargs.get("fee") or 0.001
-        fee = f"{fee} XYZ"  # Stored as a string in our DB
+        fee = kwargs.get("fee") or 0.00
+        fee_usd = kwargs.get("fee_usd") or 0.00
         gas_price = kwargs.get("gas_price") or 1
         gas_used = kwargs.get("gas_used") or 1
         hash = kwargs.get("hash")
@@ -169,7 +169,13 @@ class TxFactory:
                     debank_name = "send"
 
             return dict(
-                tx=dict(name=debank_name),
+                tx=dict(
+                    name=debank_name,
+                    from_addr=from_address,
+                    to_addr=to_address,
+                    eth_gas_fee=fee,
+                    usd_gas_fee=fee_usd,
+                ),
                 receives=receives,
                 sends=sends,
             )

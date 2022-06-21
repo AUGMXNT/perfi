@@ -188,27 +188,13 @@ def update_wallet_ledger_transactions(address):
                     raise Exception(f"Coudnt make ledger OUT for {debank_item}")
                     pass
 
-        # Get the fee tx only if we are the sender (otherwise it's not something we paid for)
-        tx = LedgerTx(chain=chain, address=address, hash=hash, timestamp=timestamp)
-        try:
-            from_address = tx.get_attr_from_explorer("from_address", raw_data)
-        except:
-            logger.debug(
-                f"ERROR: couldnt get from_address from explorer for: {tx.hash}"
-            )
-            from_address = None
-
-        if address == from_address:
+            # Get the fee tx only if we are the sender (otherwise it's not something we paid for)
             tx = LedgerTx(chain=chain, address=address, hash=hash, timestamp=timestamp)
-
-            ignore = False
-            try:
-                tx.fee_from_chain(raw_data)
-            except (TokenApproveForOtherAddressException, UnscrapedChainError):
-                ignore = True
-
-            if not ignore:
-                ledger_txs.append(tx)
+            if debank_tx["tx"] is not None:
+                from_address = debank_tx["tx"]["from_addr"]
+                if address.lower() == from_address.lower():
+                    tx.fee_from_debank(raw_data)
+                    ledger_txs.append(tx)
 
     # Now we have all our ledger_txs, so lets put them into the tx_ledger table in the DB
     tx_ledger_store = TxLedgerStore(db)
@@ -380,13 +366,12 @@ class LedgerTx:
         }
         return explorer_mapping.get(self.chain)
 
-    def fee_from_chain(self, raw_data):
-        """
-        TODO: For now we ignore the fees for chains we haven't scraped...
-        """
-
+    def fee_from_debank(self, raw_data):
+        debank_tx_data = raw_data["debank"]["tx"]
         self.direction = "OUT"
         self.tx_ledger_type = "fee"
+
+        # Set asset_tx_id based on chain
         asset_mapping = {
             "ethereum": "eth",
             "avalanche": "avax",
@@ -394,57 +379,24 @@ class LedgerTx:
             "fantom": "ftm",
             "xdai": "xdai",
         }
-
         self.asset_tx_id = asset_mapping[self.chain]
 
-        fetchers = {
-            "ethereum": EtherscanTransactionsFetcher(db),
-            "avalanche": AvalancheTransactionsFetcher(db),
-            "polygon": PolygonTransactionsFetcher(db),
-            "fantom": FantomTransactionsFetcher(db),
-            "harmony": HarmonyTransactionsFetcher(db),
-        }
-
-        if self.chain not in fetchers.keys():
-            raise UnscrapedChainError(f"Chain {self.chain} currently unsupported")
-
-        explorer = self.explorer_name()
-
-        if explorer not in raw_data:
-            # HACK: Try to grab the tx details from the explorer
-            fetcher = fetchers[self.chain]
-            tx_details = fetcher._scrape_transaction_details(raw_data["hash"])
-            raw_data[explorer] = dict(details=tx_details)
-
-            # HACK: For some reason the block explorer scraped data is missing.
-            # One case we are OK to ignore is if this appears to be a token_approve action and the
-            # raw_data.debank.token_approve.spender != raw_data.address, we will ignore this.
-            if not tx_details and "debank" in raw_data:
-                debank = raw_data["debank"]
-                if (
-                    debank["cate_id"] == "approve"
-                    and debank["token_approve"]["spender"] != raw_data["address"]
-                ):
-                    raise TokenApproveForOtherAddressException(
-                        f"address: {raw_data['address']} | spender: {debank['token_approve']['spender']}"
-                    )
-                else:
-                    logger.debug(f"{explorer} not in raw_data!")
-                    logger.debug(pformat(raw_data))
-                    sys.exit()
-
         # Assign addresses
-        try:
-            self.from_address = raw_data[explorer]["from_address"]
-            self.to_address = raw_data[explorer]["to_address"]
-        except:
-            # HACK: This is a fee so as long as it's assigned to our PK(chain, address, hash) we don't actually care...
-            self.from_address = raw_data["address"]
-            self.to_address = raw_data["address"]
+        self.from_address = debank_tx_data["from_addr"]
+        self.to_address = debank_tx_data["to_addr"]
 
         try:
-            self.amount = Decimal(raw_data[explorer]["details"]["fee"].split()[0])
+            self.amount = Decimal(debank_tx_data["eth_gas_fee"])
             self.isfee = 1
+
+            if self.amount > 0:
+                # Use DeBank's USD price
+                self.price_usd = debank_tx_data["usd_gas_fee"]
+                self.price_source = "debank"
+            else:
+                self.price_usd = Decimal(0)
+                self.price_source = "zero_fee_value"
+
             try:
                 self.debank_name = (
                     raw_data["debank"]["tx"]["name"]
@@ -456,12 +408,11 @@ class LedgerTx:
 
             # extra
             self.extra = {}
-            self.extra["gas_price"] = raw_data[explorer]["details"]["gas_price"]
-            self.extra["gas_used"] = raw_data[explorer]["details"]["gas_used"]
         except Exception as err:
-            raise
-            # pprint(raw_data)
-            # raise Exception(f'raw_data does not have key {explorer}')
+            pprint(raw_data)
+            raise Exception(
+                f"Error when trying to create fee from debank data: {err} {raw_data}"
+            )
 
     def assign_tx_ledger_type(self):
         if self.tx_ledger_type:

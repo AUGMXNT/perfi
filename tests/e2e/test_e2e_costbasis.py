@@ -45,6 +45,9 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     monkeysession.setattr("perfi.asset.db", test_db)
     monkeysession.setattr("perfi.price.db", test_db)
     monkeysession.setattr("perfi.costbasis.price_feed", price_feed)
+    monkeysession.setattr("perfi.transaction.chain_to_ledger.price_feed", price_feed)
+    yield
+    monkeysession.undo()
 
 
 def get_costbasis_lots(test_db, entity, address):
@@ -163,7 +166,7 @@ class TestCostbasisGeneral:
             outs=["1 AVAX"],
             ins=["10 JOE"],
             debank_name="swapExactTokensForETH",
-            fee=0.00123,
+            fee=0.00,
             timestamp=2,
             to_address="Some DEX",
         )
@@ -177,7 +180,7 @@ class TestCostbasisGeneral:
             outs=["10 AVAX"],
             ins=["200 JOE"],
             debank_name="swapExactTokensForETH",
-            fee=0.00123,
+            fee=0.00,
             timestamp=3,
             to_address="Some DEX",
         )
@@ -196,7 +199,7 @@ class TestCostbasisGeneral:
             for l in get_costbasis_lots(test_db, entity_name, address)
             if l.asset_price_id == "joe"
         ]
-        assert len(avax_lots) == 2  # 1 normal, 1 zerocost
+        assert len(avax_lots) == 2  # 1 normal, 1 autoreconciled
         assert len(joe_lots) == 2  # 2 normal
 
         avax_normal_lot = avax_lots[0]
@@ -269,6 +272,66 @@ class TestCostbasisGeneral:
         assert foo_lots[0].history[0].amount == 10
 
 
+class TestCostbasisFees:
+    def test_fee_total_value_is_added_to_costbasis_total_usd_for_new_lots(
+        self, test_db
+    ):
+        make.tx(ins=["5 AVAX"], timestamp=1, from_address="A FRIEND")
+        price_feed.stub_price(1, "avalanche-2", 1.00)
+
+        make.tx(
+            outs=["1 AVAX"],
+            ins=["10 JOE"],
+            debank_name="swapExactTokensForETH",
+            fee=0.25,
+            fee_usd=1.25,
+            timestamp=2,
+            to_address="Some DEX",
+        )
+        price_feed.stub_price(2, "avalanche-2", 5.00)
+        price_feed.stub_price(2, "joe", 0.50)
+
+        common(test_db)
+
+        joe_lots = [
+            l
+            for l in get_costbasis_lots(test_db, entity_name, address)
+            if l.asset_price_id == "joe"
+        ]
+
+        assert len(joe_lots) == 1
+        # Total lot basis_usd should equal (asset_price at timestamp) * (amount of asset) + (value of fee paid)
+        expected_asset_price_at_timestamp = 0.5
+        expected_fee_value = 0.25 * 5.00
+        expected_basis_usd = expected_asset_price_at_timestamp * 10 + expected_fee_value
+        assert expected_basis_usd == joe_lots[0].basis_usd
+
+    def test_fee_total_value_is_subtracted_from_disposal_total_usd(self, test_db):
+        make.tx(ins=["5 AVAX"], timestamp=1, from_address="A FRIEND")
+        price_feed.stub_price(1, "avalanche-2", 1.00)
+
+        make.tx(
+            outs=["1 AVAX"],
+            ins=["10 JOE"],
+            debank_name="swapExactTokensForETH",
+            fee=0.25,
+            fee_usd=1.25,
+            timestamp=2,
+            to_address="Some DEX",
+        )
+        price_feed.stub_price(2, "avalanche-2", 5.00)
+        price_feed.stub_price(2, "joe", 0.50)
+
+        common(test_db)
+
+        disposals = get_disposals(test_db, "AVAX")
+        assert len(disposals) == 1
+        # When we swapped 1 avax away, it had a unit value of 5.00,
+        # but we also paid 0.25 avax in fees at a unit price of 5.00 for a total fee of 1.25
+        # So our total usd proceeds value should be 5.00 - 1.25 == 3.75
+        assert disposals[0].total_usd == 3.75
+
+
 class TestCostbasisForm8949:
     def test_respects_ignored_from_costbasis_flag_on_tx_logicals(
         self, test_db, event_store
@@ -280,7 +343,7 @@ class TestCostbasisForm8949:
             outs=["1 AVAX"],
             ins=["10 JOE"],
             debank_name="swapExactTokensForETH",
-            fee=0.00123,
+            fee=0,
             timestamp=2,
             to_address="Some DEX",
         )
@@ -343,7 +406,7 @@ class TestCostbasisDisposal:
         make.tx(ins=["5 AVAX"], timestamp=1, from_address="A FRIEND")
         price_feed.stub_price(1, "avalanche-2", 1.00)
 
-        make.tx(outs=["1 AVAX"], fee=0.00123, timestamp=2, to_address="ANOTHER FRIEND")
+        make.tx(outs=["1 AVAX"], fee=0.00, timestamp=2, to_address="ANOTHER FRIEND")
         price_feed.stub_price(2, "avalanche-2", 5.00)
 
         common(test_db)
@@ -363,9 +426,11 @@ class TestCostbasisDisposal:
                 "1 USDC.e|0xa7d7079b0fead91f3e65f86e8915cb59c1a4c664",  # USDC.e on Avalanche
             ],
             timestamp=1,
+            fee=0,
             from_address="A Friend",
         )
         price_feed.stub_price(1, "usd-coin", 1.00)
+        price_feed.stub_price(1, "avalanche-2", 1.00)
 
         # This may look unusual at first glance because we are setting up 1 each of native USDC and bridged USDC.e above
         # but then we send out 2 of the native. You might expect this to create a zero-cost lot for 2-1 amount But
@@ -377,10 +442,12 @@ class TestCostbasisDisposal:
                 "1.5 USDC|0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e"
             ],  # Native USDC on Avalanche
             timestamp=2,
+            fee=0,
             debank_name="disposal",
             to_address="Other Person",
         )
         price_feed.stub_price(2, "usd-coin", 1.00)
+        price_feed.stub_price(2, "avalanche-2", 1.00)
 
         common(test_db)
 
@@ -429,7 +496,7 @@ class TestCostbasisDisposal:
             outs=["1 AVAX"],
             ins=["0.5 avWAVAX|0xavWAVAX"],
             debank_name="depositBNB",
-            fee=0.00123,
+            fee=0.00,
             timestamp=2,
             to_address="Aave",
         )
@@ -439,7 +506,7 @@ class TestCostbasisDisposal:
         make.tx(
             outs=["0.25 avWAVAX|0xavWAVAX"],
             debank_name="send",
-            fee=0.00123,
+            fee=0.00,
             timestamp=3,
             to_address="A FRIEND",
         )
@@ -489,7 +556,7 @@ class TestCostbasisDisposal:
             outs=["1 AVAX"],
             ins=["0.5 avWAVAX|0xavWAVAX"],
             debank_name="depositBNB",
-            fee=0.00123,
+            fee=0.00000,
             timestamp=2,
             to_address="Aave",
         )
@@ -500,7 +567,7 @@ class TestCostbasisDisposal:
             ins=["3 USDC"],
             outs=["0.25 avWAVAX|0xavWAVAX"],
             debank_name="swap",
-            fee=0.00123,
+            fee=0.00000,
             timestamp=3,
             to_address="A VENDOR",
         )
@@ -562,7 +629,7 @@ class TestCostbasisPrice:
             outs=["1 AVAX"],
             ins=["0.5 avWAVAX"],
             debank_name="depositBNB",
-            fee=0.00123,
+            fee=0.00000,
             timestamp=2,
             to_address="Aave",
         )
@@ -614,18 +681,20 @@ class TestCostbasisPrice:
             outs=["1 AVAX"],
             ins=["10 JOE"],
             debank_name="swapExactTokensForETH",
-            fee=0.00123,
+            fee=0.00,
             timestamp=2,
             to_address="Some DEX",
         )
         price_feed.stub_price(2, "avalanche-2", 5.00)
-        price_feed.stub_price(2, "joe", 0.50)
+        price_feed.stub_price(2, "joe", 50.00)
 
         common(test_db, event_store)
 
         # Update our first tx_ledger (5 avax in, setting manual price)
         tx_ledgers = get_tx_ledgers(test_db, chain, address)
         tx = tx_ledgers[0]
+        assert tx.asset_tx_id == "avax"
+        assert tx.amount == 5
         event = event_store.create_tx_ledger_price_updated(
             tx.id, 20.00, "user-provided", source="manual"
         )
@@ -665,15 +734,16 @@ class TestCostbasisPrice:
         assert lot.current_amount == 4
 
         # Check to make sure a CostbasisDisposal was generated with appropriate attrs (updated price)
-        disposals = get_disposals(test_db, "AVAX", 2)
+        disposals = get_disposals(test_db, "AVAX")
         assert len(disposals) == 1
         disposal = disposals[0]
         assert disposal.amount == 1
         assert disposal.timestamp == 2
         assert disposal.duration_held == 1
-        assert (
-            disposal.total_usd - disposal.basis_usd == -10.00
-        )  # Got it for 20, disposed at price 10, so a loss of 10
+        assert disposal.total_usd == Decimal(
+            10.00
+        )  # Note that we have a max_disposal guard that prevents the price of a disposal being more than the total price of the INs, so be sure that price of JOE above is enough to allow this to work
+        assert disposal.basis_usd == Decimal(20.00)
 
 
 class TestCostbasisReceive:
@@ -800,7 +870,7 @@ class TestCostbasisDeposit:
             outs=["1 AVAX"],
             ins=["5 mysteryTOK|0xWhoKnows"],
             debank_name="deposit",
-            fee=0.00123,
+            fee=0.00,
             timestamp=2,
             to_address="Mystery",
         )
@@ -848,7 +918,7 @@ class TestCostbasisWithdraw:
             outs=["1 AVAX"],
             ins=["0.9 avWAVAX|0xavWAVAX"],
             debank_name="depositBNB",
-            fee=0.00123,
+            fee=0.00,
             timestamp=2,
             to_address="Aave",
         )
@@ -860,7 +930,7 @@ class TestCostbasisWithdraw:
             outs=["0.9 avWAVAX|0xavWAVAX"],
             ins=["1.1 AVAX"],
             debank_name="withdrawBNB",
-            fee=0.00123,
+            fee=0.00,
             timestamp=3,
             to_address="Aave",
         )
@@ -920,7 +990,7 @@ class TestCostbasisBorrow:
         make.tx(
             ins=["1 AVAX", "1.25 variableDebtWAVAX|0xvariableDebtWAVAX"],
             debank_name="borrow",
-            fee=0.00123,
+            fee=0.00,
             timestamp=2,
             from_address="Aave",
         )
@@ -967,7 +1037,7 @@ class TestCostbasisRepay:
         make.tx(
             ins=["1 AVAX", "1.2 variableDebtWAVAX|0xvariableDebtWAVAX"],
             debank_name="borrow",
-            fee=0.00123,
+            fee=0.00,
             timestamp=2,
             from_address="Aave",
         )
@@ -979,7 +1049,7 @@ class TestCostbasisRepay:
         make.tx(
             outs=["1.1 AVAX", "1.2 variableDebtWAVAX|0xvariableDebtWAVAX"],
             debank_name="repay",
-            fee=0.00123,
+            fee=0.00,
             timestamp=3,
             to_address="Aave",
         )
@@ -1134,7 +1204,7 @@ class TestCostbasisLP:
             outs=["1 AVAX", "100 DAI"],
             ins=["10 JLP|0xJoeLiquidity"],
             debank_name="addLiquidity",
-            fee=0.00123,
+            fee=0.00,
             timestamp=3,
             to_address="Some DEX",
         )
@@ -1148,7 +1218,7 @@ class TestCostbasisLP:
             outs=["10 JLP|0xJoeLiquidity"],
             ins=["0.5 AVAX", "200 DAI"],
             debank_name="removeLiquidity",
-            fee=0.00123,
+            fee=0.00,
             timestamp=3,
             to_address="Some DEX",
         )
@@ -1200,7 +1270,7 @@ class TestCostbasisLP:
         make.tx(
             ins=["1 AVAX", "1.2 variableDebtWAVAX|0xvariableDebtWAVAX"],
             debank_name="borrow",
-            fee=0.00123,
+            fee=0.00,
             timestamp=2,
             from_address="Aave",
         )
@@ -1211,7 +1281,7 @@ class TestCostbasisLP:
             ins=["1 LP|0xLP"],
             outs=["1 AVAX"],
             debank_name="provideLiquidity",
-            fee=0.00123,
+            fee=0.00,
             timestamp=3,
             to_address="Curve",
         )
@@ -1247,7 +1317,7 @@ class TestCostbasisSwap:
             outs=["1 AVAX"],
             ins=["10 JOE"],
             debank_name="swapExactTokensForETH",
-            fee=0.00123,
+            fee=0.00,
             timestamp=2,
             to_address="Some DEX",
         )
@@ -1294,7 +1364,7 @@ class TestCostbasisSwap:
             outs=["1.2 USDf|0xUSDf"],
             ins=["1 USDC"],
             debank_name="swapExactTokensForTokens",
-            fee=0.00123,
+            fee=0.00,
             timestamp=2,
             to_address="Some DEX",
         )
@@ -1369,7 +1439,7 @@ class TODO:
             outs=["1 AVAX"],
             ins=["0.5 avWAVAX|0xavWAVAX"],
             debank_name="depositBNB",
-            fee=0.00123,
+            fee=0.00,
             timestamp=2,
             to_address="Aave",
         )
@@ -1379,7 +1449,7 @@ class TODO:
         make.tx(
             outs=["1 avWAVAX|0xavWAVAX"],
             debank_name="send",
-            fee=0.00123,
+            fee=0.00,
             timestamp=3,
             to_address="A FRIEND",
         )
