@@ -1,11 +1,9 @@
+import csv
+import io
 from decimal import Decimal
 
 import pytest
 import xlsxwriter
-import csv
-import io
-from tests.helpers import *
-
 from sttable import parse_str_table
 
 from perfi.ingest.exchange import (
@@ -13,10 +11,11 @@ from perfi.ingest.exchange import (
     GeminiImporter,
     CoinbaseProImporter,
     KrakenImporter,
+    CoinbaseTransactionHistoryImporter,
 )
-from perfi.transaction.chain_to_ledger import update_entity_transactions
-
 from perfi.models import TxLedger
+from perfi.transaction.chain_to_ledger import update_entity_transactions
+from tests.helpers import *
 
 kraken_sample_ledgers_tbl = """
 | txid                | refid                 | time                | type       | subtype | aclass   | asset | amount        | fee          | balance      |
@@ -233,6 +232,7 @@ class TestKrakenImporter:
             isfee=0,
             timestamp=int(arrow.get("2016-10-29 11:30:16").timestamp()),
             direction="IN",
+            price_usd=Decimal(1.0),  # currency was USD so price is 1
             tx_ledger_type="Kraken.deposit",
             symbol="USD",
         )
@@ -312,6 +312,7 @@ class TestKrakenImporter:
             direction="OUT",
             tx_ledger_type="fee",
             symbol="BTC",
+            price_usd=Decimal("697.2773624560577446"),
         )
         actual_fee = actual_fees[0]
         actual_fee.id = None
@@ -419,6 +420,7 @@ class TestCoinbaseImporter:
             direction="IN",
             tx_ledger_type="Coinbase.Sell",
             isfee=0,
+            price_usd=Decimal(1.0),  # currency was USD to price is 1
         )
         actual_in.id = None
         assert actual_in == expected_in
@@ -426,7 +428,7 @@ class TestCoinbaseImporter:
     def test_buy(self, test_db):
         txns = """
 | Transaction ID                       | Transaction Type | Date & time          | Asset Acquired | Quantity Acquired (Bought, Received, etc) | Cost Basis (incl. fees paid) (USD) | Data Source | Asset Disposed (Sold, Sent, etc) | Quantity Disposed | Proceeds (excl. fees paid) (USD) |
-| aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Buy              | 2017-03-14T05:56:39Z | ETH            | 50                                        | 1031.71                            | Coinbase    |                                  |                   |                                  |
+| aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Buy              | 2017-03-14T05:56:39Z | ETH            | 50                                        | 1000.00                            | Coinbase    |                                  |                   |                                  |
 """.lstrip(
             "\n"
         )
@@ -456,11 +458,12 @@ class TestCoinbaseImporter:
             to_address="Coinbase:SomeCoinbaseAccountId",
             asset_tx_id="FIAT:USD",
             symbol="USD",
-            amount=Decimal("1031.71"),
+            amount=Decimal("1000.00"),
             timestamp=int(arrow.get("2017-03-14T05:56:39Z").timestamp()),
             direction="OUT",
             tx_ledger_type="Coinbase.Buy",
             isfee=0,
+            price_usd=Decimal(1.0),  # currency was USD so price is 1.0
         )
         actual_out.id = None
         assert actual_out == expected_out
@@ -480,6 +483,7 @@ class TestCoinbaseImporter:
             direction="IN",
             tx_ledger_type="Coinbase.Buy",
             isfee=0,
+            price_usd=Decimal(20.0),
         )
         actual_in.id = None
         assert actual_in == expected_in
@@ -523,6 +527,7 @@ class TestCoinbaseImporter:
             direction="OUT",
             tx_ledger_type="Coinbase.ConvertedFromTo",
             isfee=0,
+            price_usd=Decimal("185.6050"),
         )
         actual_out.id = None
         assert actual_out == expected_out
@@ -545,6 +550,215 @@ class TestCoinbaseImporter:
         )
         actual_in.id = None
         assert actual_in == expected_in
+
+
+COINBASE_TRANSACTIONS_HISTORY_HEADER = """"You can use this transaction report to inform your likely tax obligations. For US customers, Sells, Converts, Rewards Income, Coinbase Earn transactions, and Donations are taxable events. For final tax obligations, please consult your tax advisor."
+
+
+
+Transactions
+User,xxxxxxxx@xxxxxxxxx.com,aaaaaaaaaaaaaaaaaaaaaaaa
+
+""".lstrip(
+    "\n"
+)
+
+
+class TestCoinbaseTransactionHistoryImporter:
+    coinbase_importer = CoinbaseTransactionHistoryImporter()
+
+    def test_receive(self, test_db):
+        txns = """
+| Timestamp            | Transaction Type | Asset | Quantity Transacted | Spot Price Currency | Spot Price at Transaction | Subtotal | Total (inclusive of fees) | Fees | Notes                                           |
+| 2017-03-04T06:52:21Z | Receive          | BTC   | 0.9997288           | USD                 | 1291.49                   | ""       | ""                        | ""   | Received 0.9997288 BTC from an external account |
+""".lstrip(
+            "\n"
+        )
+        csv = table_to_csv(txns)
+        csv_file = io.StringIO(COINBASE_TRANSACTIONS_HISTORY_HEADER + csv)
+
+        self.coinbase_importer.do_import(
+            csv_file,
+            entity_address_for_imports=address,
+            exchange_account_id="SomeCoinbaseAccountId",
+        )
+        update_entity_transactions(entity_name)
+        tx_ledgers = get_tx_ledgers(test_db, "import.coinbase", address)
+
+        assert len(tx_ledgers) == 1  # only 1 ledger for a receive
+
+        expected_receive = TxLedger(
+            chain="import.coinbase",
+            address=address,
+            hash="import.coinbase_1488610341_Receive_btc",
+            from_address="Coinbase:SomeCoinbaseAccountId",
+            to_address="Coinbase:SomeCoinbaseAccountId",
+            asset_tx_id="btc",
+            amount=Decimal("0.9997288"),
+            isfee=0,
+            timestamp=int(arrow.get("2017-03-04T06:52:21Z").timestamp()),
+            direction="IN",
+            tx_ledger_type="Coinbase.Receive",
+            symbol="BTC",
+            price_usd=Decimal("1291.4900000000000000"),
+        )
+        actual_receive = tx_ledgers[0]
+        actual_receive.id = None
+        assert actual_receive == expected_receive
+
+    def test_convert(self, test_db):
+        txns = """
+| Timestamp            | Transaction Type | Asset | Quantity Transacted | Spot Price Currency | Spot Price at Transaction | Subtotal | Total (inclusive of fees) | Fees | Notes                                      |
+| 2021-01-29T09:21:33Z | Convert          | BCH   | 0.4997288           | USD                 | 415.69                    | 203.22   | 207.73                    | 4.51 | Converted 0.4997288 BCH to 650.1690543 XLM |
+""".lstrip(
+            "\n"
+        )
+        csv = table_to_csv(txns)
+        csv_file = io.StringIO(COINBASE_TRANSACTIONS_HISTORY_HEADER + csv)
+
+        self.coinbase_importer.do_import(
+            csv_file,
+            entity_address_for_imports=address,
+            exchange_account_id="SomeCoinbaseAccountId",
+        )
+        update_entity_transactions(entity_name)
+        tx_ledgers = get_tx_ledgers(test_db, "import.coinbase", address)
+
+        assert len(tx_ledgers) == 3  # out, in, fee
+
+        expected_out = TxLedger(
+            chain="import.coinbase",
+            address=address,
+            hash="import.coinbase_1611912093_Convert_BCH_XLM",
+            from_address="Coinbase:SomeCoinbaseAccountId",
+            to_address="Coinbase:SomeCoinbaseAccountId",
+            asset_tx_id="bch",
+            amount=Decimal("0.4997288"),
+            isfee=0,
+            timestamp=int(arrow.get("2021-01-29T09:21:33Z").timestamp()),
+            direction="OUT",
+            tx_ledger_type="Coinbase.Convert",
+            symbol="BCH",
+            price_usd=Decimal("415.69"),
+        )
+        actual_out = tx_ledgers[0]
+        actual_out.id = None
+        assert actual_out == expected_out
+
+        expected_in = TxLedger(
+            chain="import.coinbase",
+            address=address,
+            hash="import.coinbase_1611912093_Convert_BCH_XLM",
+            from_address="Coinbase:SomeCoinbaseAccountId",
+            to_address="Coinbase:SomeCoinbaseAccountId",
+            asset_tx_id="xlm",
+            amount=Decimal("650.1690543"),
+            isfee=0,
+            timestamp=int(arrow.get("2021-01-29T09:21:33Z").timestamp()),
+            direction="IN",
+            tx_ledger_type="Coinbase.Convert",
+            symbol="XLM",
+            price_usd=Decimal("0.3125648608711397"),
+        )
+        actual_in = tx_ledgers[1]
+        actual_in.id = None
+        assert actual_in == expected_in
+
+        expected_fee = TxLedger(
+            chain="import.coinbase",
+            address=address,
+            hash="import.coinbase_1611912093_Convert_BCH_XLM",
+            from_address="Coinbase:SomeCoinbaseAccountId",
+            to_address="Coinbase:SomeCoinbaseAccountId",
+            asset_tx_id="FIAT:USD",
+            amount=Decimal("4.5100000000000000"),
+            isfee=1,
+            timestamp=int(arrow.get("2021-01-29T09:21:33Z").timestamp()),
+            direction="OUT",
+            tx_ledger_type="fee",
+            symbol="USD",
+            price_usd=Decimal("1.0000000000000000"),
+        )
+        actual_fee = tx_ledgers[2]
+        actual_fee.id = None
+        assert actual_fee == expected_fee
+
+    def test_buy(self, test_db):
+        txns = """
+| Timestamp            | Transaction Type | Asset | Quantity Transacted | Spot Price Currency | Spot Price at Transaction | Subtotal | Total (inclusive of fees) | Fees | Notes                                |
+| 2019-02-12T20:41:42Z | Buy              | BSV   | 0.49972881          | USD                 | 65.12                     | 32.54    | 32.54                     | 0.00 | Bought 0.49972881 BSV for $32.54 USD |
+""".lstrip(
+            "\n"
+        )
+        csv = table_to_csv(txns)
+        csv_file = io.StringIO(COINBASE_TRANSACTIONS_HISTORY_HEADER + csv)
+
+        self.coinbase_importer.do_import(
+            csv_file,
+            entity_address_for_imports=address,
+            exchange_account_id="SomeCoinbaseAccountId",
+        )
+        update_entity_transactions(entity_name)
+        tx_ledgers = get_tx_ledgers(test_db, "import.coinbase", address)
+
+        assert len(tx_ledgers) == 3  # out, in, fee
+
+        expected_out = TxLedger(
+            chain="import.coinbase",
+            address=address,
+            hash="import.coinbase_1550004102_Buy_bsv",
+            from_address="Coinbase:SomeCoinbaseAccountId",
+            to_address="Coinbase:SomeCoinbaseAccountId",
+            asset_tx_id="FIAT:USD",
+            amount=Decimal("32.54"),
+            isfee=0,
+            timestamp=int(arrow.get("2019-02-12T20:41:42Z").timestamp()),
+            direction="OUT",
+            tx_ledger_type="Coinbase.Buy",
+            symbol="USD",
+            price_usd=Decimal("1.0000000000000000"),
+        )
+        actual_out = tx_ledgers[0]
+        actual_out.id = None
+        assert actual_out == expected_out
+
+        expected_in = TxLedger(
+            chain="import.coinbase",
+            address=address,
+            hash="import.coinbase_1550004102_Buy_bsv",
+            from_address="Coinbase:SomeCoinbaseAccountId",
+            to_address="Coinbase:SomeCoinbaseAccountId",
+            asset_tx_id="bsv",
+            amount=Decimal("0.4997288100000000"),
+            isfee=0,
+            timestamp=int(arrow.get("2019-02-12T20:41:42Z").timestamp()),
+            direction="IN",
+            tx_ledger_type="Coinbase.Buy",
+            symbol="BSV",
+            price_usd=Decimal("65.1200000000000000"),
+        )
+        actual_in = tx_ledgers[1]
+        actual_in.id = None
+        assert actual_in == expected_in
+
+        expected_fee = TxLedger(
+            chain="import.coinbase",
+            address=address,
+            hash="import.coinbase_1550004102_Buy_bsv",
+            from_address="Coinbase:SomeCoinbaseAccountId",
+            to_address="Coinbase:SomeCoinbaseAccountId",
+            asset_tx_id="FIAT:USD",
+            amount=Decimal("0.00"),
+            isfee=1,
+            timestamp=int(arrow.get("2019-02-12T20:41:42Z").timestamp()),
+            direction="OUT",
+            tx_ledger_type="fee",
+            symbol="USD",
+            price_usd=Decimal("1.0000000000000000"),
+        )
+        actual_fee = tx_ledgers[2]
+        actual_fee.id = None
+        assert actual_fee == expected_fee
 
 
 class TestCoinbaseProImporter:
@@ -601,11 +815,12 @@ class TestCoinbaseProImporter:
             to_address="CoinbasePro:SomeCoinbaseProAccountId",
             asset_tx_id="FIAT:USD",
             symbol="USD",
-            amount=Decimal("20452.321643292"),
+            amount=Decimal("20454.3670800000000000"),
             timestamp=int(arrow.get("2021-12-06T06:22:49.825Z").timestamp()),
             direction="IN",
             tx_ledger_type="CoinbasePro.SELL",
             isfee=0,
+            price_usd=Decimal("1.0000000000000000"),
         )
         actual_in.id = None
         assert actual_in == expected_in
@@ -624,6 +839,7 @@ class TestCoinbaseProImporter:
             direction="OUT",
             tx_ledger_type="fee",
             isfee=1,
+            price_usd=Decimal("1.0000000000000000"),
         )
         actual_fee.id = None
         assert actual_fee == expected_fee
@@ -843,6 +1059,9 @@ class TestGeminiImporter:
             direction="OUT",
             tx_ledger_type="Gemini.Buy",
             isfee=0,
+            price_usd=Decimal(
+                "3610.3291923451183912"
+            ),  # price converted to USD from SGD.
         )
         actual_out.id = None
         assert actual_out == expected_out
@@ -862,6 +1081,7 @@ class TestGeminiImporter:
             direction="IN",
             tx_ledger_type="Gemini.Buy",
             isfee=0,
+            price_usd=Decimal("1.0042219891266823"),
         )
         actual_in.id = None
         assert actual_in == expected_in
@@ -879,6 +1099,7 @@ class TestGeminiImporter:
             direction="OUT",
             tx_ledger_type="fee",
             isfee=1,
+            price_usd=Decimal("0.7329873499837820"),
         )
         actual_fee.id = None
         assert actual_fee == expected_fee
@@ -921,6 +1142,7 @@ class TestGeminiImporter:
             direction="IN",
             tx_ledger_type="Gemini.Credit",
             isfee=0,
+            price_usd=Decimal("0.7403307722359682"),
         )
         actual_in.id = None
         assert actual_in == expected_in

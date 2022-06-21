@@ -338,6 +338,14 @@ python-versions = ">=3.7"
 toml = ["tomli"]
 
 [[package]]
+name = "currencyconverter"
+version = "0.16.12"
+description = "A currency converter using the European Central Bank data."
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "cytoolz"
 version = "0.11.2"
 description = "Cython implementation of Toolz: High performance functional utilities"
@@ -1641,7 +1649,7 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "7c8e37acc8a8b031211652acf75e3b388f7a453cdd8812ce80807cc6dbad05e9"
+content-hash = "036db14f68ff0ac2784aefbe054e3e1f23004b65de61e4c29f8a1e394c73a2fe"
 
 [metadata.files]
 abnf = [
@@ -1875,6 +1883,10 @@ coverage = [
     {file = "coverage-6.4-cp39-cp39-win_amd64.whl", hash = "sha256:e35217031e4b534b09f9b9a5841b9344a30a6357627761d4218818b865d45055"},
     {file = "coverage-6.4-pp36.pp37.pp38-none-any.whl", hash = "sha256:e637ae0b7b481905358624ef2e81d7fb0b1af55f5ff99f9ba05442a444b11e45"},
     {file = "coverage-6.4.tar.gz", hash = "sha256:727dafd7f67a6e1cad808dc884bd9c5a2f6ef1f8f6d2f22b37b96cb0080d4f49"},
+]
+currencyconverter = [
+    {file = "CurrencyConverter-0.16.12-py2.py3-none-any.whl", hash = "sha256:03a9f2a0d104f5a552a0963982a6d851d24bf80f3aad431c2e14951fe32f2383"},
+    {file = "CurrencyConverter-0.16.12.tar.gz", hash = "sha256:1321e51be90f5c801b8b347e333c0d0090e66697099529ce4a2ab99528ef2f34"},
 ]
 cytoolz = [
     {file = "cytoolz-0.11.2.tar.gz", hash = "sha256:ea23663153806edddce7e4153d1d407d62357c05120a4e8485bddf1bd5ab22b4"},
