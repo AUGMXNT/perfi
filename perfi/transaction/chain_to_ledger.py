@@ -391,8 +391,15 @@ class LedgerTx:
 
             if self.amount > 0:
                 # Use DeBank's USD price
-                self.price_usd = debank_tx_data["usd_gas_fee"]
+                self.price_usd = Decimal(debank_tx_data["usd_gas_fee"]) / Decimal(
+                    self.amount
+                )
                 self.price_source = "debank"
+
+                if self.price_usd is None:
+                    raise Exception(
+                        f"Unexpected none value for price_usd from debank\n {self}"
+                    )
             else:
                 self.price_usd = Decimal(0)
                 self.price_source = "zero_fee_value"

@@ -1192,7 +1192,7 @@ class CostbasisGenerator:
         # LATER: we should be considering TxLogical fees, approvals, etc...
         # Basis should equal the price * amount + value_of_fees
         value_of_fee = 0
-        if self.fee and self.fee.amount > 0:
+        if self.fee and self.fee.amount > 0 and self.fee.price_usd:
             value_of_fee = self.fee.amount * self.fee.price_usd
         basis_usd = decimal_mul(price, t.amount) + value_of_fee
 
@@ -1290,7 +1290,12 @@ class CostbasisGenerator:
                     # Attrs for new Costbasis disposal row
                     # If this is not a disposal for a fee (because all fees are their own disposal events), and if this transaction has a fee...
                     fee_value_usd = 0
-                    if not t.isfee and self.fee and self.fee.amount > 0:
+                    if (
+                        not t.isfee
+                        and self.fee
+                        and self.fee.amount > 0
+                        and self.fee.price_usd
+                    ):
                         # Subtract total fee value from the total_usd of this disposal
                         fee_value_usd = self.fee.amount * self.fee.price_usd
                     total_usd = decimal_mul(amount, sale_price) - fee_value_usd
