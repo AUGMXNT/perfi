@@ -8,6 +8,7 @@ from ..ingest.chain import (
     HarmonyTransactionsFetcher,
 )
 from ..price import price_feed
+from ..cache import cache
 
 import arrow
 from decimal import *
@@ -113,6 +114,9 @@ def update_wallet_ledger_transactions(address):
                 tx.symbol = t["symbol"]
                 tx.from_address = t["from_address"]
                 tx.to_address = t["to_address"]
+                tx.proceeds_after_fees_usd = t.get("proceeds_after_fees_usd", None)
+                tx.price_usd = t.get("price_usd", None)
+                tx.price_source = t.get("price_source", None)
 
                 tx.isfee = 0
                 try:
@@ -137,6 +141,12 @@ def update_wallet_ledger_transactions(address):
                 tx.symbol = t["symbol"]
                 tx.from_address = t["from_address"]
                 tx.to_address = t["to_address"]
+                tx.price_usd = t.get("price_usd", None)
+                tx.price_source = t.get("price_source", None)
+                tx.costbasis_including_fees_usd = t.get(
+                    "costbasis_including_fees_usd", None
+                )
+
                 ledger_txs.append(tx)
 
             continue
@@ -245,12 +255,15 @@ class LedgerTx:
         self.isfee = 0
         self.amount = None
 
+        self.costbasis_including_fees_usd = None
+        self.proceeds_after_fees_usd = None
+        self.price_usd = None
+        self.price_source = None
         self.timestamp = kwargs["timestamp"]
         self.direction = None
         self.tx_ledger_type = None
         self.asset_price_id = None
         self.symbol = None
-        self.price = None
         self.price_source = None
         self.debank_name = None
 
@@ -267,13 +280,16 @@ class LedgerTx:
              isfee : {self.isfee }
              amount : {self.amount }
 
+             costbasis_including_fees: {self.costbasis_including_fees_usd}
+             proceeds_after_fees_usd: {self.proceeds_after_fees_usd}
+             price_usd : {self.price_usd }
+             price_source : {self.price_source }
+
              timestamp: {self.timestamp}
              direction : {self.direction }
              tx_ledger_type : {self.tx_ledger_type }
              asset_price_id : {self.asset_price_id }
              symbol : {self.symbol }
-             price : {self.price }
-             price_source : {self.price_source }
              debank_name : {self.debank_name or '__None__'}
              """
 
@@ -414,6 +430,7 @@ class LedgerTx:
 
             if self.amount > 0:
                 # Use DeBank's USD price
+                # Costbais code downstream wants price_usd to represent the unit price, so we divide total gas fee by amount here
                 self.price_usd = Decimal(debank_tx_data["usd_gas_fee"]) / Decimal(
                     self.amount
                 )
@@ -452,9 +469,53 @@ class LedgerTx:
         logger.debug(f'{self.hash} | {type or "__None__"}')
 
     def assign_price(self):
-        # This only works with chain imported assets...
         if self.chain.startswith("import"):
-            return
+            # If we have explicit price from an import (e.g. coinbasepro), we'll use what we have, and just set the price_source here and return early.
+            if self.price_usd:
+                self.price_source = (
+                    self.price_source or "exchange_export_file_explicit_price"
+                )
+                return
+
+            # If we have explicit costbasis info for this asset already (from coinbase import), derive price from that
+            elif self.direction == "IN" and self.costbasis_including_fees_usd:
+                if Decimal(self.costbasis_including_fees_usd) > 0:
+                    self.price_usd = Decimal(
+                        self.costbasis_including_fees_usd
+                    ) / Decimal(self.amount)
+                    self.price_source = "exchange_export_file_explicit_costbasis"
+                    return
+
+            # If we have explicit proceeds info for this asset already (from coinbase import), derive price from that
+            elif self.direction == "OUT" and self.proceeds_after_fees_usd:
+                self.price_usd = Decimal(self.proceeds_after_fees_usd) / Decimal(
+                    self.amount
+                )
+                self.price_source = "exchange_export_file_explicit_proceeds"
+                return
+
+            # If this asset is for FIAT, try to convert it to USD
+            elif self.asset_tx_id.startswith("FIAT:"):
+                from_fiat_symbol = self.asset_tx_id.split(":")[1]
+                to_fiat_symbol = "USD"
+                if from_fiat_symbol == "USD":
+                    price_usd = 1
+                    price_source = "exchange_export_file"
+                else:
+                    price_usd, price_source = price_feed.convert_fiat(
+                        from_fiat_symbol,
+                        to_fiat_symbol,
+                        Decimal(self.amount),
+                        int(self.timestamp),
+                    )
+                self.price_usd = price_usd
+                self.price_source = price_source
+                return
+
+            else:
+                # If we get this far, we were an imported chain TX but didn't get pricing info.
+                # Let downstream costbasis pricing handle this (in costbasis.py)
+                return
 
         asset_map = price_feed.map_asset(self.chain, self.asset_tx_id)
         if asset_map:
@@ -462,9 +523,9 @@ class LedgerTx:
             if not self.symbol:
                 self.symbol = asset_map["symbol"]
             self.asset_price_id = asset_map["asset_price_id"]
-            coin_price = price_feed.get(self.asset_price_id, self.timestamp)
+            coin_price = price_feed.get(self.asset_price_id, int(self.timestamp))
             if coin_price:
-                self.price = coin_price.price
+                self.price_usd = coin_price.price
                 self.price_source = coin_price.source
 
     def as_tx_ledger(self):
@@ -485,7 +546,7 @@ class LedgerTx:
             tx_ledger_type=self.tx_ledger_type,
             asset_price_id=self.asset_price_id,
             symbol=self.symbol,
-            price_usd=self.price,
+            price_usd=self.price_usd,
             price_source=self.price_source,
         )
         return TxLedger(**args)

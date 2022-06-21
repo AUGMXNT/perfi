@@ -233,6 +233,7 @@ class TestKrakenImporter:
             isfee=0,
             timestamp=int(arrow.get("2016-10-29 11:30:16").timestamp()),
             direction="IN",
+            price_usd=Decimal(1.0),  # currency was USD so price is 1
             tx_ledger_type="Kraken.deposit",
             symbol="USD",
         )
@@ -312,6 +313,7 @@ class TestKrakenImporter:
             direction="OUT",
             tx_ledger_type="fee",
             symbol="BTC",
+            price_usd=Decimal("697.2773624560577446"),
         )
         actual_fee = actual_fees[0]
         actual_fee.id = None
@@ -419,6 +421,7 @@ class TestCoinbaseImporter:
             direction="IN",
             tx_ledger_type="Coinbase.Sell",
             isfee=0,
+            price_usd=Decimal(1.0),  # currency was USD to price is 1
         )
         actual_in.id = None
         assert actual_in == expected_in
@@ -426,7 +429,7 @@ class TestCoinbaseImporter:
     def test_buy(self, test_db):
         txns = """
 | Transaction ID                       | Transaction Type | Date & time          | Asset Acquired | Quantity Acquired (Bought, Received, etc) | Cost Basis (incl. fees paid) (USD) | Data Source | Asset Disposed (Sold, Sent, etc) | Quantity Disposed | Proceeds (excl. fees paid) (USD) |
-| aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Buy              | 2017-03-14T05:56:39Z | ETH            | 50                                        | 1031.71                            | Coinbase    |                                  |                   |                                  |
+| aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Buy              | 2017-03-14T05:56:39Z | ETH            | 50                                        | 1000.00                            | Coinbase    |                                  |                   |                                  |
 """.lstrip(
             "\n"
         )
@@ -456,11 +459,12 @@ class TestCoinbaseImporter:
             to_address="Coinbase:SomeCoinbaseAccountId",
             asset_tx_id="FIAT:USD",
             symbol="USD",
-            amount=Decimal("1031.71"),
+            amount=Decimal("1000.00"),
             timestamp=int(arrow.get("2017-03-14T05:56:39Z").timestamp()),
             direction="OUT",
             tx_ledger_type="Coinbase.Buy",
             isfee=0,
+            price_usd=Decimal(1.0),  # currency was USD so price is 1.0
         )
         actual_out.id = None
         assert actual_out == expected_out
@@ -480,6 +484,7 @@ class TestCoinbaseImporter:
             direction="IN",
             tx_ledger_type="Coinbase.Buy",
             isfee=0,
+            price_usd=Decimal(20.0),
         )
         actual_in.id = None
         assert actual_in == expected_in
@@ -523,6 +528,7 @@ class TestCoinbaseImporter:
             direction="OUT",
             tx_ledger_type="Coinbase.ConvertedFromTo",
             isfee=0,
+            price_usd=Decimal("185.6050"),
         )
         actual_out.id = None
         assert actual_out == expected_out
@@ -601,11 +607,12 @@ class TestCoinbaseProImporter:
             to_address="CoinbasePro:SomeCoinbaseProAccountId",
             asset_tx_id="FIAT:USD",
             symbol="USD",
-            amount=Decimal("20452.321643292"),
+            amount=Decimal("20454.3670800000000000"),
             timestamp=int(arrow.get("2021-12-06T06:22:49.825Z").timestamp()),
             direction="IN",
             tx_ledger_type="CoinbasePro.SELL",
             isfee=0,
+            price_usd=Decimal("1.0000000000000000"),
         )
         actual_in.id = None
         assert actual_in == expected_in
@@ -624,6 +631,7 @@ class TestCoinbaseProImporter:
             direction="OUT",
             tx_ledger_type="fee",
             isfee=1,
+            price_usd=Decimal("1.0000000000000000"),
         )
         actual_fee.id = None
         assert actual_fee == expected_fee
@@ -843,6 +851,9 @@ class TestGeminiImporter:
             direction="OUT",
             tx_ledger_type="Gemini.Buy",
             isfee=0,
+            price_usd=Decimal(
+                "3610.3291923451183912"
+            ),  # price converted to USD from SGD.
         )
         actual_out.id = None
         assert actual_out == expected_out
@@ -862,6 +873,7 @@ class TestGeminiImporter:
             direction="IN",
             tx_ledger_type="Gemini.Buy",
             isfee=0,
+            price_usd=Decimal("1.0042219891266823"),
         )
         actual_in.id = None
         assert actual_in == expected_in
@@ -879,6 +891,7 @@ class TestGeminiImporter:
             direction="OUT",
             tx_ledger_type="fee",
             isfee=1,
+            price_usd=Decimal("0.7329873499837820"),
         )
         actual_fee.id = None
         assert actual_fee == expected_fee
@@ -921,6 +934,7 @@ class TestGeminiImporter:
             direction="IN",
             tx_ledger_type="Gemini.Credit",
             isfee=0,
+            price_usd=Decimal("0.7403307722359682"),
         )
         actual_in.id = None
         assert actual_in == expected_in
