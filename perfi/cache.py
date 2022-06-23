@@ -1,16 +1,79 @@
+from typing import Callable, Any
+
+from devtools import debug
+from web3.types import RPCEndpoint, RPCResponse
+
 from .db import DB
 from .constants.paths import CACHEDB_PATH, CACHEDB_SCHEMA_PATH
 
 
+from web3 import Web3
 from collections import defaultdict
 import httpx
 import lzma
 import os
-import time
 from urllib.parse import urlparse
 import json
 import hashlib
+import collections
+from collections.abc import Generator
 import time
+import pickle
+
+from eth_utils import (
+    is_boolean,
+    is_bytes,
+    is_dict,
+    is_list_like,
+    is_null,
+    is_number,
+    is_text,
+    to_bytes,
+)
+
+
+def generate_cache_key(value: Any) -> str:
+    """
+    Generates a cache key for the *args and **kwargs
+    """
+    if is_bytes(value):
+        return hashlib.md5(value).hexdigest()
+    elif is_text(value):
+        return generate_cache_key(to_bytes(text=value))
+    elif is_boolean(value) or is_null(value) or is_number(value):
+        return generate_cache_key(repr(value))
+    elif is_dict(value):
+        return generate_cache_key(((key, value[key]) for key in sorted(value.keys())))
+    elif is_list_like(value) or isinstance(value, collections.abc.Generator):
+        return generate_cache_key("".join((generate_cache_key(item) for item in value)))
+    else:
+        raise TypeError(
+            f"Cannot generate cache key for value {value} of type {type(value)}"
+        )
+
+
+def web3_db_cache_middleware(
+    make_request: Callable[[RPCEndpoint, Any], RPCResponse], w3: "Web3"
+) -> Callable[[RPCEndpoint, Any], RPCResponse]:
+    rpc_whitelist = ["eth_getTransactionReceipt"]
+
+    def middleware(method: RPCEndpoint, params: Any) -> RPCResponse:
+        if method in rpc_whitelist:
+            cache_key = generate_cache_key((method, params))
+            r = cache._get_val(cache_key)
+            if not r:
+                print(f"Web3 cache key {cache_key} not in our cache.")
+                t = int(time.time())
+                response = make_request(method, params)
+                cache._set_val(cache_key, pickle.dumps(response), t)
+                return response
+            print(f"Web3 cache key {cache_key} IS IN our cache.")
+            return pickle.loads(r["value"])
+        else:
+            print(f"Web3 NOT CACHING {method}")
+            return make_request(method, params)
+
+    return middleware
 
 
 class CacheGet404Exception(Exception):
@@ -50,6 +113,41 @@ class Cache:
             self.client = httpx.Client(proxies=self.proxy)
             return self.client
 
+    def _get_val(self, key, refresh_if=None):
+        r = self.db.query(
+            "SELECT key, value_lzma, saved, expire FROM cache WHERE key = ? ORDER BY saved DESC LIMIT 1",
+            key,
+        )
+        if len(r):
+            if refresh_if and time.time() - r[0]["saved"] > refresh_if:
+                return None
+            else:
+                result = {}
+                result["status"] = "cached"
+                result["key"] = r[0][0]
+                result["saved"] = r[0][2]
+                # Decompress LZMA'd value
+                value_lzma = r[0][1]
+                lzmad = lzma.LZMADecompressor()
+                result["value"] = lzmad.decompress(value_lzma)  # type: ignore
+                return result
+        return None
+
+    def _set_val(self, key, value, timestamp):
+        if type(value) is str:
+            value = value.encode("utf-8")
+        # Compress value for storage
+        lzmac = lzma.LZMACompressor()
+        value_lzma = lzmac.compress(value)
+        value_lzma += lzmac.flush()
+
+        sql = """REPLACE INTO cache
+         (key, value_lzma, saved)
+         VALUES
+         (?, ?, ?)"""
+        params = (key, value_lzma, timestamp)
+        self.db.execute(sql, params)
+
     def set_cookies_for_requests(self, hostname, cookies):
         for k, v in cookies.items():
             print("Setting cookie -- %s | %s : %s" % (hostname, k, v))
@@ -60,24 +158,14 @@ class Cache:
 
         result = {}
         # Get cached version
-        r = self.db.query(
-            "SELECT key, value_lzma, saved, expire FROM cache WHERE key = ? ORDER BY saved DESC LIMIT 1",
-            url,
-        )
+        r = self._get_val(url)
         # Conditional Refresh - refresh if record is older than refresh_if
-        if len(r) and refresh_if and time.time() - r[0][2] > refresh_if:
+        if r and refresh_if and time.time() - r["saved"] > refresh_if:
             refresh = True
 
         if r and not refresh:
             # print(f'CACHED: {url}')
-            result["status"] = "cached"
-            result["key"] = r[0][0]
-            result["saved"] = r[0][2]
-
-            # Decompress LZMA'd value
-            value_lzma = r[0][1]
-            lzmad = lzma.LZMADecompressor()
-            result["value"] = lzmad.decompress(value_lzma)  # type: ignore
+            return r
         else:
             # Get
             self.headers["Referer"] = f"https://{urlparse(url).hostname}/"
@@ -132,17 +220,7 @@ class Cache:
                     retry_count += 1
 
             if req.status_code == 200:
-                # Compress value for storage
-                lzmac = lzma.LZMACompressor()
-                value_lzma = lzmac.compress(req.content)
-                value_lzma += lzmac.flush()
-
-                sql = """REPLACE INTO cache
-                 (key, value_lzma, saved)
-                 VALUES
-                 (?, ?, ?)"""
-                params = (url, value_lzma, t)
-                self.db.execute(sql, params)
+                self._set_val(url, req.content, t)
 
                 result["status"] = "cached"
                 result["key"] = url
