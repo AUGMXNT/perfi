@@ -1764,9 +1764,9 @@ class LotMatcher:
                  {'AND chain = ?' if not asset_price_id else ''}
         """
         if algorithm == "hifo":
-            sql += "ORDER BY price_usd DESC, timestamp ASC"
+            sql += "ORDER BY cast(price_usd as float) DESC, timestamp ASC"
         if algorithm == "low":
-            sql += "ORDER BY price_usd ASC"
+            sql += "ORDER BY cast(price_usd as float) ASC"
         if algorithm == "fifo":
             sql += "ORDER BY timestamp ASC"
         if algorithm == "lifo":
