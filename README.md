@@ -105,7 +105,7 @@ poetry run bin/import_from_exchange.py --entity_name <peepo> --file <path/to/exp
 
 #### How to export files from supported exchanges
 - **Coinbase**
-  - Tax Section → Documents → Generate Report → Raw Transaction Activity (can only do for All Time, which is fine). Format should be CSV.
+  - Reports Section → Transaction History → Generate Report → All time, all assets, All transactions. Format should be CSV.
 - **Coinbase Pro**
   - Statements → Generate → Account Statement → Select date range and 'All Accounts'. Format should be CSV.
 - **Gemini**
