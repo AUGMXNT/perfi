@@ -1540,7 +1540,12 @@ class CostbasisGenerator:
 
         # 1.  If we have a price_usd on the tx_ledger, return that
         if tx.price_usd is not None:
-            return (Decimal(tx.price_usd), "tx_ledger")
+            price_source = (
+                "tx_ledger"
+                if tx.price_source is None
+                else f"tx_ledger__{tx.price_source}"
+            )
+            return (Decimal(tx.price_usd), price_source)
 
         # 2. Try to get the price from our mapped assets
         # tx_ledgers[] have chain, not tx_logical
