@@ -1221,7 +1221,7 @@ class CostbasisGenerator:
         save_costbasis_lot(lot)
         replace_flags(type(lot).__name__, lot.tx_ledger_id, flags)
         self.print_if_debug(
-            f"{datetime.fromtimestamp(t.timestamp)}  |  LOT_CREATED | {lot.original_amount} {lot.symbol} @ {lot.basis_usd}"
+            f"{datetime.fromtimestamp(t.timestamp)}  |  LOT_CREATED | {lot.original_amount} {lot.symbol} @ {lot.price_usd}"
         )
 
     def drawdown_from_lots(self, lots, t, is_disposal=None, max_disposal_usd=None):
@@ -1237,7 +1237,7 @@ class CostbasisGenerator:
             self.print_if_debug(f"Need to drawdown {t.amount} {t.symbol}")
             for l in lots:
                 self.print_if_debug(
-                    f"\t {l.timestamp} has {l.current_amount} / {l.original_amount} @ {l.basis_usd}"
+                    f"\t {l.timestamp} has {l.current_amount} / {l.original_amount} @ {l.price_usd}"
                 )
 
         amount_left_to_subtract = Decimal(t.amount)
@@ -1425,10 +1425,12 @@ class CostbasisGenerator:
                         save_costbasis_disposal(disposal)
 
                 # We subtract the amount for the current lot
-                update_costbasis_lot_current_amount(
-                    lot.tx_ledger_id,
-                    decimal_quantize(lot.current_amount)
-                    - decimal_quantize(amount_to_subtract_from_lot),
+                amount_remaining = decimal_quantize(
+                    lot.current_amount
+                ) - decimal_quantize(amount_to_subtract_from_lot)
+                update_costbasis_lot_current_amount(lot.tx_ledger_id, amount_remaining)
+                self.print_if_debug(
+                    f"Drawdown from lot {lot.tx_ledger_id}. Removing {decimal_quantize(amount_to_subtract_from_lot)}.  Amount remaining: {decimal_quantize(amount_remaining)}"
                 )
 
                 # unused but putting it here in case we ever want the updated lot in memory, it should have the updated current_amount...
