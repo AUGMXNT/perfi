@@ -549,7 +549,11 @@ class LedgerTx:
             price_usd=self.price_usd,
             price_source=self.price_source,
         )
-        return TxLedger(**args)
+        try:
+            return TxLedger(**args)
+        except Exception as err:
+            print(args)
+            raise err
 
 
 class TxTyper:
