@@ -624,6 +624,8 @@ class TxLogical(BaseModel):
         # income
         if self.tx_logical_type in [
             "CoinbasePro.Reward",
+            "Coinbase.Rewards Income",
+            "Coinbase.Coinbase Earn",
         ]:
             self.save_type("income")
             return
