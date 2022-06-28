@@ -178,6 +178,7 @@ class TxFactory:
                 ),
                 receives=receives,
                 sends=sends,
+                cate_id=None,
             )
 
         tx = dict(

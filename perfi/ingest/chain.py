@@ -1989,6 +1989,9 @@ class DeBankTransactionsFetcher:
                     if "token_id" in r and r["token_id"] in tokens:
                         r["_token"] = tokens[r["token_id"]]
 
+                if tx["cate_id"] == "approve":
+                    tx["_token"] = tokens[tx["token_approve"]["token_id"]]
+
                 transactions.append(tx)
 
             if len(j["history_list"]) == 0:
