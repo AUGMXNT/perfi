@@ -196,6 +196,29 @@ def update_wallet_ledger_transactions(address):
                     tx.fee_from_debank(raw_data)
                     ledger_txs.append(tx)
 
+            # If this is an approval, create a  TxLedger for it
+            if debank_tx["cate_id"] == "approve":
+                tx = LedgerTx(
+                    chain=chain, address=address, hash=hash, timestamp=timestamp
+                )
+                tx.tx_ledger_type = "approval"
+                tx.to_address = debank_tx["other_addr"]
+                if "_project" in debank_tx:
+                    tx.to_address_name = debank_tx["_project"]["name"]
+                tx.from_address = tx.address
+                tx.direction = "APPROVE"
+                tx.amount = debank_tx["token_approve"]["value"]
+                tx.isfee = 0
+                tx.asset_tx_id = debank_tx["_token"]["id"]
+                [_, tx.symbol, tx.asset_price_id] = tx.normalize_asset(
+                    tx.chain, tx.asset_tx_id
+                )
+                if (
+                    tx.symbol is None or tx.symbol.strip() == ""
+                ) and "_token" in debank_tx:
+                    tx.symbol = debank_tx["_token"]["symbol"]
+                ledger_txs.append(tx)
+
     # Now we have all our ledger_txs, so lets put them into the tx_ledger table in the DB
     tx_ledger_store = TxLedgerStore(db)
     for tx in tqdm(ledger_txs, desc="Saving Ledger TXs", disable=None):

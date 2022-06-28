@@ -80,11 +80,11 @@ const handleEditTxLogicalTypeClick = (txLogicalId) => {
   showEditTxLogicalTypeForm.value = true
 }
 
-const handleCopyId = (txLogicalId) => {
-  copyToClipboard(txLogicalId)
+const handleCopyValue = (prefix, value) => {
+  copyToClipboard(value)
   quasar.notify({
     type: 'positive',
-    message: `Logical ID ${txLogicalId} copied to clipboard.`
+    message: `${prefix} ${value} copied to clipboard.`
   })
 }
 
@@ -177,7 +177,7 @@ const moveTxLedger = async (txLedgerId, txLogicalId) => {
             </div>
 
             <div class="col">
-              <q-btn class="hoverEdit" flat size="xs" label="Copy ID" @click="handleCopyId(props.row.id)" color="secondary" />
+              <q-btn class="hoverEdit" flat size="xs" label="Copy ID" @click="handleCopyValue('Logical ID', props.row.id)" color="secondary" />
             </div>
           </div>
         </q-td>
@@ -237,6 +237,20 @@ const moveTxLedger = async (txLedgerId, txLogicalId) => {
 
               <q-btn class="hoverEdit on-right" flat size="xs" label="Edit Price" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
               <q-btn class="hoverEdit on-right" flat size="xs" label="Move" @click="handleMoveClick(props.row.id, tx_ledger.id)" color="secondary" />
+            </div>
+
+            <div class="logicalOther row items-center q-pb-sm" v-for="tx_ledger in props.row.others" :key="tx_ledger.id">
+              <img class="txIcon" :src="txIconUrl(tx_ledger)" />
+
+              &nbsp;{{ tx_ledger.tx_ledger_type == 'approval' ? 'Approve' : '' }}
+              &nbsp;{{tx_ledger.amount.toFixed(2)}}
+              &nbsp;
+              <div><span class="text-weight-bold">{{tx_ledger.symbol}}</span> for {{tx_ledger.to_address_name}}
+                &nbsp;
+                <q-tooltip anchor="bottom middle" self="center middle" :hide-delay="1000">
+                  {{tx_ledger.to_address}}
+                </q-tooltip>
+              </div>
             </div>
         </q-td>
       </q-tr>
