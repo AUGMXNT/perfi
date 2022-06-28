@@ -48,6 +48,7 @@ const columns = [
    { name: 'date_and_time', align: 'left', label: 'Date', field: txl => dateAndTime(txl)  },
    { name: 'type', align: 'left', label: 'Type', field: 'tx_logical_type' },
    { name: 'transactions', align: 'left', label: 'Transactions', field: txl => txl },
+   { name: 'fee', align: 'left', label: 'Fee', field: 'fee' },
 ]
 
 const rows = tx_logicals
@@ -165,6 +166,7 @@ const moveTxLedger = async (txLedgerId, txLogicalId) => {
         <q-th key="date"> Date </q-th>
         <q-th key="type"> Type </q-th>
         <q-th key="transactions"> Transactions </q-th>
+        <q-th key="fee"> Fee </q-th>
       </q-tr>
     </template>
 
@@ -194,8 +196,7 @@ const moveTxLedger = async (txLedgerId, txLogicalId) => {
           </div>
         </q-td>
 
-
-        <q-td key="transactions" :props="props">
+        <q-td key="transactions" :props="props" style="width: 600px;">
             <div class="logicalOut row items-center q-pb-sm" v-for="tx_ledger in props.row.outs" :key="tx_ledger.id">
               <img class="txIcon" :src="txIconUrl(tx_ledger)" />
               &nbsp;-
@@ -213,8 +214,8 @@ const moveTxLedger = async (txLedgerId, txLogicalId) => {
               &nbsp;<span v-if="tx_ledger.price_source">
                 via {{tx_ledger.price_source }}
               </span>
-              <q-btn class="hoverEdit on-right" flat size="xs" label="Edit Price" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
-              <q-btn class="hoverEdit on-right" flat size="xs" label="Move" @click="handleMoveClick(props.row.id, tx_ledger.id)" color="secondary" />
+              <q-btn class="hoverEdit on-right q-py-none" flat size="xs" label="Edit Price" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
+              <q-btn class="hoverEdit on-right q-py-none" flat size="xs" label="Move" @click="handleMoveClick(props.row.id, tx_ledger.id)" color="secondary" />
             </div>
 
             <div class="logicalIn row items-center q-pb-sm" v-for="tx_ledger in props.row.ins" :key="tx_ledger.id">
@@ -235,8 +236,8 @@ const moveTxLedger = async (txLedgerId, txLogicalId) => {
                 via {{tx_ledger.price_source }}
               </span>
 
-              <q-btn class="hoverEdit on-right" flat size="xs" label="Edit Price" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
-              <q-btn class="hoverEdit on-right" flat size="xs" label="Move" @click="handleMoveClick(props.row.id, tx_ledger.id)" color="secondary" />
+              <q-btn class="hoverEdit on-right q-py-none" flat size="xs" label="Edit Price" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
+              <q-btn class="hoverEdit on-right q-py-none" flat size="xs" label="Move" @click="handleMoveClick(props.row.id, tx_ledger.id)" color="secondary" />
             </div>
 
             <div class="logicalOther row items-center q-pb-sm" v-for="tx_ledger in props.row.others" :key="tx_ledger.id">
@@ -253,6 +254,14 @@ const moveTxLedger = async (txLedgerId, txLogicalId) => {
               </div>
             </div>
         </q-td>
+
+        <q-td key="fee" :props="props" style="xwidth: 200px;">
+          <template v-if="props.row.fee">
+            {{props.row.fee.amount}}
+            {{props.row.fee.symbol}}
+          </template>
+        </q-td>
+
       </q-tr>
     </template>
 
