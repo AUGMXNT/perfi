@@ -396,7 +396,7 @@ class LedgerTx:
             "fantom": "ftm",
             "xdai": "xdai",
         }
-        self.asset_tx_id = asset_mapping[self.chain]
+        self.asset_tx_id = CHAIN_FEE_ASSETS[self.chain]
 
         # Assign addresses
         self.from_address = debank_tx_data["from_addr"]
