@@ -10,7 +10,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: HomeView
+      component: SettingsView
     },
     {
       path: '/entity/:entityId',
