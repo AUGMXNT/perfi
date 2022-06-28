@@ -40,6 +40,7 @@ class TX_LOGICAL_TYPE(Enum):
     receive = "receive"
     send = "send"
     income = "income"
+    approval = "approval"
 
 
 # TODO: go find the places where we create unknown_send, zero_price, auto_reconciled flags and use this enum.value instead
@@ -441,6 +442,14 @@ class TxLogical(BaseModel):
         if len(ledger_types) == 0:
             return
 
+        if (
+            len(self.ins) == 0
+            and len(self.outs) == 0
+            and len(self.others) == 1
+            and self.others[0].tx_ledger_type == "approval"
+        ):
+            self.save_type("approval")
+
         # Wrap and unwrap are special cases we'll look at first
         def is_native(txle):
             return txle.asset_tx_id in assets.WRAPPED_TOKENS.values()
@@ -543,6 +552,7 @@ class TxLogical(BaseModel):
                     "getReward",
                     "yield",
                 ],
+                "approval": ["approve", "approval"],
             }
 
             # See if we match
