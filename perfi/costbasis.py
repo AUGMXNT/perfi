@@ -2414,7 +2414,7 @@ class Form8949:
 class CostbasisYearCloser:
     def __init__(self, entity, year, closing_values_file_path):
         self.entity = entity
-        self.year = year
+        self.year = int(year)
         self.closing_values_file_path = (
             closing_values_file_path
             or f"{self.entity}-costbaisis-closing-year-{self.year}-{get_active_branch_name().lower()}.csv"
@@ -2423,11 +2423,17 @@ class CostbasisYearCloser:
     def lock_costbasis_lots(self):
         start_timestamp = int(datetime(self.year, 1, 1).timestamp())
         end_timestamp = int(datetime(self.year + 1, 1, 1).timestamp())
+
+        # We want to lock all costbasis lots that were involved in any disposals for the year
         sql = """UPDATE costbasis_lot
                  SET locked_for_year = :year
-                 WHERE timestamp >= :start
-                 AND timestamp < :end
-                 AND entity = :entity
+                 WHERE tx_ledger_id in (
+                    SELECT tx_ledger_id
+                    FROM costbasis_disposal
+                    WHERE timestamp >= :start
+                    AND timestamp < :end
+                    AND entity = :entity
+                 )
               """
         params = dict(
             year=self.year,
@@ -2435,12 +2441,14 @@ class CostbasisYearCloser:
             end=end_timestamp,
             entity=self.entity,
         )
+        db.con.set_trace_callback(print)
         db.execute(sql, params)
 
     def export_closing_values(self):
         sql = """SELECT *
                  FROM costbasis_lot
                  WHERE locked_for_year = :year
+                 ORDER BY timestamp ASC
               """
         params = dict(
             year=self.year,
