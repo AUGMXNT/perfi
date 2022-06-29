@@ -33,6 +33,7 @@ from perfi.models import (
     TX_LOGICAL_TYPE,
     AddressStore,
     EntityStore,
+    CostbasisLotStore,
     RecordNotFoundException,
 )
 from perfi.db import db
@@ -60,6 +61,13 @@ rich vs pytermgui
 * https://github.com/bczsalba/pytermgui
 """
 
+
+class CommandNotPermittedException(Exception):
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
+
+
 logger = logging.getLogger(__name__)
 
 if sys.stdout.isatty():
@@ -86,6 +94,7 @@ console = Console()
 
 entity_store = EntityStore(db)
 address_store = AddressStore(db)
+costbasis_lot_store = CostbasisLotStore(db)
 
 
 # Entity
@@ -251,6 +260,19 @@ def ledger_update_ledger_type(
 def ledger_update_price(
     entity_name: str, tx_ledger_id: str, new_price_usd: float, auto_refresh_state=True
 ):
+    # Don't allow the ledger's price to be changed if we have locked a costbasis_lot for this ledger
+    results = costbasis_lot_store.find(tx_ledger_id=tx_ledger_id)
+    if len(results) > 0:
+        if len(results) != 1:
+            raise Exception(
+                f"Found more than 1 lot for tx_ledger_id {tx_ledger_id}. How is this possible?"
+            )
+        lot = results[0]
+        if lot.locked_for_year is not None:
+            raise CommandNotPermittedException(
+                f"The CostbasisLot for this tx_ledger_id ({tx_ledger_id}) was locked starting for tax year {lot.locked_for_year}. The price for the tx_ledger that created it can't be changed now."
+            )
+
     event = event_store.create_tx_ledger_price_updated(
         tx_ledger_id,
         new_price_usd,
