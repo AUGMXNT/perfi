@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from perfi import costbasis
 from perfi.constants.paths import DATA_DIR
 
 from os import listdir
@@ -57,6 +58,7 @@ from bin.cli import (
     ledger_flag_logical,
     ledger_remove_flag_logical,
     ledger_move_tx_ledger,
+    CommandNotPermittedException,
 )
 from bin.import_from_exchange import do_import
 from bin.map_assets import generate_constants
@@ -408,9 +410,12 @@ def update_tx_ledger_price(
     stores: Stores = Depends(stores),
 ):
     tx_logical = stores.tx_logical.find_by_primary_key(tx_ledger.tx_logical_id)[0]
-    ledger_update_price(
-        tx_logical.entity, tx_ledger.id, updated_price, auto_refresh_state=False
-    )
+    try:
+        ledger_update_price(
+            tx_logical.entity, tx_ledger.id, updated_price, auto_refresh_state=False
+        )
+    except CommandNotPermittedException as err:
+        return {"error": err.message}
     return stores.tx_ledger.find_by_primary_key(tx_ledger.id)
 
 
@@ -526,6 +531,15 @@ def generate_tax_report(
     # finally:
     #     tmp_dir.cleanup()
     #
+
+
+# Costbasis Lots
+# ============================================================
+@app.post("/lock_costbasis_lots/{entity}/{year}")
+def lock_costbasis_lots(entity: str, year: int):
+    costbasis_closer = costbasis.CostbasisYearCloser(entity, year, None)
+    costbasis_closer.lock_costbasis_lots()
+    return {"ok": year}
 
 
 if __name__ == "__main__":
