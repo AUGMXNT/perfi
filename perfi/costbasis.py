@@ -2414,13 +2414,20 @@ class CostbasisYearCloser:
         )
 
     def lock_costbasis_lots(self):
+        # We want to lock all costbasis lots that were either 1) created this year or 2) drawn down from in the target year
         start_timestamp = int(datetime(self.year, 1, 1).timestamp())
         end_timestamp = int(datetime(self.year + 1, 1, 1).timestamp())
-
-        # We want to lock all costbasis lots that were involved in any disposals for the year
         sql = """UPDATE costbasis_lot
                  SET locked_for_year = :year
                  WHERE tx_ledger_id in (
+                    SELECT tx_ledger_id
+                    FROM tx_ledger
+                    WHERE timestamp >= :start
+                    AND timestamp < :end
+                    AND entity = :entity
+                 )
+                 OR
+                 tx_ledger_id in (
                     SELECT tx_ledger_id
                     FROM costbasis_disposal
                     WHERE timestamp >= :start
@@ -2434,7 +2441,6 @@ class CostbasisYearCloser:
             end=end_timestamp,
             entity=self.entity,
         )
-        db.con.set_trace_callback(print)
         db.execute(sql, params)
 
     def export_closing_values(self):
@@ -2454,3 +2460,5 @@ class CostbasisYearCloser:
             writer.writeheader()
             for r in results:
                 writer.writerow(dict(**r))
+
+        print(f"Exported closing values to {self.closing_values_file_path}")
