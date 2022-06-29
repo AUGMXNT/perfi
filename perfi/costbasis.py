@@ -89,6 +89,8 @@ def get_active_branch_name():
     for line in content:
         if line[0:4] == "ref:":
             return line.partition("refs/heads/")[2]
+        else:
+            return line[:10]
 
 
 def regenerate_costbasis_lots(entity, args=None, quiet=False):
