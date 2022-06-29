@@ -182,6 +182,7 @@ CREATE TABLE IF NOT EXISTS "costbasis_lot" (
 	"flags"	text,
 	"receipt"	INTEGER,
 	"price_source" TEXT,
+	"locked_for_year" INTEGER,
 	PRIMARY KEY("tx_ledger_id")
 );
 CREATE TABLE IF NOT EXISTS "asset_price" (
