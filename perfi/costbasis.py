@@ -1,3 +1,5 @@
+import csv
+
 from devtools import debug
 
 from .db import db
@@ -2405,3 +2407,47 @@ class Form8949:
 
         # Freeze Header Row
         ws.freeze_panes(1, 0)
+
+
+class CostbasisYearCloser:
+    def __init__(self, entity, year, closing_values_file_path):
+        self.entity = entity
+        self.year = year
+        self.closing_values_file_path = (
+            closing_values_file_path
+            or f"{self.entity}-costbaisis-closing-year-{self.year}-{get_active_branch_name().lower()}.csv"
+        )
+
+    def lock_costbasis_lots(self):
+        start_timestamp = int(datetime(self.year, 1, 1).timestamp())
+        end_timestamp = int(datetime(self.year + 1, 1, 1).timestamp())
+        sql = """UPDATE costbasis_lot
+                 SET locked_for_year = :year
+                 WHERE timestamp >= :start
+                 AND timestamp < :end
+                 AND entity = :entity
+              """
+        params = dict(
+            year=self.year,
+            start=start_timestamp,
+            end=end_timestamp,
+            entity=self.entity,
+        )
+        db.execute(sql, params)
+
+    def export_closing_values(self):
+        sql = """SELECT *
+                 FROM costbasis_lot
+                 WHERE locked_for_year = :year
+              """
+        params = dict(
+            year=self.year,
+        )
+        results = db.query(sql, params)
+        fieldnames = dict(**results[0]).keys()
+
+        with open(self.closing_values_file_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for r in results:
+                writer.writerow(dict(**r))
