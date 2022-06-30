@@ -59,6 +59,7 @@ from bin.cli import (
     ledger_remove_flag_logical,
     ledger_move_tx_ledger,
     CommandNotPermittedException,
+    entity_lock_costbasis_lots,
 )
 from bin.import_from_exchange import do_import
 from bin.map_assets import generate_constants
@@ -537,8 +538,7 @@ def generate_tax_report(
 # ============================================================
 @app.post("/lock_costbasis_lots/{entity}/{year}")
 def lock_costbasis_lots(entity: str, year: int):
-    costbasis_closer = costbasis.CostbasisYearCloser(entity, year, None)
-    costbasis_closer.lock_costbasis_lots()
+    entity_lock_costbasis_lots(entity, year)
     return {"ok": year}
 
 
