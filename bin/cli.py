@@ -139,6 +139,13 @@ def entity_add_address(entity_name: str, label: str, chain: Chain, address: str)
         print(f"Created address {address}")
 
 
+@entity_app.command("lock_costbasis_lots")
+def entity_lock_costbasis_lots(entity_name: str, year: int):
+    event = event_store.create_costbasis_lots_locked(entity_name, year, source="manual")
+    event_store.apply_event(event)
+    print(f"Locked costbasis lots for entity {entity_name} and year {year}")
+
+
 # Setting
 # ---------------------------------------------
 setting_app = typer.Typer()

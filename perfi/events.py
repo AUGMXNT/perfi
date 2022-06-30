@@ -1,3 +1,6 @@
+from typing import List
+
+from . import costbasis
 from .models import TxLedger, TxLogical, Flag, replace_flags
 
 from copy import copy
@@ -17,6 +20,7 @@ class EVENT_ACTION(Enum):
     tx_logical_type_updated = "tx_logical_type_updated"
     tx_logical_flag_added = "tx_logical_flag_added"
     tx_logical_flag_removed = "tx_logical_flag_removed"
+    costbasis_lots_locked = "costbasis_lots_locked"
 
 
 @dataclass
@@ -37,10 +41,9 @@ class EventStore:
     def new_id(self):
         return str(uuid.uuid4())
 
-    def apply_events(self, action: EVENT_ACTION = None, source: str = None):
-        # QUESTION: should we consider moving to entity-scoped events?
-        # Right now we re-apply all events here, which is fine as long as we
-        # keep event application as idempotent.
+    def find_events(
+        self, action: EVENT_ACTION = None, source: str = None
+    ) -> List[Event]:
         sql = f"""
             SELECT id, source, action, data, timestamp
             FROM event
@@ -54,17 +57,25 @@ class EventStore:
             params.append(action.value)
         if source:
             params.append(source)
-        results = self.db.query(sql, params)
+        results = []
+        for rec in self.db.query(sql, params):
+            id = rec["id"]
+            source = rec["source"]
+            action = EVENT_ACTION(rec["action"])
+            data = json.loads(rec["data"])
+            timestamp = rec["timestamp"]
+            results.append(Event(id, source, action, data, timestamp))
+        return results
+
+    def apply_events(self, action: EVENT_ACTION = None, source: str = None):
+        # QUESTION: should we consider moving to entity-scoped events?
+        # Right now we re-apply all events here, which is fine as long as we
+        # keep event application as idempotent.
+        events = self.find_events(action, source)
         desc = "Applying events"
         if action:
             desc += ": " + action.value
-        for rec in tqdm(results, desc=desc, disable=None):
-            id = rec[0]
-            source = rec[1]
-            action = EVENT_ACTION(rec[2])
-            data = json.loads(rec[3])
-            timestamp = rec[4]
-            event = Event(id, source, action, data, timestamp)
+        for event in tqdm(events, desc=desc, disable=None):
             self.apply_event(event)
 
     def apply_event(self, event: Event):
@@ -75,6 +86,7 @@ class EventStore:
             EVENT_ACTION.tx_logical_flag_added: self.handle_tx_logical_flag_added_event,
             EVENT_ACTION.tx_logical_flag_removed: self.handle_tx_logical_flag_removed_event,
             EVENT_ACTION.tx_logical_type_updated: self.handle_tx_logical_type_updated_event,
+            EVENT_ACTION.costbasis_lots_locked: self.handle_costbasis_lots_locked_event,
         }
         if event.action not in handlers.keys():
             raise Exception(f"Don't know how to handle event action {event.action}")
@@ -269,6 +281,33 @@ class EventStore:
         TxLogical.from_id.cache_clear()
         return Event(id, source, action, data, timestamp)
 
+    def create_costbasis_lots_locked(
+        self, entity_name: str, year: int, source: str = "perfi"
+    ):
+        id = self.new_id()
+        source = source
+        action = EVENT_ACTION.costbasis_lots_locked
+        data = {
+            "version": 1,
+            "entity_name": entity_name,
+            "year": year,
+        }
+        timestamp = int(time.time())
+        sql = """INSERT INTO event
+           (id, source, action, data, timestamp)
+           VALUES
+           (?, ?, ?, ?, ?)
+        """
+        params = [
+            id,
+            source,
+            action.value,
+            json.dumps(data),
+            timestamp,
+        ]
+        self.db.execute(sql, params)
+        return Event(id, source, action, data, timestamp)
+
     def handle_tx_ledger_moved_event(self, event: Event):
         data = event.data
         tx_ledger_id = data["tx_ledger_id"]
@@ -338,3 +377,9 @@ class EventStore:
         updated_flags = [f for f in tx.flags if f.name != event.data["flag_value"]]
         replace_flags(TxLogical.__name__, tx.id, updated_flags)
         TxLogical.from_id.cache_clear()
+
+    def handle_costbasis_lots_locked_event(self, event: Event):
+        costbasis_closer = costbasis.CostbasisYearCloser(
+            event.data["entity_name"], event.data["year"], None
+        )
+        costbasis_closer.lock_costbasis_lots()
