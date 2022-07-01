@@ -1,4 +1,4 @@
-from .constants.paths import DB_PATH, DB_SCHEMA_PATH
+from .constants.paths import DB_PATH, DB_SCHEMA_PATH, IS_PYINSTALLER
 
 import atexit
 import os

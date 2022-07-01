@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from perfi.constants.paths import DATA_DIR, IS_PYINSTALLER
 from perfi import costbasis
 from perfi.constants.paths import DATA_DIR
 
@@ -546,4 +547,11 @@ if __name__ == "__main__":
     # Use this for debugging purposes only
     import uvicorn
 
-    uvicorn.run("api:app", host="0.0.0.0", port=8001, log_level="debug", reload=False)
+    if IS_PYINSTALLER:
+        uvicorn.run(
+            "perfi.api:app", host="0.0.0.0", port=8001, log_level="debug", reload=False
+        )
+    else:
+        uvicorn.run(
+            "api:app", host="0.0.0.0", port=8001, log_level="debug", reload=False
+        )
