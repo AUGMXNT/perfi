@@ -6,7 +6,7 @@ authors = ["Your Name <you@example.com>"]
 license = "AGPL-3.0-or-later"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = ">=3.8,<3.11"
 psutil = "^5.9.0"
 httpx = "^0.22.0"
 rootpath = "^0.1.1"
@@ -38,6 +38,7 @@ pre-commit = "^2.18.1"
 devtools = "^0.8.0"
 sttable = "^0.0.1"
 ipdb = "^0.13.9"
+pyinstaller = "^5.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
