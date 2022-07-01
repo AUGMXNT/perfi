@@ -1,6 +1,6 @@
 import sys
 
-from PyQt6.QtCore import QUrl
+from PyQt6.QtCore import QUrl, QSize
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import QApplication
 from fastapi import FastAPI
@@ -33,15 +33,14 @@ frontend_server = Server(config=frontend_config)
 if __name__ == "__main__":
     with server.run_in_thread():
         with frontend_server.run_in_thread():
-            sys.argv.append(
-                "--disable-web-security"
-            )  # So we can load a local html file
             app = QApplication(sys.argv)
+            app.setApplicationName("perfi")
 
             view = QWebEngineView()
+            view.setWindowTitle("perfi")
+            view.resize(QSize(1400, 1000))
             url = QUrl(f"http://{HOST}:{FRONTEND_PORT}")
             view.setUrl(url)
             view.show()
 
-            # Start the event loop.
             app.exec()
