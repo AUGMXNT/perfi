@@ -1,7 +1,8 @@
 # Run this server like this: uvicorn api:app --reload
-import builtins
+import contextlib
 import os
 import shutil
+import threading
 import time
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -12,45 +13,24 @@ from perfi.constants.paths import DATA_DIR
 
 from os import listdir
 from os.path import isfile, join
-import pytz
-import json
-
-from devtools import debug
-
-from perfi.transaction.chain_to_ledger import (
-    update_entity_transactions as do_chain_to_ledger,
-)
-
-
-from perfi.db import DB
-from perfi.models import TxLogical, TxLedger, AddressStore, Address, TxLogicalStore
-from starlette.middleware.sessions import SessionMiddleware
-
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import List, Dict
+from typing import Optional
+
+import pytz
+import uvicorn
 from fastapi import (
-    Cookie,
     Depends,
     FastAPI,
-    responses,
-    Response,
-    status,
-    Body,
     Request,
-    File,
     HTTPException,
     UploadFile,
 )
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from siwe import siwe
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import Optional
-
-from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
-from bin.generate_8949 import generate_file as generate_8949_file
-
-from bin.update_coingecko_pricelist import main as update_coingecko_pricelist_main
+from starlette.middleware.sessions import SessionMiddleware
 
 from bin.cli import (
     ledger_update_logical_type,
@@ -62,9 +42,12 @@ from bin.cli import (
     CommandNotPermittedException,
     entity_lock_costbasis_lots,
 )
+from bin.generate_8949 import generate_file as generate_8949_file
 from bin.import_from_exchange import do_import
 from bin.map_assets import generate_constants
+from bin.update_coingecko_pricelist import main as update_coingecko_pricelist_main
 from perfi.asset import update_assets_from_txchain
+from perfi.constants.paths import DATA_DIR
 from perfi.costbasis import regenerate_costbasis_lots
 from perfi.db import DB
 from perfi.events import EventStore
@@ -77,15 +60,16 @@ from perfi.models import (
     Entity,
     Address,
     TxLogicalStore,
-    BaseStore,
-    StoreProtocol,
     SettingStore,
     Setting,
     TX_LOGICAL_TYPE,
     TxLedgerStore,
     TX_LOGICAL_FLAG,
 )
-from typing import List, Dict, Type
+from perfi.transaction.chain_to_ledger import (
+    update_entity_transactions as do_chain_to_ledger,
+)
+from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
 
 """
 -------------------------
@@ -543,15 +527,26 @@ def lock_costbasis_lots(entity: str, year: int):
     return {"ok": year}
 
 
+# Server class via https://stackoverflow.com/questions/61577643/python-how-to-use-fastapi-and-uvicorn-run-without-blocking-the-thread
+class Server(uvicorn.Server):
+    def install_signal_handlers(self):
+        pass
+
+    @contextlib.contextmanager
+    def run_in_thread(self):
+        thread = threading.Thread(target=self.run)
+        thread.start()
+        try:
+            while not self.started:
+                time.sleep(1e-3)
+            yield
+        finally:
+            self.should_exit = True
+            thread.join()
+
+
 if __name__ == "__main__":
     # Use this for debugging purposes only
     import uvicorn
 
-    if IS_PYINSTALLER:
-        uvicorn.run(
-            "perfi.api:app", host="0.0.0.0", port=8001, log_level="debug", reload=False
-        )
-    else:
-        uvicorn.run(
-            "api:app", host="0.0.0.0", port=8001, log_level="debug", reload=False
-        )
+    uvicorn.run("api:app", host="0.0.0.0", port=8001, log_level="debug", reload=False)
