@@ -1,26 +1,47 @@
 import sys
 
+from PyQt6.QtCore import QUrl
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWidgets import QApplication
+from fastapi import FastAPI
+from starlette.staticfiles import StaticFiles
 from uvicorn import Config
 
-import contextlib
-import time
-import threading
-import uvicorn
-
-from PyQt6.QtWidgets import QApplication, QWidget
-
 from perfi.api import Server
+from perfi.constants.paths import ROOT
 
-config = Config("perfi.api:app", host="127.0.0.1", port=5000, log_level="info")
+HOST = "127.0.0.1"
+
+API_PORT = 5000
+config = Config("perfi.api:app", host=HOST, port=API_PORT, log_level="info")
 server = Server(config=config)
+
+FRONTEND_PORT = 5001
+frontend_app = FastAPI()
+FRONTEND_FILES_PATH = f"{ROOT}/frontend/dist"
+frontend_app.mount(
+    "/",
+    StaticFiles(directory=FRONTEND_FILES_PATH),
+    name="frontend_files_static",
+)
+frontend_config = Config(
+    "app_main:frontend_app", host=HOST, port=FRONTEND_PORT, log_level="info"
+)
+frontend_server = Server(config=frontend_config)
+
 
 if __name__ == "__main__":
     with server.run_in_thread():
-        app = QApplication(sys.argv)
+        with frontend_server.run_in_thread():
+            sys.argv.append(
+                "--disable-web-security"
+            )  # So we can load a local html file
+            app = QApplication(sys.argv)
 
-        # Create a Qt widget, which will be our window.
-        window = QWidget()
-        window.show()  # IMPORTANT!!!!! Windows are hidden by default.
+            view = QWebEngineView()
+            url = QUrl(f"http://{HOST}:{FRONTEND_PORT}/index.html")
+            view.setUrl(url)
+            view.show()
 
-        # Start the event loop.
-        app.exec()
+            # Start the event loop.
+            app.exec()
