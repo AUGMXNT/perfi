@@ -47,7 +47,7 @@ from bin.import_from_exchange import do_import
 from bin.map_assets import generate_constants
 from bin.update_coingecko_pricelist import main as update_coingecko_pricelist_main
 from perfi.asset import update_assets_from_txchain
-from perfi.constants.paths import DATA_DIR, ROOT
+from perfi.constants.paths import DATA_DIR
 from perfi.costbasis import regenerate_costbasis_lots
 from perfi.db import DB
 from perfi.events import EventStore
@@ -159,6 +159,8 @@ origins = [
     "http://localhost",
     "http://localhost:3000",
     "http://localhost:3001",
+    "http://127.0.0.1",
+    "http://127.0.0.1:5001",
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -178,13 +180,6 @@ app.mount(
     "/static",
     StaticFiles(directory=GENERATED_FILES_PATH),
     name="generated_files_static",
-)
-
-FRONTEND_FILES_PATH = f"{ROOT}/frontend/dist"
-app.mount(
-    "/frontend",
-    StaticFiles(directory=FRONTEND_FILES_PATH),
-    name="frontend_files_static",
 )
 
 

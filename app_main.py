@@ -21,11 +21,11 @@ frontend_app = FastAPI()
 FRONTEND_FILES_PATH = f"{ROOT}/frontend/dist"
 frontend_app.mount(
     "/",
-    StaticFiles(directory=FRONTEND_FILES_PATH),
+    StaticFiles(directory=FRONTEND_FILES_PATH, html=True),
     name="frontend_files_static",
 )
 frontend_config = Config(
-    "app_main:frontend_app", host=HOST, port=FRONTEND_PORT, log_level="info"
+    "app_main:frontend_app", host=HOST, port=FRONTEND_PORT, log_level="debug"
 )
 frontend_server = Server(config=frontend_config)
 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
             app = QApplication(sys.argv)
 
             view = QWebEngineView()
-            url = QUrl(f"http://{HOST}:{FRONTEND_PORT}/index.html")
+            url = QUrl(f"http://{HOST}:{FRONTEND_PORT}")
             view.setUrl(url)
             view.show()
 
