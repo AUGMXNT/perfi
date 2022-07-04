@@ -47,7 +47,7 @@ from bin.import_from_exchange import do_import
 from bin.map_assets import generate_constants
 from bin.update_coingecko_pricelist import main as update_coingecko_pricelist_main
 from perfi.asset import update_assets_from_txchain
-from perfi.constants.paths import DATA_DIR
+from perfi.constants.paths import DATA_DIR, SOURCE_ROOT
 from perfi.costbasis import regenerate_costbasis_lots
 from perfi.db import DB
 from perfi.events import EventStore
@@ -151,6 +151,15 @@ class EnsureRecord:
         if not record:
             raise HTTPException(status_code=404, detail=f"No record found for id {id}")
         return record[0]
+
+
+frontend_app = FastAPI()
+FRONTEND_FILES_PATH = f"{SOURCE_ROOT}/frontend/dist"
+frontend_app.mount(
+    "/",
+    StaticFiles(directory=FRONTEND_FILES_PATH, html=True),
+    name="frontend_files_static",
+)
 
 
 app = FastAPI()

@@ -1,10 +1,10 @@
+import logging
 import os
+import pathlib
+import sys
+from typing import Union, List, Tuple
 
 import rootpath
-import sys
-import logging
-import pathlib
-from typing import Optional, Union, List, Tuple
 
 logger = logging.getLogger(__name__)
 logger.setLevel(os.environ.get("LOG_LEVEL", "WARNING").upper())
@@ -81,9 +81,9 @@ for directory in [DATA_DIR, CACHE_DIR, LOG_DIR, GENERATED_FILES_DIR]:
 DB_PATH = f"{DATA_DIR}/perfi.db"
 CACHEDB_PATH = f"{CACHE_DIR}/cache.db"
 
-schema_root = ROOT if not IS_PYINSTALLER else sys._MEIPASS  # noqa
-DB_SCHEMA_PATH = f"{schema_root}/perfi.schema.sql"
-CACHEDB_SCHEMA_PATH = f"{schema_root}/cache.schema.sql"
+SOURCE_ROOT = ROOT if not IS_PYINSTALLER else sys._MEIPASS  # noqa
+DB_SCHEMA_PATH = f"{SOURCE_ROOT}/perfi.schema.sql"
+CACHEDB_SCHEMA_PATH = f"{SOURCE_ROOT}/cache.schema.sql"
 
 logging.debug(f"DB_PATH: {DB_PATH}")
 logging.debug(f"CACHE_PATH: {DB_PATH}")

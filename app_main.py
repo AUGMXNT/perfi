@@ -3,12 +3,9 @@ import sys
 from PyQt6.QtCore import QUrl, QSize
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import QApplication
-from fastapi import FastAPI
-from starlette.staticfiles import StaticFiles
 from uvicorn import Config
 
 from perfi.api import Server
-from perfi.constants.paths import ROOT
 
 HOST = "127.0.0.1"
 
@@ -17,15 +14,8 @@ config = Config("perfi.api:app", host=HOST, port=API_PORT, log_level="info")
 server = Server(config=config)
 
 FRONTEND_PORT = 5001
-frontend_app = FastAPI()
-FRONTEND_FILES_PATH = f"{ROOT}/frontend/dist"
-frontend_app.mount(
-    "/",
-    StaticFiles(directory=FRONTEND_FILES_PATH, html=True),
-    name="frontend_files_static",
-)
 frontend_config = Config(
-    "app_main:frontend_app", host=HOST, port=FRONTEND_PORT, log_level="debug"
+    "perfi.api:frontend_app", host=HOST, port=FRONTEND_PORT, log_level="debug"
 )
 frontend_server = Server(config=frontend_config)
 
