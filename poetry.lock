@@ -1178,11 +1178,12 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "pyinstaller"
-version = "5.2"
+version = "5.1"
 description = "PyInstaller bundles a Python application and all its dependencies into a single package."
 category = "dev"
 optional = false
 python-versions = "<3.11,>=3.7"
+develop = false
 
 [package.dependencies]
 altgraph = "*"
@@ -1195,6 +1196,12 @@ setuptools = "*"
 [package.extras]
 encryption = ["tinyaes (>=1.0.0)"]
 hook_testing = ["pytest (>=2.7.3)", "execnet (>=1.5.0)", "psutil"]
+
+[package.source]
+type = "git"
+url = "https://github.com/pyinstaller/pyinstaller.git"
+reference = "develop"
+resolved_reference = "7875d7684c6ddad90e91af9141229083ebb1297f"
 
 [[package]]
 name = "pyinstaller-hooks-contrib"
@@ -1796,7 +1803,7 @@ testing = ["coverage (>=5.0.3)", "zope-event", "zope-testing"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<3.11"
-content-hash = "79100cb9a3b3c267f15a15020bf1e3ae3057f86b918d567394345355eb88fa63"
+content-hash = "6dc6f1870aea34d3efdf8a54d8547de86de377cebfbfc4e736cb8e9fa6ae3562"
 
 [metadata.files]
 abnf = [
