@@ -39,14 +39,14 @@ jobs:
           - os: macos-latest
             TARGET: macos
             CMD_BUILD: >
-                poetry run pyinstaller -F -w -n perfi app_main.spec &&
+                poetry run pyinstaller app_main.spec &&
                 cd dist/ &&
                 zip -r9 perfi perfi.app/
             OUT_FILE_NAME: perfi.zip
             ASSET_MIME: application/zip
           - os: windows-latest
             TARGET: windows
-            CMD_BUILD: poetry run pyinstaller -F -w -n perfi app_main.spec
+            CMD_BUILD: poetry run pyinstaller app_main.spec
             OUT_FILE_NAME: perfi.exe
             ASSET_MIME: application/vnd.microsoft.portable-executable
     steps:
