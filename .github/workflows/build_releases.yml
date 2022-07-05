@@ -46,9 +46,15 @@ jobs:
 #            ASSET_MIME: application/zip
           - os: windows-latest
             TARGET: windows
-            CMD_BUILD: pushd frontend && npx vite build && popd && poetry run pyinstaller app_main.spec
-            OUT_FILE_NAME: perfi.exe
-            ASSET_MIME: application/vnd.microsoft.portable-executable
+            CMD_BUILD: >
+                pushd frontend && npx vite build && popd &&
+                poetry run pyinstaller app_main.spec &&
+                cd dist/ &&
+                zip -r9 perfi perfi
+            # OUT_FILE_NAME: perfi.exe
+            OUT_FILE_NAME: perfi.zip
+            ASSET_MIME: application/zip
+            # ASSET_MIME: application/vnd.microsoft.portable-executable
     steps:
     - uses: actions/setup-node@v3
     - uses: actions/checkout@v1
