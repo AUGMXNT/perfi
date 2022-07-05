@@ -42,7 +42,7 @@ jobs:
                 pushd frontend && npx vite build && rm -rf node_modules && popd &&
                 poetry run pyinstaller app_main.spec &&
                 cd dist/ &&
-                zip -r9 MAC_perfi.zip perfi.app/
+                zip -r9 MAC_perfi.zip perfi
             OUT_FILE_NAME: MAC_perfi.zip
             ASSET_MIME: application/zip
           - os: windows-latest
