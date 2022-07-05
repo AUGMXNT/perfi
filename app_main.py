@@ -1,4 +1,5 @@
-import webview
+from time import sleep
+
 from uvicorn import Config
 
 from perfi.api import Server
@@ -19,7 +20,9 @@ frontend_server = Server(config=frontend_config)
 if __name__ == "__main__":
     with server.run_in_thread():
         with frontend_server.run_in_thread():
-            webview.create_window(
-                "perfi", f"http://{HOST}:{FRONTEND_PORT}", width=1400, height=1000
-            )
-            webview.start()
+            while True:
+                sleep(1)
+            # webview.create_window(
+            #     "perfi", f"http://{HOST}:{FRONTEND_PORT}", width=1400, height=1000
+            # )
+            # webview.start()
