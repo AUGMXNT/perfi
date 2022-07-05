@@ -1,8 +1,4 @@
-import sys
-
-from PyQt6.QtCore import QUrl, QSize
-from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWidgets import QApplication
+import webview
 from uvicorn import Config
 
 from perfi.api import Server
@@ -23,14 +19,7 @@ frontend_server = Server(config=frontend_config)
 if __name__ == "__main__":
     with server.run_in_thread():
         with frontend_server.run_in_thread():
-            app = QApplication(sys.argv)
-            app.setApplicationName("perfi")
-
-            view = QWebEngineView()
-            view.setWindowTitle("perfi")
-            view.resize(QSize(1400, 1000))
-            url = QUrl(f"http://{HOST}:{FRONTEND_PORT}")
-            view.setUrl(url)
-            view.show()
-
-            app.exec()
+            webview.create_window(
+                "perfi", f"http://{HOST}:{FRONTEND_PORT}", width=1400, height=1000
+            )
+            webview.start()
