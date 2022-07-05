@@ -14,7 +14,7 @@ const router = useRouter()
 const route = useRoute()
 
 const entityStore = useEntityStore()
-entityStore.fetch()
+await entityStore.fetch()
 const allEntities = storeToRefs(entityStore).all
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
@@ -23,7 +23,6 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 <template>
   <CrudTable
-    v-if="allEntities.length > 0"
     title="Entities"
     :records="allEntities"
     :form="EntityForm"

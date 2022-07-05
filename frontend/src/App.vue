@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
+import { Suspense } from 'vue'
 
 </script>
 
 <template>
+  <Suspense>
   <q-layout view="hHh lpR fFf">
 
     <q-header elevated class="bg-primary text-white">
@@ -34,6 +36,7 @@ import { RouterLink, RouterView } from 'vue-router'
     </q-page-container>
 
   </q-layout>
+  </Suspense>
 </template>
 
 
