@@ -9,11 +9,11 @@ from perfi.api import Server
 
 HOST = "127.0.0.1"
 
-API_PORT = 5000
+API_PORT = 5001
 config = Config("perfi.api:app", host=HOST, port=API_PORT, log_level="info")
 server = Server(config=config)
 
-FRONTEND_PORT = 5001
+FRONTEND_PORT = 5002
 frontend_config = Config(
     "perfi.api:frontend_app", host=HOST, port=FRONTEND_PORT, log_level="debug"
 )
