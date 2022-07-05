@@ -46,7 +46,7 @@ jobs:
 #            ASSET_MIME: application/zip
           - os: windows-latest
             TARGET: windows
-            CMD_BUILD: pushd frontend && npm i && npx vite build && popd && poetry run pyinstaller app_main.spec
+            CMD_BUILD: pushd frontend && npx vite build && popd && poetry run pyinstaller app_main.spec
             OUT_FILE_NAME: perfi.exe
             ASSET_MIME: application/vnd.microsoft.portable-executable
     steps:
@@ -61,7 +61,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install poetry
         poetry install
-        # pip install -r requirements.txt
+        pushd frontend && npm install && popd
     - name: Build with pyinstaller for ${{matrix.TARGET}}
       run: ${{matrix.CMD_BUILD}}
     - name: Load Release URL File from release job
