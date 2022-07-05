@@ -36,6 +36,15 @@ jobs:
     strategy:
       matrix:
         include:
+          - os: ubuntu-latest
+            TARGET: linux
+            CMD_BUILD: >
+                pushd frontend && npx vite build && rm -rf node_modules && popd &&
+                poetry run pyinstaller app_main.spec &&
+                cd dist/ &&
+                zip -r9 LINUX_perfi.zip perfi
+            OUT_FILE_NAME: LINUX_perfi.zip
+            ASSET_MIME: application/zip
           - os: macos-latest
             TARGET: macos
             CMD_BUILD: >
