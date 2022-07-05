@@ -46,10 +46,11 @@ jobs:
             ASSET_MIME: application/zip
           - os: windows-latest
             TARGET: windows
-            CMD_BUILD: poetry run pyinstaller app_main.spec
+            CMD_BUILD: pushd frontend && npx vite build && popd && poetry run pyinstaller app_main.spec
             OUT_FILE_NAME: perfi.exe
             ASSET_MIME: application/vnd.microsoft.portable-executable
     steps:
+    - uses: actions/setup-node@v3
     - uses: actions/checkout@v1
     - name: Set up Python 3.8
       uses: actions/setup-python@v2
