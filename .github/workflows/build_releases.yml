@@ -36,15 +36,15 @@ jobs:
     strategy:
       matrix:
         include:
-#          - os: macos-latest
-#            TARGET: macos
-#            CMD_BUILD: >
-#                pushd frontend && npx vite build && rm -rf node_modules && popd &&
-#                poetry run pyinstaller app_main.spec &&
-#                cd dist/ &&
-#                zip -r9 perfi perfi.app/
-#            OUT_FILE_NAME: perfi.zip
-#            ASSET_MIME: application/zip
+          - os: macos-latest
+            TARGET: macos
+            CMD_BUILD: >
+                pushd frontend && npx vite build && rm -rf node_modules && popd &&
+                poetry run pyinstaller app_main.spec &&
+                cd dist/ &&
+                zip -r9 perfi perfi.app/
+            OUT_FILE_NAME: perfi.zip
+            ASSET_MIME: application/zip
           - os: windows-latest
             TARGET: windows
             CMD_BUILD: >
