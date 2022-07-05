@@ -39,6 +39,7 @@ jobs:
 #          - os: macos-latest
 #            TARGET: macos
 #            CMD_BUILD: >
+#                pushd frontend && npx vite build && rm -rf node_modules && popd &&
 #                poetry run pyinstaller app_main.spec &&
 #                cd dist/ &&
 #                zip -r9 perfi perfi.app/
@@ -47,7 +48,7 @@ jobs:
           - os: windows-latest
             TARGET: windows
             CMD_BUILD: >
-                pushd frontend && npx vite build && popd &&
+                pushd frontend && npx vite build && rm node_modules -r -fo && popd &&
                 poetry run pyinstaller app_main.spec &&
                 cd dist/ &&
                 Compress-Archive -Path perfi -DestinationPath perfi.zip
