@@ -50,7 +50,7 @@ jobs:
                 pushd frontend && npx vite build && popd &&
                 poetry run pyinstaller app_main.spec &&
                 cd dist/ &&
-                zip -r9 perfi perfi
+                Compress-Archive -Path perfi -DestinationPath perfi.zip
             # OUT_FILE_NAME: perfi.exe
             OUT_FILE_NAME: perfi.zip
             ASSET_MIME: application/zip
