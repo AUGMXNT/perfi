@@ -1,5 +1,6 @@
 # Run this server like this: uvicorn api:app --reload
 import contextlib
+import mimetypes
 import os
 import shutil
 import threading
@@ -72,6 +73,12 @@ TODOs
 
 -------------------------
 """
+
+# On Windows, js files can get mapped to text/plain based on Win registry keys.
+# Let's try overriding manaully
+mimetypes.init()
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("text/css", ".css")
 
 
 def db():
