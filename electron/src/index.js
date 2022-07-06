@@ -26,36 +26,23 @@ const getScriptPath = () => {
   return path.join(__dirname, "..", "dist", "perfi", "perfi")
 }
 
+let pyProc
 const createPyProc = () => {
   let script = getScriptPath()
   console.log('launching ' + script)
 
   if (guessPackaged()) {
     console.log('looks packaged')
-    console.log(script)
-    pyProc = require('child_process').execFile(script, [], (error, stdout, stderr) => {
-      if (error) {
-        throw error;
-      }
-      console.log(stdout)
-    })
+    pyProc = require('child_process').execFile(script, [])
   } else {
     console.log('looks local')
     pyProc = require('child_process').spawn('poetry', ['run', 'python', 'app_main.py'], {
       cwd: path.join(__dirname, '..', '..')
     })
-    pyProc.stdout.on('data', (data) => {
-      console.log(data.toString())
-    })
-    pyProc.stderr.on('error', (data) => {
-      console.log('stderr: ' + data.toString())
-    })
   }
 
-  if (pyProc != null) {
-    //console.log(pyProc)
-    console.log('child process running')
-  }
+  pyProc.stdout.pipe(process.stdout);
+  pyProc.stderr.pipe(process.stderr);
 }
 
 
@@ -129,3 +116,11 @@ app.on('activate', () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
+
+app.on('before-quit', () => {
+  if (pyProc) {
+    console.log('Killing python process...')
+    pyProc.kill('SIGTERM')
+    console.log('Killed.')
+  }
+})
