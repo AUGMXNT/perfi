@@ -37,7 +37,7 @@ jobs:
           - os: ubuntu-latest
             TARGET: linux
             CMD_BUILD: >
-                pushd frontend && npx vite build && rm -rf node_modules && popd &&
+                pushd frontend && VITE_BACKEND_URL="http://127.0.0.1:5001" npx vite build && rm -rf node_modules && popd &&
                 poetry run pyinstaller app_main.spec &&
                 mv dist electron/ &&
                 pushd electron && npm install && npm run make
@@ -46,7 +46,7 @@ jobs:
           - os: macos-latest
             TARGET: macos
             CMD_BUILD: >
-                pushd frontend && npx vite build && rm -rf node_modules && popd &&
+                pushd frontend && VITE_BACKEND_URL="http://127.0.0.1:5001" npx vite build && rm -rf node_modules && popd &&
                 poetry run pyinstaller app_main.spec &&
                 mv dist electron/ &&
                 pushd electron && npm install && npm run make
@@ -55,7 +55,7 @@ jobs:
           - os: windows-latest
             TARGET: windows
             CMD_BUILD: >
-                pushd frontend && npx vite build && rm node_modules -r -fo && popd &&
+                pushd frontend && VITE_BACKEND_URL="http://127.0.0.1:5001" npx vite build && rm node_modules -r -fo && popd &&
                 poetry run pyinstaller app_main.spec &&
                 mv dist electron/ &&
                 pushd electron && npm install && npm run make
