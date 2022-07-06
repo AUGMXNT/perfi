@@ -55,7 +55,7 @@ jobs:
           - os: windows-latest
             TARGET: windows
             CMD_BUILD: >
-                pushd frontend && VITE_BACKEND_URL="http://127.0.0.1:5001" npx vite build && rm node_modules -r -fo && popd &&
+                pushd frontend && $env:VITE_BACKEND_URL="http://127.0.0.1:5001" && npx vite build && rm node_modules -r -fo && popd &&
                 poetry run pyinstaller app_main.spec &&
                 mv dist electron/ &&
                 pushd electron && npm install && npm run make
