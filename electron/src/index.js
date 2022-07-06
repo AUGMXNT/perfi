@@ -21,9 +21,9 @@ const getScriptPath = () => {
     return path.join(__dirname, "..", "app_main.py")
   }
   if (process.platform === 'win32') {
-    return path.join(__dirname, "..", "dist", "perfi", "perfi.exe")
+    return path.join(__dirname, ".", "dist", "perfi", "perfi.exe")
   }
-  return path.join(__dirname, "..", "dist", "perfi", "perfi")
+  return path.join(__dirname, ".", "dist", "perfi", "perfi")
 }
 
 const createPyProc = () => {

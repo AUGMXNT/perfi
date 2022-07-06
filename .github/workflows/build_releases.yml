@@ -6,29 +6,27 @@ on:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
 jobs:
-
-  createrelease:
-    name: Create Release
-    runs-on: [ubuntu-latest]
-    steps:
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
-    - name: Output Release URL File
-      run: echo "${{ steps.create_release.outputs.upload_url }}" > release_url.txt
-    - name: Save Release URL File for publish
-      uses: actions/upload-artifact@v1
-      with:
-        name: release_url
-        path: release_url.txt
-
+#  createrelease:
+#    name: Create Release
+#    runs-on: [ubuntu-latest]
+#    steps:
+#    - name: Create Release
+#      id: create_release
+#      uses: actions/create-release@v1
+#      env:
+#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      with:
+#        tag_name: ${{ github.ref }}
+#        release_name: Release ${{ github.ref }}
+#        draft: false
+#        prerelease: false
+#    - name: Output Release URL File
+#      run: echo "${{ steps.create_release.outputs.upload_url }}" > release_url.txt
+#    - name: Save Release URL File for publish
+#      uses: actions/upload-artifact@v1
+#      with:
+#        name: release_url
+#        path: release_url.txt
   build:
     name: Build packages
     needs: createrelease
@@ -41,29 +39,29 @@ jobs:
             CMD_BUILD: >
                 pushd frontend && npx vite build && rm -rf node_modules && popd &&
                 poetry run pyinstaller app_main.spec &&
-                cd dist/ &&
-                zip -r9 LINUX_perfi.zip perfi
-            OUT_FILE_NAME: LINUX_perfi.zip
-            ASSET_MIME: application/zip
+                mv dist electron
+                pushd electron && npm install && npm run make
+#            OUT_FILE_NAME: LINUX_perfi.zip
+#            ASSET_MIME: application/zip
           - os: macos-latest
             TARGET: macos
             CMD_BUILD: >
                 pushd frontend && npx vite build && rm -rf node_modules && popd &&
                 poetry run pyinstaller app_main.spec &&
-                cd dist/ &&
-                zip -r9 MAC_perfi.zip perfi
-            OUT_FILE_NAME: MAC_perfi.zip
-            ASSET_MIME: application/zip
+                mv dist electron
+                pushd electron && npm install && npm run make
+#            OUT_FILE_NAME: MAC_perfi.zip
+#            ASSET_MIME: application/zip
           - os: windows-latest
             TARGET: windows
             CMD_BUILD: >
                 pushd frontend && npx vite build && rm node_modules -r -fo && popd &&
                 poetry run pyinstaller app_main.spec &&
-                cd dist/ &&
-                Compress-Archive -Path perfi -DestinationPath WIN_perfi.zip
+                mv dist electron
+                pushd electron && npm install && npm run make
             # OUT_FILE_NAME: perfi.exe
-            OUT_FILE_NAME: WIN_perfi.zip
-            ASSET_MIME: application/zip
+#            OUT_FILE_NAME: WIN_perfi.zip
+#            ASSET_MIME: application/zip
             # ASSET_MIME: application/vnd.microsoft.portable-executable
     steps:
     - uses: actions/setup-node@v3
@@ -80,23 +78,27 @@ jobs:
         pushd frontend && npm install && popd
     - name: Build with pyinstaller for ${{matrix.TARGET}}
       run: ${{matrix.CMD_BUILD}}
-    - name: Load Release URL File from release job
-      uses: actions/download-artifact@v1
-      with:
-        name: release_url
-    - name: Get Release File Name & Upload URL
-      id: get_release_info
-      shell: bash
-      run: |
-        value=`cat release_url/release_url.txt`
-        echo ::set-output name=upload_url::$value
-    - name: Upload Release Asset
-      id: upload-release-asset
-      uses: actions/upload-release-asset@v1
+    - name: Release to GitHub
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.get_release_info.outputs.upload_url }}
-        asset_path: ./dist/${{ matrix.OUT_FILE_NAME}}
-        asset_name: ${{ matrix.OUT_FILE_NAME}}
-        asset_content_type: ${{ matrix.ASSET_MIME}}
+      run: npm run publish
+#    - name: Load Release URL File from release job
+#      uses: actions/download-artifact@v1
+#      with:
+#        name: release_url
+#    - name: Get Release File Name & Upload URL
+#      id: get_release_info
+#      shell: bash
+#      run: |
+#        value=`cat release_url/release_url.txt`
+#        echo ::set-output name=upload_url::$value
+#    - name: Upload Release Asset
+#      id: upload-release-asset
+#      uses: actions/upload-release-asset@v1
+#      env:
+#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      with:
+#        upload_url: ${{ steps.get_release_info.outputs.upload_url }}
+#        asset_path: ./dist/${{ matrix.OUT_FILE_NAME}}
+#        asset_name: ${{ matrix.OUT_FILE_NAME}}
+#        asset_content_type: ${{ matrix.ASSET_MIME}}
