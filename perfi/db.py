@@ -1,11 +1,11 @@
-from .constants.paths import DB_PATH, DB_SCHEMA_PATH, IS_PYINSTALLER
-
 import atexit
 import os
-import psutil
 import sqlite3
-import sys
 from decimal import Decimal, Context
+
+import psutil
+
+from .constants.paths import DB_PATH, DB_SCHEMA_PATH
 
 # Decimal adapting from https://stackoverflow.com/questions/6319409/how-to-convert-python-decimal-to-sqlite-numeric
 DECIMAL_QUANTIZE_PLACES = (
@@ -83,14 +83,20 @@ class DB:
     def execute(self, query, params=()):
         if type(params) == str:
             params = (params,)
-        self.cur.execute(query, params)
-        self.con.commit()
+        try:
+            self.cur.execute(query, params)
+            self.con.commit()
+        except:
+            self.con.rollback()
 
     def execute_many(self, query, params=()):
         if type(params) == str:
             params = (params,)
-        self.cur.executemany(query, params)
-        self.con.commit()
+        try:
+            self.cur.executemany(query, params)
+            self.con.commit()
+        except:
+            self.con.rollback()
 
     def create_db(self, schema_path):
         with open(schema_path) as f:
