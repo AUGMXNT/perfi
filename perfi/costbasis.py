@@ -1,3 +1,5 @@
+import csv
+
 from devtools import debug
 
 from .db import db
@@ -87,6 +89,8 @@ def get_active_branch_name():
     for line in content:
         if line[0:4] == "ref:":
             return line.partition("refs/heads/")[2]
+        else:
+            return line[:10]
 
 
 def regenerate_costbasis_lots(entity, args=None, quiet=False):
@@ -2405,3 +2409,63 @@ class Form8949:
 
         # Freeze Header Row
         ws.freeze_panes(1, 0)
+
+
+class CostbasisYearCloser:
+    def __init__(self, entity, year, closing_values_file_path):
+        self.entity = entity
+        self.year = int(year)
+        self.closing_values_file_path = (
+            closing_values_file_path
+            or f"{self.entity}-costbaisis-closing-year-{self.year}-{get_active_branch_name().lower()}.csv"
+        )
+
+    def lock_costbasis_lots(self):
+        # We want to lock all costbasis lots that were either 1) created this year or 2) drawn down from in the target year
+        start_timestamp = int(datetime(self.year, 1, 1).timestamp())
+        end_timestamp = int(datetime(self.year + 1, 1, 1).timestamp())
+        sql = """UPDATE costbasis_lot
+                 SET locked_for_year = :year
+                 WHERE tx_ledger_id in (
+                    SELECT tx_ledger_id
+                    FROM tx_ledger
+                    WHERE timestamp >= :start
+                    AND timestamp < :end
+                    AND entity = :entity
+                 )
+                 OR
+                 tx_ledger_id in (
+                    SELECT tx_ledger_id
+                    FROM costbasis_disposal
+                    WHERE timestamp >= :start
+                    AND timestamp < :end
+                    AND entity = :entity
+                 )
+              """
+        params = dict(
+            year=self.year,
+            start=start_timestamp,
+            end=end_timestamp,
+            entity=self.entity,
+        )
+        db.execute(sql, params)
+
+    def export_closing_values(self):
+        sql = """SELECT *
+                 FROM costbasis_lot
+                 WHERE locked_for_year = :year
+                 ORDER BY timestamp ASC
+              """
+        params = dict(
+            year=self.year,
+        )
+        results = db.query(sql, params)
+        fieldnames = dict(**results[0]).keys()
+
+        with open(self.closing_values_file_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for r in results:
+                writer.writerow(dict(**r))
+
+        print(f"Exported closing values to {self.closing_values_file_path}")
