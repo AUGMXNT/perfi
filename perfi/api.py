@@ -160,7 +160,22 @@ class EnsureRecord:
         return record[0]
 
 
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1",
+    "http://127.0.0.1:5002",
+]
+
 frontend_app = FastAPI()
+frontend_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 FRONTEND_FILES_PATH = f"{SOURCE_ROOT}/frontend/dist"
 frontend_app.mount(
     "/",
@@ -171,13 +186,6 @@ frontend_app.mount(
 
 app = FastAPI()
 
-origins = [
-    "http://localhost",
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1",
-    "http://127.0.0.1:5002",
-]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
