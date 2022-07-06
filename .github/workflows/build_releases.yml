@@ -39,7 +39,7 @@ jobs:
             CMD_BUILD: >
                 pushd frontend && npx vite build && rm -rf node_modules && popd &&
                 poetry run pyinstaller app_main.spec &&
-                mv dist electron
+                mv dist electron/ &&
                 pushd electron && npm install && npm run make
 #            OUT_FILE_NAME: LINUX_perfi.zip
 #            ASSET_MIME: application/zip
@@ -48,7 +48,7 @@ jobs:
             CMD_BUILD: >
                 pushd frontend && npx vite build && rm -rf node_modules && popd &&
                 poetry run pyinstaller app_main.spec &&
-                mv dist electron
+                mv dist electron/ &&
                 pushd electron && npm install && npm run make
 #            OUT_FILE_NAME: MAC_perfi.zip
 #            ASSET_MIME: application/zip
@@ -57,7 +57,7 @@ jobs:
             CMD_BUILD: >
                 pushd frontend && npx vite build && rm node_modules -r -fo && popd &&
                 poetry run pyinstaller app_main.spec &&
-                mv dist electron
+                mv dist electron/ &&
                 pushd electron && npm install && npm run make
             # OUT_FILE_NAME: perfi.exe
 #            OUT_FILE_NAME: WIN_perfi.zip
