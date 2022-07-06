@@ -41,20 +41,20 @@ jobs:
                 poetry run pyinstaller app_main.spec &&
                 mv dist electron/ &&
                 pushd electron && npm install && npm run make
-#          - os: macos-latest
-#            TARGET: macos
-#            CMD_BUILD: >
-#                pushd frontend && npx vite build && rm -rf node_modules && popd &&
-#                poetry run pyinstaller app_main.spec &&
-#                mv dist electron/ &&
-#                pushd electron && npm install && npm run make
-#          - os: windows-latest
-#            TARGET: windows
-#            CMD_BUILD: >
-#                pushd frontend && npx vite build && rm node_modules -r -fo && popd &&
-#                poetry run pyinstaller app_main.spec &&
-#                mv dist electron/ &&
-#                pushd electron && npm install && npm run make
+          - os: macos-latest
+            TARGET: macos
+            CMD_BUILD: >
+                pushd frontend && npx vite build && rm -rf node_modules && popd &&
+                poetry run pyinstaller app_main.spec &&
+                mv dist electron/ &&
+                pushd electron && npm install && npm run make
+          - os: windows-latest
+            TARGET: windows
+            CMD_BUILD: >
+                pushd frontend && npx vite build && rm node_modules -r -fo && popd &&
+                poetry run pyinstaller app_main.spec &&
+                mv dist electron/ &&
+                pushd electron && npm install && npm run make
     steps:
     - uses: actions/setup-node@v3
     - uses: actions/checkout@v1
@@ -68,7 +68,7 @@ jobs:
         pip install poetry
         poetry install
         pushd frontend && npm install && popd
-    - name: Build with pyinstaller for ${{matrix.TARGET}}
+    - name: Build for ${{matrix.TARGET}}
       run: ${{matrix.CMD_BUILD}}
     - name: Release to GitHub
       env:
