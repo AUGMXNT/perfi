@@ -81,7 +81,7 @@ jobs:
     - name: Release to GitHub
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: npm run publish
+      run: pushd electron && npm run publish && popd
 #    - name: Load Release URL File from release job
 #      uses: actions/download-artifact@v1
 #      with:
