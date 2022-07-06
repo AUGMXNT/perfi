@@ -34,35 +34,27 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            TARGET: linux
-            CMD_BUILD: >
-                pushd frontend && VITE_BACKEND_URL="http://127.0.0.1:5001" npx vite build && rm -rf node_modules && popd &&
-                poetry run pyinstaller app_main.spec &&
-                mv dist electron/ &&
-                pushd electron && npm install && npm run make
-#            OUT_FILE_NAME: LINUX_perfi.zip
-#            ASSET_MIME: application/zip
-          - os: macos-latest
-            TARGET: macos
-            CMD_BUILD: >
-                pushd frontend && VITE_BACKEND_URL="http://127.0.0.1:5001" npx vite build && rm -rf node_modules && popd &&
-                poetry run pyinstaller app_main.spec &&
-                mv dist electron/ &&
-                pushd electron && npm install && npm run make
-#            OUT_FILE_NAME: MAC_perfi.zip
-#            ASSET_MIME: application/zip
+#          - os: ubuntu-latest
+#            TARGET: linux
+#            CMD_BUILD: >
+#                pushd frontend && npx vite build && rm -rf node_modules && popd &&
+#                poetry run pyinstaller app_main.spec &&
+#                mv dist electron/ &&
+#                pushd electron && npm install && npm run make
+#          - os: macos-latest
+#            TARGET: macos
+#            CMD_BUILD: >
+#                pushd frontend && npx vite build && rm -rf node_modules && popd &&
+#                poetry run pyinstaller app_main.spec &&
+#                mv dist electron/ &&
+#                pushd electron && npm install && npm run make
           - os: windows-latest
             TARGET: windows
             CMD_BUILD: >
-                pushd frontend && $env:VITE_BACKEND_URL="http://127.0.0.1:5001" && npx vite build && rm node_modules -r -fo && popd &&
+                pushd frontend && npx vite build && rm node_modules -r -fo && popd &&
                 poetry run pyinstaller app_main.spec &&
                 mv dist electron/ &&
                 pushd electron && npm install && npm run make
-            # OUT_FILE_NAME: perfi.exe
-#            OUT_FILE_NAME: WIN_perfi.zip
-#            ASSET_MIME: application/zip
-            # ASSET_MIME: application/vnd.microsoft.portable-executable
     steps:
     - uses: actions/setup-node@v3
     - uses: actions/checkout@v1
