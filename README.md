@@ -32,7 +32,7 @@ perfi currently depends on several third party API providers (no configuration i
 * [DeBank OpenAPI](https://open.debank.com/) - provides a helpful list of transaction history per chain
 * [CoinGecko API](https://www.coingecko.com/en/api) - provides day-resolution coin prices. No API key is required for but requests will be rate-limited. perfi caches and retries so your initial fetches will be slow, but it should eventually work
     * [Paid API plans](https://www.coingecko.com/en/api/pricing) are supported and can be entered in the initial setup
-
+* [ECB Euro foreign exchange reference rates](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html) daily conversion rates cached for [CurrencyConverter](Euro foreign exchange reference rates)
 
 ## Getting Started
 Here's how to install:
