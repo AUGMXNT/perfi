@@ -244,6 +244,20 @@ COSTBASIS_LIKEKIND = {
 }
 
 
+CHAIN_FEE_ASSETS = {
+    "ethereum": "eth",
+    "avalanche": "avax",
+    "polygon": "matic",
+    "fantom": "ftm",
+    "boba": "ftm",
+    "arbitrum": "eth",
+    "optimism": "eth",
+    "xdai": "xdai",
+    "metis": "metis",
+    "binancesc": "bnb",
+}
+
+
 def generate_constants():
     # ORDER market_cap ASC: in case we missed some mapping, try to overwrite with canonical using (fixes some solana wormhole mappings)
     sql = """SELECT id, symbol, name, raw_data
@@ -312,6 +326,13 @@ def generate_constants():
     f.write("COSTBASIS_LIKEKIND = {\n")
     for k in COSTBASIS_LIKEKIND:
         f.write(f'    "{k}": "{COSTBASIS_LIKEKIND[k]}",\n')
+    f.write("}\n")
+
+    f.write("\n")
+
+    f.write("CHAIN_FEE_ASSETS = {\n")
+    for k in CHAIN_FEE_ASSETS:
+        f.write(f'    "{k}": "{CHAIN_FEE_ASSETS[k]}",\n')
     f.write("}\n")
 
 
