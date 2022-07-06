@@ -204,7 +204,7 @@ def read_root():
 
 
 # List  Entities
-@app.get("/entities/")
+@app.get("/entities")
 def list_entities(store: EntityStore = Depends(entity_store)):
     return store.list()
 
@@ -226,7 +226,7 @@ def list_addresses_for_entity(
 
 
 # Create entity
-@app.post("/entities/")
+@app.post("/entities")
 def create_entity(entity: Entity, stores: Stores = Depends(stores)):
     return stores.entity.create(**entity.dict())
 
@@ -245,7 +245,7 @@ def delete_entity(id: int, store: EntityStore = Depends(entity_store)):
 # ADDRESSES =================================================================================
 
 # List Addresses
-@app.get("/addresses/")
+@app.get("/addresses")
 def list_addresses(store: AddressStore = Depends(address_store)):
     return store.list()
 
