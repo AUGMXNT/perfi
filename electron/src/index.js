@@ -1,6 +1,6 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
-
+const axios = require('axios');
 
 const cp = require("child_process");
 const util = require("util");
@@ -18,12 +18,12 @@ const guessPackaged = () => {
 
 const getScriptPath = () => {
   if (!guessPackaged()) {
-    return path.join(__dirname, "..", "app_main.py")
+    return path.join(__dirname, "..", "..", "app_main.py")
   }
   if (process.platform === 'win32') {
-    return path.join(__dirname, ".", "dist", "perfi", "perfi.exe")
+    return path.join(__dirname, "..", "dist", "perfi", "perfi.exe")
   }
-  return path.join(__dirname, ".", "dist", "perfi", "perfi")
+  return path.join(__dirname, "..", "dist", "perfi", "perfi")
 }
 
 const createPyProc = () => {
@@ -31,9 +31,25 @@ const createPyProc = () => {
   console.log('launching ' + script)
 
   if (guessPackaged()) {
-    pyProc = require('child_process').execFile(script, [])
+    console.log('looks packaged')
+    console.log(script)
+    pyProc = require('child_process').execFile(script, [], (error, stdout, stderr) => {
+      if (error) {
+        throw error;
+      }
+      console.log(stdout)
+    })
   } else {
-    pyProc = require('child_process').spawn('python', [script])
+    console.log('looks local')
+    pyProc = require('child_process').spawn('poetry', ['run', 'python', 'app_main.py'], {
+      cwd: path.join(__dirname, '..', '..')
+    })
+    pyProc.stdout.on('data', (data) => {
+      console.log(data.toString())
+    })
+    pyProc.stderr.on('error', (data) => {
+      console.log('stderr: ' + data.toString())
+    })
   }
 
   if (pyProc != null) {
@@ -49,7 +65,10 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
-const createWindow = () => {
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+
+const createWindow = async () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 800,
@@ -60,8 +79,25 @@ const createWindow = () => {
   });
 
   // and load the index.html of the app.
-  // mainWindow.loadFile(path.join(__dirname, 'index.html'));
-  mainWindow.loadURL("http://127.0.0.1:5002");
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
+
+  let tries = 0
+  const url = "http://127.0.0.1:5002"
+  let ready = false
+  while (! ready && tries < 20) {
+    await sleep(1000)
+    try {
+      console.log(`Trying to fetch ${url}`)
+      let data = await axios.get(url)
+      if (data) ready = true
+    }
+    catch (exception) {
+      console.log(`Fetch failed for ${url}. Sleeping...`)
+    }
+    tries += 1
+  }
+
+  mainWindow.loadURL(url);
 
   // Open the DevTools.
   mainWindow.webContents.openDevTools();
