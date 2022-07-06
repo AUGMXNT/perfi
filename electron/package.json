@@ -1,8 +1,8 @@
 {
-  "name": "electron",
-  "productName": "electron",
-  "version": "1.0.0",
-  "description": "My Electron application description",
+  "name": "perfi",
+  "productName": "perfi",
+  "version": "0.0.1",
+  "description": "perfi",
   "main": "src/index.js",
   "scripts": {
     "start": "electron-forge start",
