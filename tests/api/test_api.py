@@ -1,12 +1,16 @@
+import datetime
+import time
 import uuid
 from decimal import Decimal
 from typing import List
 
+import jsonpickle
 import pytest
 from _pytest.python_api import approx
 from starlette.testclient import TestClient
 from perfi.api import app, TxLogicalOut
-from perfi.events import EventStore
+from perfi.costbasis import regenerate_costbasis_lots
+from perfi.events import EventStore, EVENT_ACTION
 from perfi.models import (
     AddressStore,
     Chain,
@@ -42,6 +46,7 @@ def common_setup(monkeysession, test_db, setup_asset_and_price_ids):
     monkeysession.setattr("perfi.api.DB", test_db_returner)
     monkeysession.setattr("perfi.models.db", test_db)
     monkeysession.setattr("bin.cli.db", test_db)
+    monkeysession.setattr("bin.cli.costbasis_lot_store.db", test_db)
     monkeysession.setattr("perfi.transaction.ledger_to_logical.db", test_db)
     monkeysession.setattr("perfi.costbasis.db", test_db)
     monkeysession.setattr("bin.cli.event_store", event_store)
@@ -446,3 +451,120 @@ def test_reparent_tx_ledger(test_db):
     tx_ledger_store = TxLedgerStore(test_db)
     updated_ledger = tx_ledger_store.find_by_primary_key(tx_ledger.id)[0]
     assert updated_ledger.tx_logical_id == tx_logical_2.id
+
+
+class TestCostbasisLocking:
+    def test_lock_costbasis_lot_then_try_to_edit_tx_ledger_price_should_give_error(
+        self, test_db
+    ):
+        entity_store = EntityStore(test_db)
+        entity = entity_store.create(name="Foo")
+
+        address_store = AddressStore(test_db)
+        address = address_store.create(
+            "foo", Chain.ethereum, "0x123", entity_id=entity.id
+        )
+
+        tx_logical_store = TxLogicalStore(test_db)
+        timestamp_now = int(time.time())
+        tx_logical = make_tx_logical(
+            entity_name=entity.name,
+            address=address.address,
+            tx_ledgers=[
+                make_tx_ledger(
+                    address.address,
+                    "OUT",
+                    "swap",
+                    timestamp=timestamp_now,
+                    symbol="AVAX",
+                    amount=10,
+                    price_usd=Decimal(100),
+                ),
+                make_tx_ledger(
+                    address.address,
+                    "IN",
+                    "swap",
+                    timestamp=timestamp_now,
+                    symbol="ETH",
+                    amount=1,
+                    price_usd=Decimal(1000),
+                ),
+            ],
+            tx_logical_type=TX_LOGICAL_TYPE.swap,
+            timestamp=timestamp_now,
+        )
+        tx_logical = tx_logical_store._create_for_tests(tx_logical)
+
+        regenerate_costbasis_lots(entity.name, args=None, quiet=True)
+
+        # Lock the costbasis lots
+        year = datetime.datetime.fromtimestamp(timestamp_now).year
+        client.post(f"/lock_costbasis_lots/{entity.name}/{year}")
+
+        # Now try to edit the price of the tx_ledger that associated with the locked costbasis_lot
+        tx_ledger = tx_logical.ins[0]
+        updated_price = Decimal(99.87)
+        response = client.put(
+            f"/tx_ledgers/{tx_ledger.id}/tx_ledger_price/{updated_price}"
+        )
+
+        # We should see an error in the API response
+        assert response.status_code == 200
+        assert response.json()["error"]
+
+        # Let's also make sure the price didn't get updated on the ledger
+        tx_ledger_store = TxLedgerStore(test_db)
+        assert tx_ledger_store.find(id=tx_ledger.id)[0].price_usd == Decimal(1000)
+
+    def test_lock_costbasis_creates_and_applies_a_COSTBASIS_LOCKED_event(self, test_db):
+        entity_store = EntityStore(test_db)
+        entity = entity_store.create(name="Foo")
+
+        address_store = AddressStore(test_db)
+        address = address_store.create(
+            "foo", Chain.ethereum, "0x123", entity_id=entity.id
+        )
+
+        event_store = EventStore(test_db, TxLogical, TxLedger)
+
+        tx_logical_store = TxLogicalStore(test_db)
+        timestamp_now = int(time.time())
+        tx_logical = make_tx_logical(
+            entity_name=entity.name,
+            address=address.address,
+            tx_ledgers=[
+                make_tx_ledger(
+                    address.address,
+                    "OUT",
+                    "swap",
+                    timestamp=timestamp_now,
+                    symbol="AVAX",
+                    amount=10,
+                    price_usd=Decimal(100),
+                ),
+                make_tx_ledger(
+                    address.address,
+                    "IN",
+                    "swap",
+                    timestamp=timestamp_now,
+                    symbol="ETH",
+                    amount=1,
+                    price_usd=Decimal(1000),
+                ),
+            ],
+            tx_logical_type=TX_LOGICAL_TYPE.swap,
+            timestamp=timestamp_now,
+        )
+        tx_logical = tx_logical_store._create_for_tests(tx_logical)
+
+        regenerate_costbasis_lots(entity.name, args=None, quiet=True)
+
+        # Lock the costbasis lots
+        year = datetime.datetime.fromtimestamp(timestamp_now).year
+        client.post(f"/lock_costbasis_lots/{entity.name}/{year}")
+
+        # We should have a COSTBASIS_LOTS_LOCKED event for this entity/year
+        events = event_store.find_events(EVENT_ACTION.costbasis_lots_locked)
+        assert len(events) == 1
+        assert events[0].data["year"] == year
+        assert events[0].data["entity_name"] == entity.name

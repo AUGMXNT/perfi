@@ -731,6 +731,7 @@ class CostbasisLot(BaseModel):
     receipt: int
     price_source: str
     chain: str
+    locked_for_year: Optional[int]
 
 
 class CostbasisDisposal(BaseModel):
@@ -1059,3 +1060,27 @@ class TxLedgerStore(BaseStore[TxLedger]):
         ]
         self.db.execute(sql, params)
         return tx
+
+
+class CostbasisLotStore:
+    def __init__(self, db):
+        self.db = db
+
+    def find(self, **kwargs) -> List[CostbasisLot]:
+        where = " AND ".join([f"{arg} = ?" for arg in kwargs])
+        sql = f"""SELECT *
+                  FROM costbasis_lot
+                  WHERE {where}
+               """
+        params = [kwargs[arg] for arg in kwargs]
+        rows = self.db.query(sql, params)
+
+        results = []
+        for r in rows:
+            r_dict = dict(**r)
+            r_dict["history"] = jsonpickle.decode(r["history"])
+            r_dict.pop("flags")
+            flags = load_flags(CostbasisLot.__name__, r["tx_ledger_id"])
+            lot = CostbasisLot(flags=flags, **r_dict)
+            results.append(lot)
+        return results
