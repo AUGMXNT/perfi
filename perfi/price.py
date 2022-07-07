@@ -1,19 +1,16 @@
+import json
+import pathlib
+import time
+import urllib.request
+from collections import namedtuple, defaultdict
+from datetime import datetime
+
+from currency_converter import CurrencyConverter
+
 from .cache import cache
 from .constants import assets, paths
 from .db import db
 from .settings import setting
-
-from decimal import Decimal
-import json
-from collections import namedtuple, defaultdict, OrderedDict
-from currency_converter import CurrencyConverter
-from pprint import pprint
-from pprint import pprint as pp
-import pathlib
-import urllib.request
-from datetime import datetime
-import sys
-import time
 
 CoinPrice = namedtuple("CoinPrice", ["source", "coin_id", "epoch", "price"])
 
@@ -168,7 +165,7 @@ class PriceFeed:
 
     def map_asset(self, chain, asset_tx_id, symbol_fallback=False):
         # We want things like usdc_on_avax -> usdc_core
-        # This will be differen from our asset_tx_id -> asset_price_id mapping because that goes for the most specific asset_price_id it can find, but for costbasis, we want to group all the variants together for LOT MATCHING purposes. This mapping can be used for exposure mapping as well (we need to do additional mappings for exposure since that needs to split LP amounts and account for ib multipliers)
+        # This will be different from our asset_tx_id -> asset_price_id mapping because that goes for the most specific asset_price_id it can find, but for costbasis, we want to group all the variants together for LOT MATCHING purposes. This mapping can be used for exposure mapping as well (we need to do additional mappings for exposure since that needs to split LP amounts and account for ib multipliers)
 
         # This allows up to use our manual COSTBASIS_LIKEKIND matching for imported asset_tx_ids
         if chain.startswith("import."):
