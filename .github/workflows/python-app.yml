@@ -29,6 +29,7 @@ jobs:
         pip install pytest poetry
         # if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         poetry install
+        poetry run python bin/update_coingecko_pricelist.py
         poetry run python bin/map_assets.py
     - name: Test with pytest
       run: |
