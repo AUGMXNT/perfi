@@ -94,7 +94,7 @@ def _refresh_db(db, coin_id, epoch):
 
 
 def get_coingecko_price_for_day(coin_id, epoch):
-    date = datetime.fromtimestamp(epoch)
+    date = datetime.utcfromtimestamp(epoch)
     date_str = date.strftime("%d-%m-%Y")
     c = cache.get(COINGECKO_DATE_URL.format(coin_id=coin_id, date_str=date_str))
     j = json.loads(c["value"])

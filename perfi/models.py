@@ -1,21 +1,18 @@
+import logging
 import time
 from abc import ABC
-
-from .constants import assets
-from .db import db, DB
-from typing import Optional, List, Dict, Type, Protocol, TypeVar, Generic
-
-import logging
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from functools import lru_cache
 from pprint import pformat
+from typing import Optional, List, Type, Protocol, TypeVar, Generic
 
 import jsonpickle
-from devtools import debug
 from pydantic import BaseModel
 
+from .constants import assets
+from .db import db, DB
 
 T = TypeVar("T")
 
@@ -356,7 +353,7 @@ class TxLogical(BaseModel):
         return self.entity
 
     def auto_description(self):
-        datestamp = datetime.fromtimestamp(self.timestamp).isoformat() + "Z"
+        datestamp = datetime.utcfromtimestamp(self.timestamp).isoformat() + "Z"
         outs_strs = [t.auto_description() for t in self.outs]
         ins_strs = [t.auto_description() for t in self.ins]
         chain = None

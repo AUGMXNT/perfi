@@ -312,7 +312,7 @@ class TestKrakenImporter:
             direction="OUT",
             tx_ledger_type="fee",
             symbol="BTC",
-            price_usd=Decimal("697.2773624560577446"),
+            price_usd=Decimal("715.4103243232162868"),
         )
         actual_fee = actual_fees[0]
         actual_fee.id = None

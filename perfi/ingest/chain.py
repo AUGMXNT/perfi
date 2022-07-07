@@ -1,23 +1,20 @@
-from ..cache import cache, CacheGet404Exception
-from ..db import db
-from ..settings import setting
-
-
-import arrow
-from bs4 import BeautifulSoup
+import json
+import logging
+import lzma
+import re
 from collections import namedtuple
 from datetime import datetime
 from decimal import Decimal
-import json
-import logging
-from lxml import etree, html
-import lzma
-import os
 from pprint import pprint, pformat
-import re
-import subprocess
-import sys
+
+import arrow
+from bs4 import BeautifulSoup
+from lxml import etree, html
 from tqdm import tqdm
+
+from ..cache import cache, CacheGet404Exception
+from ..db import db
+from ..settings import setting
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -193,7 +190,7 @@ class TransactionsFetcher:
         """
         The goal would be to be able to log details like a timestamp for a tx after it was fetched
         """
-        datestamp = datetime.fromtimestamp(tx["_epoch_timestamp"]).isoformat()
+        datestamp = datetime.utcfromtimestamp(tx["_epoch_timestamp"]).isoformat()
         hash = tx["hash"]
         logger.info(f"{type(self)} Scraped {datestamp} - {hash}")
 
@@ -624,7 +621,9 @@ class EtherscanTransactionsFetcher(TransactionsFetcher):
         for tx in r:
             tx["__eth_type"] = type
             tx["__direction"] = "IN" if tx["to"] == address else "OUT"
-            tx["__datetime"] = datetime.fromtimestamp(int(tx["timestamp"])).isoformat()
+            tx["__datetime"] = datetime.utcfromtimestamp(
+                int(tx["timestamp"])
+            ).isoformat()
 
             # Time to get stuff via HTML
             URL = "https://etherscan.io/tx/%s" % tx["hash"]

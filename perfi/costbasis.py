@@ -1,4 +1,5 @@
 import atexit
+import csv
 import logging
 from copy import copy
 from datetime import date, datetime
@@ -11,9 +12,6 @@ import arrow
 import jsonpickle
 import xlsxwriter
 from tqdm import tqdm
-import csv
-
-from devtools import debug
 
 from .constants import assets, paths
 from .db import db
@@ -396,7 +394,7 @@ class CostbasisGenerator:
 
         self.print_if_debug("\n\n===========================")
         self.print_if_debug(
-            datetime.fromtimestamp(self.tx_logical.timestamp).isoformat()
+            datetime.utcfromtimestamp(self.tx_logical.timestamp).isoformat()
         )
         self.print_if_debug("INs")
         for t in self.ins:
@@ -1222,7 +1220,7 @@ class CostbasisGenerator:
         save_costbasis_lot(lot)
         replace_flags(type(lot).__name__, lot.tx_ledger_id, flags)
         self.print_if_debug(
-            f"{datetime.fromtimestamp(t.timestamp)}  |  LOT_CREATED | {lot.original_amount} {lot.symbol} @ {lot.price_usd}"
+            f"{datetime.utcfromtimestamp(t.timestamp)}  |  LOT_CREATED | {lot.original_amount} {lot.symbol} @ {lot.price_usd} via {price_source}"
         )
 
     def drawdown_from_lots(self, lots, t, is_disposal=None, max_disposal_usd=None):
@@ -1234,7 +1232,7 @@ class CostbasisGenerator:
 
         if self.debug_print:
             self.print_if_debug("-------------------------------")
-            self.print_if_debug(datetime.fromtimestamp(t.timestamp).isoformat())
+            self.print_if_debug(datetime.utcfromtimestamp(t.timestamp).isoformat())
             self.print_if_debug(f"Need to drawdown {t.amount} {t.symbol}")
             for l in lots:
                 self.print_if_debug(
