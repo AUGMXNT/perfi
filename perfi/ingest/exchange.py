@@ -7,12 +7,36 @@ import csv
 import io
 import openpyxl
 import re
+from ..price import PriceFeed
+
+price_feed = PriceFeed()
 
 
 def normalize_asset_tx_id(str):
     if str.upper() in FIAT_SYMBOLS:
         return f"FIAT:{str.upper()}"
     return str.lower()
+
+
+# Sometimes our price unit is not in USD (could be other fiat or even other crypto).
+# This function takes in a price_symbol, a price_value, and a timestamp and gives back a price_usd and a price_source string.
+def get_price_usd_and_source(price_symbol: str, price_value: Decimal, timestamp: int):
+    if price_symbol.upper() == "USD":
+        # Price is USD already so just take it in as-is
+        price_usd = price_value
+        price_source = "exchange_file_usd"
+    elif price_symbol.upper() in FIAT_SYMBOLS:
+        # Price is in another fiat, so convert to USD
+        price_usd, price_source = price_feed.convert_fiat(
+            price_symbol.upper(), "USD", price_value, timestamp
+        )
+        price_source = "exchange_file_converted_from_fiat"
+    else:
+        mapped_asset = price_feed.map_asset("import", price_symbol.lower(), True)
+        coin_price = price_feed.get(mapped_asset["asset_price_id"], timestamp)
+        price_usd = Decimal(coin_price.price) * price_value
+        price_source = coin_price.source
+    return price_usd, price_source
 
 
 class BitcoinTaxImporter:
@@ -263,19 +287,28 @@ class KrakenImporter:
                         sends.append(this_row_t)
 
                     # Add on the fee
-                    if Decimal(r["fee"]) > 0:
+                    fee_amount = Decimal(r["fee"])
+                    if fee_amount > 0:
+                        amount = abs(Decimal(fee_amount))
+                        symbol = this_row_t["symbol"]
+                        total_price_usd, price_source = get_price_usd_and_source(
+                            symbol, amount, int(timestamp)
+                        )
+                        price_usd = total_price_usd / abs(fee_amount)
                         sends.append(
                             dict(
                                 asset_tx_id=normalize_asset_tx_id(
                                     this_row_t["asset_tx_id"]
                                 ),
                                 amount=abs(Decimal(r["fee"])),
-                                direction="OUT",  # TODO dont need direction anymore on these
+                                direction="OUT",
                                 tx_ledger_type="fee",
                                 symbol=this_row_t["symbol"],
                                 from_address=default_from_to,
                                 to_address=default_from_to,
                                 isfee=1,
+                                price_usd=price_usd,
+                                price_source=price_source,
                             )
                         )
 
@@ -286,7 +319,7 @@ class KrakenImporter:
                                     last_row_t["asset_tx_id"]
                                 ),
                                 amount=abs(Decimal(last_row_trade["fee"])),
-                                direction="OUT",  # TODO dont need direction anymore on these
+                                direction="OUT",
                                 tx_ledger_type="fee",
                                 symbol=last_row_t["symbol"],
                                 from_address=default_from_to,
@@ -456,6 +489,15 @@ class GeminiImporter:
             transaction_types_for_receive = ["Credit", "Buy"]
             transaction_types_for_send = ["Debit", "Sell"]
 
+            # calculate unit price based on amount
+            price_usd = None
+            price_source = None
+            if amount_fiat and amount:
+                total_price_usd, price_source = get_price_usd_and_source(
+                    fiat_symbol_actual, abs(amount_fiat), int(timestamp)
+                )
+                price_usd = total_price_usd / abs(Decimal(amount))
+
             side_asset = dict(
                 asset_tx_id=symbol_left.lower(),
                 amount=abs(amount),
@@ -464,6 +506,8 @@ class GeminiImporter:
                 from_address=from_address,
                 to_address=to_address,
                 isfee=0,
+                price_usd=price_usd,
+                price_source=price_source,
             )
 
             price_asset = None
@@ -493,6 +537,12 @@ class GeminiImporter:
 
             # Add on the fee
             if fee_amount > 0:
+                amount = abs(Decimal(fee_amount))
+                total_price_usd, price_source = get_price_usd_and_source(
+                    fee_symbol, amount, int(timestamp)
+                )
+                price_usd = total_price_usd / abs(fee_amount)
+
                 sends.append(
                     dict(
                         asset_tx_id=normalize_asset_tx_id(fee_symbol),
@@ -502,6 +552,8 @@ class GeminiImporter:
                         from_address=from_address,
                         to_address="Gemini",
                         isfee=1,
+                        price_usd=price_usd,
+                        price_source=price_source,
                     )
                 )
 
@@ -624,6 +676,10 @@ class CoinbaseImporter:
                     last_row_transaction_type = (
                         f"Coinbase.{last_row_converted_from['Transaction Type']}"
                     )
+                    last_row_proceeds = last_row_converted_from[
+                        "Proceeds (excl. fees paid) (USD)"
+                    ]
+
                     tx = dict(
                         chain=chain,
                         address=entity_address_for_imports,
@@ -638,7 +694,7 @@ class CoinbaseImporter:
                                 symbol=symbol,
                                 from_address=default_from_to,
                                 to_address=default_from_to,
-                                cost_basis_usd=costbasis_usd,
+                                cost_basis_including_fees_usd=costbasis_usd,
                                 isfee=0,
                             )
                         ],
@@ -652,6 +708,7 @@ class CoinbaseImporter:
                                 from_address=default_from_to,
                                 to_address=default_from_to,
                                 isfee=0,
+                                proceeds_after_fees_usd=last_row_proceeds,
                             )
                         ],
                     )
@@ -675,6 +732,7 @@ class CoinbaseImporter:
                             from_address=default_from_to,
                             to_address=default_from_to,
                             is_fee=0,
+                            costbasis_including_fees_usd=costbasis_usd,
                         )
                     ],
                     sends=[
@@ -719,6 +777,7 @@ class CoinbaseImporter:
                             from_address=default_from_to,
                             to_address=default_from_to,
                             isfee=0,
+                            proceeds_after_fees_usd=proceeds_usd,
                         )
                     ],
                 )
@@ -748,8 +807,10 @@ class CoinbaseImporter:
                 isfee=0,
             )
             if r["Transaction Type"] in transaction_types_for_receive:
+                t["cost_basis_including_fees_usd"] = costbasis_usd
                 receives.append(t)
             elif r["Transaction Type"] in transaction_types_for_send:
+                t["proceeds_after_fees_usd"] = proceeds_usd
                 sends.append(t)
             else:
                 raise Exception(
@@ -770,6 +831,243 @@ class CoinbaseImporter:
 
     def do_import(self, csv_file, entity_address_for_imports, exchange_account_id):
         txns = self.raw_transactions_csv_to_chain_txns(
+            csv_file,
+            entity_address_for_imports=entity_address_for_imports,
+            exchange_account_id=exchange_account_id,
+        )
+        # Convert to unified transaction format
+        unifieds = {}
+        for tx in txns:
+            unifieds[f"{tx['chain']}:{tx['hash']}"] = tx
+        save_to_db(unifieds)
+
+
+class CoinbaseTransactionHistoryImporter:
+    def transaction_history_csv_to_chain_txns(
+        self,
+        csv_file: io.StringIO,
+        entity_address_for_imports=None,
+        exchange_account_id=None,
+    ):
+        txns = []
+        lines_after_header = csv_file.readlines()[7:]
+        cleaned_csv = io.StringIO("\n".join(lines_after_header))
+        reader = csv.DictReader(cleaned_csv)
+
+        for r in reader:
+            # Pull values out of the row
+            timestamp = int(arrow.get(r["Timestamp"]).timestamp())
+            transaction_type = r["Transaction Type"]
+            symbol = r["Asset"].upper()
+            amount = r["Quantity Transacted"]
+            price_symbol = r["Spot Price Currency"]
+            price_usd = r["Spot Price at Transaction"]
+            price_source = "exchange_export_spot_price"
+            subtotal = r["Subtotal"]
+            total_with_fees = r["Total (inclusive of fees)"]
+            fee = r["Fees"]
+            notes = r["Notes"]
+
+            chain = "import.coinbase"
+            asset_tx_id = normalize_asset_tx_id(symbol)
+            tx_ledger_type = f"Coinbase.{transaction_type}"
+            default_from_to = f"Coinbase:{exchange_account_id}"
+            hash = f"{chain}_{timestamp}_{transaction_type}_{asset_tx_id}"
+
+            # Converted is a special transaction type for handling because we need to parse the Notes field in order to know what we converted INTO
+            if transaction_type == "Convert":
+                # Notes field looks like this:
+                # Converted 0.4997288 BCH to 650.1690543 XLM
+                _, amount_out, symbol_out, _, amount_in, symbol_in = notes.split(" ")
+                tx = dict(
+                    chain=chain,
+                    address=entity_address_for_imports,
+                    timestamp=timestamp,
+                    hash=f"{chain}_{timestamp}_Convert_{symbol_out}_{symbol_in}",
+                    receives=[
+                        dict(
+                            asset_tx_id=normalize_asset_tx_id(symbol_in),
+                            amount=Decimal(amount_in.replace(",", "")),
+                            direction="IN",
+                            tx_ledger_type="Coinbase.Convert",
+                            symbol=symbol_in.upper(),
+                            from_address=default_from_to,
+                            to_address=default_from_to,
+                            isfee=0,
+                            price_usd=Decimal(subtotal)
+                            / Decimal(amount_in.replace(",", "")),
+                            price_source="exchange_export_infered_from_other_side_of_convert",
+                        )
+                    ],
+                    sends=[
+                        # the out
+                        dict(
+                            asset_tx_id=normalize_asset_tx_id(symbol_out),
+                            amount=Decimal(amount_out.replace(",", "")),
+                            direction="OUT",
+                            tx_ledger_type="Coinbase.Convert",
+                            symbol=symbol_out.upper(),
+                            from_address=default_from_to,
+                            to_address=default_from_to,
+                            isfee=0,
+                            price_usd=price_usd,
+                            price_source=price_source,
+                        ),
+                        # and the fee
+                        dict(
+                            asset_tx_id=normalize_asset_tx_id(price_symbol),
+                            amount=fee,
+                            tx_ledger_type="fee",
+                            symbol=price_symbol.upper(),
+                            from_address=default_from_to,
+                            to_address=default_from_to,
+                            isfee=1,
+                        ),
+                    ],
+                )
+                txns.append(tx)
+                continue
+
+            if transaction_type in ["Buy", "Advanced Trade Buy"]:
+                tx = dict(
+                    chain=chain,
+                    address=entity_address_for_imports,
+                    hash=hash,
+                    timestamp=timestamp,
+                    receives=[
+                        dict(
+                            asset_tx_id=asset_tx_id,
+                            amount=amount,
+                            direction="IN",
+                            tx_ledger_type=tx_ledger_type,
+                            symbol=symbol,
+                            from_address=default_from_to,
+                            to_address=default_from_to,
+                            is_fee=0,
+                            price_usd=price_usd,
+                            price_source=price_source,
+                        )
+                    ],
+                    sends=[
+                        # the money going out
+                        dict(
+                            asset_tx_id=normalize_asset_tx_id(price_symbol),
+                            amount=subtotal,
+                            direction="OUT",
+                            tx_ledger_type=tx_ledger_type,
+                            symbol=price_symbol.upper(),
+                            from_address=default_from_to,
+                            to_address=default_from_to,
+                            isfee=0,
+                            price_source=price_source,
+                        ),
+                        # And the feee
+                        dict(
+                            asset_tx_id=normalize_asset_tx_id(price_symbol),
+                            amount=fee,
+                            tx_ledger_type="fee",
+                            symbol=price_symbol.upper(),
+                            from_address=default_from_to,
+                            to_address=default_from_to,
+                            isfee=1,
+                        ),
+                    ],
+                )
+                txns.append(tx)
+                continue
+
+            if transaction_type in ["Sell", "Advanced Trade Sell"]:
+                tx = dict(
+                    chain=chain,
+                    address=entity_address_for_imports,
+                    hash=hash,
+                    timestamp=timestamp,
+                    receives=[
+                        dict(
+                            asset_tx_id=normalize_asset_tx_id(price_symbol),
+                            amount=subtotal,
+                            tx_ledger_type=tx_ledger_type,
+                            symbol=price_symbol.upper(),
+                            from_address=default_from_to,
+                            to_address=default_from_to,
+                            isfee=0,
+                            price_source=price_source,
+                        )
+                    ],
+                    sends=[
+                        # the asset we sold
+                        dict(
+                            asset_tx_id=asset_tx_id,
+                            amount=amount,
+                            tx_ledger_type=tx_ledger_type,
+                            symbol=symbol,
+                            from_address=default_from_to,
+                            to_address=default_from_to,
+                            isfee=0,
+                            price_usd=price_usd,
+                            price_source=price_source,
+                        ),
+                        # and the fee
+                        dict(
+                            asset_tx_id=normalize_asset_tx_id(price_symbol),
+                            amount=fee,
+                            tx_ledger_type="fee",
+                            symbol=price_symbol.upper(),
+                            from_address=default_from_to,
+                            to_address=default_from_to,
+                            isfee=1,
+                        ),
+                    ],
+                )
+                txns.append(tx)
+                continue
+
+            # Non-swap case
+            transaction_types_for_receive = [
+                "Airdrop",
+                "Coinbase Earn",
+                "Rewards Income",
+                "Receive",
+            ]
+            transaction_types_for_send = [
+                "Send",
+            ]
+            receives = []
+            sends = []
+            t = dict(
+                asset_tx_id=asset_tx_id,
+                amount=amount,
+                tx_ledger_type=tx_ledger_type,
+                symbol=asset_tx_id.upper(),
+                from_address=default_from_to,
+                to_address=default_from_to,
+                isfee=0,
+                price_usd=price_usd,
+                price_source=price_source,
+            )
+            if r["Transaction Type"] in transaction_types_for_receive:
+                receives.append(t)
+            elif r["Transaction Type"] in transaction_types_for_send:
+                sends.append(t)
+            else:
+                raise Exception(
+                    "Dont know how to decide if this Coinbase import row is a send or receive",
+                    r,
+                )
+            tx = dict(
+                chain=chain,
+                address=entity_address_for_imports,
+                hash=hash,
+                timestamp=timestamp,
+                receives=receives,
+                sends=sends,
+            )
+            txns.append(tx)
+
+        return txns
+
+    def do_import(self, csv_file, entity_address_for_imports, exchange_account_id):
+        txns = self.transaction_history_csv_to_chain_txns(
             csv_file,
             entity_address_for_imports=entity_address_for_imports,
             exchange_account_id=exchange_account_id,
@@ -1029,17 +1327,23 @@ class CoinbaseProImporter:
             side = r["side"]
             asset_tx_id = r["size unit"].lower()
             amount = Decimal(r["size"])
-            timestamp = arrow.get(r["created at"]).timestamp()
+            timestamp = int(arrow.get(r["created at"]).timestamp())
             tx_ledger_type = f"CoinbasePro.{r['side']}"
             symbol = r["size unit"].upper()
             default_from_to = f"CoinbasePro:{exchange_account_id}"
             fee_amount = Decimal(r["fee"])
             price_unit = r["price/fee/total unit"]
+            price = Decimal(r["price"])
             price_total = abs(Decimal(r["total"]))
             trade_id = r["trade id"]
             product = r["product"]
             portfolio = r["portfolio"]
             hash = f"{portfolio}_{trade_id}_{product}_{side}"
+
+            # NOTE: price is not always in USD, so we need to convert to USD if it's not USD...
+            price_usd, price_source = get_price_usd_and_source(
+                price_unit, price, timestamp
+            )
 
             side_asset = dict(
                 asset_tx_id=asset_tx_id,
@@ -1049,11 +1353,13 @@ class CoinbaseProImporter:
                 from_address=default_from_to,
                 to_address=default_from_to,
                 isfee=0,
+                price_usd=price_usd,
+                price_source=price_source,
             )
 
             price_asset = dict(
                 asset_tx_id=normalize_asset_tx_id(price_unit),
-                amount=abs(price_total),
+                amount=abs(price * amount),
                 tx_ledger_type=tx_ledger_type,
                 symbol=price_unit.upper(),
                 from_address=default_from_to,
@@ -1072,6 +1378,11 @@ class CoinbaseProImporter:
 
             # Add on the fee
             if fee_amount > 0:
+                # price_usd needs to be a unit price so get the total in usd and divide by the amount
+                total_price_usd, price_source = get_price_usd_and_source(
+                    price_unit, abs(fee_amount), timestamp
+                )
+                price_usd = total_price_usd / abs(fee_amount)
                 sends.append(
                     dict(
                         asset_tx_id=normalize_asset_tx_id(price_unit),
@@ -1081,6 +1392,8 @@ class CoinbaseProImporter:
                         from_address=default_from_to,
                         to_address=default_from_to,
                         isfee=1,
+                        price_usd=price_usd,
+                        price_source=price_source,
                     )
                 )
 

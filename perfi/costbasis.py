@@ -1,14 +1,26 @@
+import atexit
+import logging
+from copy import copy
+from datetime import date, datetime
+from decimal import Decimal, Context
+from pathlib import Path
+from pprint import pformat
+from types import SimpleNamespace
+
+import arrow
+import jsonpickle
+import xlsxwriter
+from tqdm import tqdm
 import csv
 
 from devtools import debug
 
-from .db import db
 from .constants import assets, paths
+from .db import db
 from .models import (
     TxLogical,
     TxLedger,
     TX_LOGICAL_FLAG,
-    AssetPrice,
     CostbasisLot,
     CostbasisDisposal,
     replace_flags,
@@ -16,21 +28,6 @@ from .models import (
     Flag,
 )
 from .price import price_feed
-
-import arrow
-import atexit
-from copy import copy
-from datetime import date, datetime
-from decimal import Decimal, Context
-
-import jsonpickle
-import logging
-from pathlib import Path
-from pprint import pprint, pformat
-import sys
-from tqdm import tqdm
-from types import SimpleNamespace
-import xlsxwriter
 from .settings import setting
 
 DECIMAL_QUANTIZE_PLACES = Decimal(10) ** -16
@@ -1118,12 +1115,10 @@ class CostbasisGenerator:
             self.drawdown_from_lots(asset_lots, asset_redeemed_txle)
 
             # Subtract from the loan_receipt lot's `current_amount`
-            amount_remaining = decimal_quantize(lot.current_amount) - decimal_quantize(
-                amount_to_subtract_from_lot
-            )
-            update_costbasis_lot_current_amount(lot.tx_ledger_id, amount_remaining)
-            self.print_if_debug(
-                f"Drawdown from lot {lot.tx_ledger_id}. Removing {decimal_quantize(amount_to_subtract_from_lot)}.  Amount remaining: {decimal_quantize(amount_remaining)}"
+            update_costbasis_lot_current_amount(
+                lot.tx_ledger_id,
+                decimal_quantize(lot.current_amount)
+                - decimal_quantize(amount_to_subtract_from_lot),
             )
 
             loan_receipt_balance -= amount_to_subtract_from_lot
@@ -1227,7 +1222,7 @@ class CostbasisGenerator:
         save_costbasis_lot(lot)
         replace_flags(type(lot).__name__, lot.tx_ledger_id, flags)
         self.print_if_debug(
-            f"{datetime.fromtimestamp(t.timestamp)}  |  LOT_CREATED | {lot.original_amount} {lot.symbol} @ {lot.price_usd} via {price_source}"
+            f"{datetime.fromtimestamp(t.timestamp)}  |  LOT_CREATED | {lot.original_amount} {lot.symbol} @ {lot.price_usd}"
         )
 
     def drawdown_from_lots(self, lots, t, is_disposal=None, max_disposal_usd=None):
@@ -1243,7 +1238,7 @@ class CostbasisGenerator:
             self.print_if_debug(f"Need to drawdown {t.amount} {t.symbol}")
             for l in lots:
                 self.print_if_debug(
-                    f"\t ID {l.tx_ledger_id[0:6]} on {arrow.get(l.timestamp)} has {l.current_amount} / {l.original_amount} @ {l.price_usd}"
+                    f"\t {l.timestamp} has {l.current_amount} / {l.original_amount} @ {l.price_usd}"
                 )
 
         amount_left_to_subtract = Decimal(t.amount)
@@ -1436,7 +1431,7 @@ class CostbasisGenerator:
                 ) - decimal_quantize(amount_to_subtract_from_lot)
                 update_costbasis_lot_current_amount(lot.tx_ledger_id, amount_remaining)
                 self.print_if_debug(
-                    f"Drawdown from lot ID {lot.tx_ledger_id[0:6]} from {arrow.get(lot.timestamp)}. Removing {decimal_quantize(amount_to_subtract_from_lot)}.  Amount remaining: {decimal_quantize(amount_remaining)}"
+                    f"Drawdown from lot {lot.tx_ledger_id}. Removing {decimal_quantize(amount_to_subtract_from_lot)}.  Amount remaining: {decimal_quantize(amount_remaining)}"
                 )
 
                 # unused but putting it here in case we ever want the updated lot in memory, it should have the updated current_amount...
@@ -1544,12 +1539,7 @@ class CostbasisGenerator:
 
         # 1.  If we have a price_usd on the tx_ledger, return that
         if tx.price_usd is not None:
-            price_source = (
-                "tx_ledger"
-                if tx.price_source is None
-                else f"tx_ledger__{tx.price_source}"
-            )
-            return (Decimal(tx.price_usd), price_source)
+            return (Decimal(tx.price_usd), "tx_ledger")
 
         # 2. Try to get the price from our mapped assets
         # tx_ledgers[] have chain, not tx_logical

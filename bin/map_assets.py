@@ -6,20 +6,13 @@ This script We need to run this to get the latest assets; depends on looking at 
 We also generate a new constants file from coingecko token info plus our own fixups
 """
 
-
-from perfi.cache import cache
-from perfi.db import db
-from perfi.constants.paths import ROOT
-from perfi.asset import update_assets_from_txchain
-
-
 import json
 import logging
-import lzma
-from pprint import pprint, pformat
 import sys
-import time
 
+from perfi.asset import update_assets_from_txchain
+from perfi.constants.paths import ROOT
+from perfi.db import db
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -249,7 +242,6 @@ CHAIN_FEE_ASSETS = {
     "avalanche": "avax",
     "polygon": "matic",
     "fantom": "ftm",
-    "boba": "ftm",
     "arbitrum": "eth",
     "optimism": "eth",
     "xdai": "xdai",

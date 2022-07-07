@@ -10,6 +10,7 @@ from perfi.ingest.exchange import (
     CoinbaseProImporter,
     GeminiImporter,
     KrakenImporter,
+    CoinbaseTransactionHistoryImporter,
 )
 
 logger = logging.getLogger(__name__)
@@ -85,7 +86,7 @@ def do_import(entity_id: int, exchange: str, exchange_account_id: str, file):
     # Figure out which importer class to use
     importer_mapping = {
         "bitcointax": BitcoinTaxImporter,
-        "coinbase": CoinbaseImporter,
+        "coinbase": CoinbaseTransactionHistoryImporter,
         "coinbasepro": CoinbaseProImporter,
         "kraken": KrakenImporter,
         "gemini": GeminiImporter,

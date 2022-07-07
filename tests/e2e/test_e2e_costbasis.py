@@ -1,16 +1,12 @@
 from decimal import Decimal
-from devtools import debug
+from pprint import pprint
 
 import jsonpickle
 import pytest
-from pprint import pprint
 from pytest import approx
 
+from perfi.costbasis import regenerate_costbasis_lots
 from perfi.events import EventStore
-from tests.integration.test_tx_logicals import get_tx_logicals
-from tests.helpers import *
-from perfi.transaction.chain_to_ledger import update_entity_transactions
-from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
 from perfi.models import (
     TxLedger,
     TxLogical,
@@ -20,8 +16,10 @@ from perfi.models import (
     CostbasisDisposal,
     load_flags,
 )
-
-from perfi.costbasis import regenerate_costbasis_lots
+from perfi.transaction.chain_to_ledger import update_entity_transactions
+from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
+from tests.helpers import *
+from tests.integration.test_tx_logicals import get_tx_logicals
 
 chain = "avalanche"
 address = "__TEST_ADDRESS__"

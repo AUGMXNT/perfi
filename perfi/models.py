@@ -627,6 +627,7 @@ class TxLogical(BaseModel):
             "Gemini.Sell",
             "Coinbase.Buy",
             "Coinbase.Sell",
+            "Coinbase.Convert",
         ]:
             self.save_type("trade")
             return

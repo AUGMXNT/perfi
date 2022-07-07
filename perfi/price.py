@@ -1,17 +1,16 @@
+import json
+import pathlib
+import time
+import urllib.request
+from collections import namedtuple, defaultdict
+from datetime import datetime
+
+from currency_converter import CurrencyConverter
+
 from .cache import cache
-from .constants import assets
+from .constants import assets, paths
 from .db import db
 from .settings import setting
-
-from decimal import Decimal
-import json
-from collections import namedtuple, defaultdict, OrderedDict
-
-from pprint import pprint
-from pprint import pprint as pp
-from datetime import datetime
-import sys
-import time
 
 CoinPrice = namedtuple("CoinPrice", ["source", "coin_id", "epoch", "price"])
 
@@ -108,9 +107,39 @@ def get_coingecko_price_for_day(coin_id, epoch):
             return get_coingecko_price_for_day(coin_id, epoch)
 
 
+# The Currency Converter lib uses the European Central Bank's fx rates file to give day rate conversions for currency pairs.
+def download_latest_ecb_price_file(destination_file):
+    urllib.request.urlretrieve(
+        "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip", destination_file
+    )
+
+
 class PriceFeed:
     def __init__(self):
         self.prices = defaultdict(lambda: defaultdict(lambda: []))
+        # If we don't yet have an ECB data file, or if it's more than an hour old, get it
+        ecb_path = f"{paths.CACHE_DIR}/eurofxref-hist.zip"
+        if (
+            not pathlib.Path(ecb_path).exists()
+            or (int(time.time()) - pathlib.Path(ecb_path).stat().st_mtime) > 3600
+        ):
+            print("Price feed's ECB data file is missing or old, getting a new copy...")
+            download_latest_ecb_price_file(ecb_path)
+        # Use the ECB data file for our currency converter
+        self.currency_converter = CurrencyConverter(
+            ecb_path, decimal=True, fallback_on_missing_rate=True
+        )
+
+    def convert_fiat(self, from_fiat_symbol, to_fiat_symbol, amount, desired_epoch):
+        return (
+            self.currency_converter.convert(
+                amount,
+                from_fiat_symbol,
+                to_fiat_symbol,
+                datetime.fromtimestamp(desired_epoch).date(),
+            ),
+            "currency_converter",
+        )
 
     def get(self, coin_id, desired_epoch) -> CoinPrice:
         try:
@@ -136,7 +165,7 @@ class PriceFeed:
 
     def map_asset(self, chain, asset_tx_id, symbol_fallback=False):
         # We want things like usdc_on_avax -> usdc_core
-        # This will be differen from our asset_tx_id -> asset_price_id mapping because that goes for the most specific asset_price_id it can find, but for costbasis, we want to group all the variants together for LOT MATCHING purposes. This mapping can be used for exposure mapping as well (we need to do additional mappings for exposure since that needs to split LP amounts and account for ib multipliers)
+        # This will be different from our asset_tx_id -> asset_price_id mapping because that goes for the most specific asset_price_id it can find, but for costbasis, we want to group all the variants together for LOT MATCHING purposes. This mapping can be used for exposure mapping as well (we need to do additional mappings for exposure since that needs to split LP amounts and account for ib multipliers)
 
         # This allows up to use our manual COSTBASIS_LIKEKIND matching for imported asset_tx_ids
         if chain.startswith("import."):
