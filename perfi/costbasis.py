@@ -1,12 +1,23 @@
-from devtools import debug
+import atexit
+import logging
+from copy import copy
+from datetime import date, datetime
+from decimal import Decimal, Context
+from pathlib import Path
+from pprint import pformat
+from types import SimpleNamespace
 
-from .db import db
+import arrow
+import jsonpickle
+import xlsxwriter
+from tqdm import tqdm
+
 from .constants import assets, paths
+from .db import db
 from .models import (
     TxLogical,
     TxLedger,
     TX_LOGICAL_FLAG,
-    AssetPrice,
     CostbasisLot,
     CostbasisDisposal,
     replace_flags,
@@ -14,21 +25,6 @@ from .models import (
     Flag,
 )
 from .price import price_feed
-
-import arrow
-import atexit
-from copy import copy
-from datetime import date, datetime
-from decimal import Decimal, Context
-
-import jsonpickle
-import logging
-from pathlib import Path
-from pprint import pprint, pformat
-import sys
-from tqdm import tqdm
-from types import SimpleNamespace
-import xlsxwriter
 from .settings import setting
 
 DECIMAL_QUANTIZE_PLACES = Decimal(10) ** -16
@@ -1757,9 +1753,9 @@ class LotMatcher:
                  {'AND chain = ?' if not asset_price_id else ''}
         """
         if algorithm == "hifo":
-            sql += "ORDER BY price_usd DESC, timestamp ASC"
+            sql += "ORDER BY cast(price_usd as float) DESC, timestamp ASC"
         if algorithm == "low":
-            sql += "ORDER BY price_usd ASC"
+            sql += "ORDER BY cast(price_usd as float) ASC"
         if algorithm == "fifo":
             sql += "ORDER BY timestamp ASC"
         if algorithm == "lifo":
