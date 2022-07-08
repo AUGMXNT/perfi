@@ -40,6 +40,15 @@
         {
           "name": "@electron-forge/maker-rpm",
           "config": {}
+        },
+       {
+          "name": "@electron-forge/maker-snap",
+          "config": {
+            "features": {
+              "webgl": true
+            },
+            "summary": "perfi"
+          }
         }
       ],
       "publishers": [
