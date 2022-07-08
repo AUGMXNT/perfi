@@ -79,6 +79,7 @@ const columns = !props.records || props.records.length == 0 ? [] : Object.keys(p
       :rows="props.records"
       :columns="columns"
       hide-pagination
+      :rows-per-page-options="[0]"
     >
       <template v-slot:top>
         <div class="q-table__title">{{props.title}}</div>
