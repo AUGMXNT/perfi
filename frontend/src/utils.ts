@@ -2,7 +2,8 @@ import { date } from 'quasar'
 import type { Flag, TxLogical, TxLedger } from '@/model_types.ts'
 
 const backendUrl = () => {
-  return import.meta.env.VITE_BACKEND_URL
+  const apiPort = window.localStorage.getItem('apiPort') || '5001'
+  return `http://127.0.0.1:${apiPort}`
 }
 
 const displayTimestamp = (timestamp: number) => date.formatDate(timestamp * 1000, 'YYYY-MM-DD HH:mm:ss')
