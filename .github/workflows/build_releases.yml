@@ -70,10 +70,12 @@ jobs:
         pushd frontend && npm install && popd
     - name: Build for ${{matrix.TARGET}}
       run: ${{matrix.CMD_BUILD}}
-    - name: Release to GitHub
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: pushd electron && npm run publish && popd
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#    - name: Release to GitHub
+#      env:
+#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      run: pushd electron && npm run publish && popd
 #    - name: Load Release URL File from release job
 #      uses: actions/download-artifact@v1
 #      with:
