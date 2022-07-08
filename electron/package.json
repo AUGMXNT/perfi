@@ -6,7 +6,8 @@
   "main": "src/index.js",
   "scripts": {
     "lint": "echo \"No linting configured\"",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "release": "electron-builder"
   },
   "keywords": [],
   "author": {
@@ -28,8 +29,7 @@
     "publish": {
       "provider": "github",
       "owner": "AUGMXNT",
-      "repo": "perfi",
-      "publish": "always"
+      "repo": "perfi"
     }
   },
   "config": {
