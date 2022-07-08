@@ -16,10 +16,10 @@
   "license": "MIT",
   "build": {
     "appId": "com.augmxnt.perfi",
-    "xxxmac": {
+    "mac": {
       "category": "public.app-category.finance"
     },
-    "xxxwin": {
+    "win": {
       "target": "portable"
     },
     "linux": {
