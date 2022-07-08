@@ -39,21 +39,21 @@ jobs:
             CMD_BUILD: >
                 pushd frontend && npx vite build && rm -rf node_modules && popd &&
                 poetry run pyinstaller app_main.spec &&
-                mv dist electron/ &&
+                mv dist electron/packaged_python &&
                 pushd electron && npm install && npm run dist
           - os: macos-latest
             TARGET: macos
             CMD_BUILD: >
                 pushd frontend && npx vite build && rm -rf node_modules && popd &&
                 poetry run pyinstaller app_main.spec &&
-                mv dist electron/ &&
+                mv dist electron/packaged_python &&
                 pushd electron && npm install && npm run dist
           - os: windows-latest
             TARGET: windows
             CMD_BUILD: >
                 pushd frontend && npx vite build && rm node_modules -r -fo && popd &&
                 poetry run pyinstaller app_main.spec &&
-                mv dist electron/ &&
+                mv dist electron/packaged_python &&
                 pushd electron && npm install && npm run dist
     steps:
     - uses: actions/setup-node@v3

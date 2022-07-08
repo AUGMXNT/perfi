@@ -8,7 +8,7 @@ const fs = require("fs");
 
 const portfinder = require('portfinder');
 
-const PY_DIST_FOLDER = 'dist'
+const PY_DIST_FOLDER = 'packaged_python'
 
 const guessPackaged = () => {
   const fullPath = path.join(__dirname, "..", PY_DIST_FOLDER)
