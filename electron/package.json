@@ -6,8 +6,7 @@
   "main": "src/index.js",
   "scripts": {
     "lint": "echo \"No linting configured\"",
-    "dist": "electron-builder",
-    "release": "electron-builder"
+    "dist": "electron-builder build -p always"
   },
   "keywords": [],
   "author": {
