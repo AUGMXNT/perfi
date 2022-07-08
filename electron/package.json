@@ -16,20 +16,19 @@
   "license": "MIT",
   "build": {
     "appId": "com.augmxnt.perfi",
-    "mac": {
+    "xxxmac": {
       "category": "public.app-category.finance"
     },
-    "win": {
+    "xxxwin": {
       "target": "portable"
     },
     "linux": {
       "target": "AppImage"
     },
     "publish": {
-      "github": {
-        "owner": "AUGMXNT",
-        "repo": "perfi"
-      }
+      "provider": "github",
+      "owner": "AUGMXNT",
+      "repo": "perfi"
     }
   },
   "config": {
