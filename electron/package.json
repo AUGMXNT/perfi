@@ -28,7 +28,8 @@
     "publish": {
       "provider": "github",
       "owner": "AUGMXNT",
-      "repo": "perfi"
+      "repo": "perfi",
+      "publish": "always"
     }
   },
   "config": {
