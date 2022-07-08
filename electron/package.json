@@ -30,8 +30,11 @@
       "owner": "AUGMXNT",
       "repo": "perfi"
     },
-    "files": [
-      "**/*"
+    "extraResources": [
+      {
+          "from": "packaged_python",
+          "to": "packaged_python"
+      }
     ]
   },
   "config": {
