@@ -29,7 +29,10 @@
       "provider": "github",
       "owner": "AUGMXNT",
       "repo": "perfi"
-    }
+    },
+    "files": [
+      "**/*"
+    ]
   },
   "config": {
     "forge": {
