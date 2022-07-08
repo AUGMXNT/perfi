@@ -2,20 +2,17 @@ const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const axios = require('axios');
 
-const cp = require("child_process");
+const childProcess = require("child_process");
 const util = require("util");
-const execFile = util.promisify(cp.execFile);
 const fs = require("fs");
 
 const portfinder = require('portfinder');
 
 const PY_DIST_FOLDER = 'dist'
-const PY_FOLDER = '.'
-const PY_MODULE = 'app_main' // without .py suffix
 
 const guessPackaged = () => {
   const fullPath = path.join(__dirname, "..", PY_DIST_FOLDER)
-  return require('fs').existsSync(fullPath)
+  return fs.existsSync(fullPath)
 }
 
 const getScriptPath = () => {
@@ -53,16 +50,23 @@ const createPyProc = async () => {
 
   if (guessPackaged()) {
     console.log('looks packaged')
-    pyProc = require('child_process').execFile(script, ['--apiPort', apiPort, '--frontendPort', frontendPort])
+    // pyProc = require('child_process').execFile(script, ['--apiPort', apiPort, '--frontendPort', frontendPort])
+    pyProc = childProcess.spawn(script, ['--apiPort', apiPort, '--frontendPort', frontendPort], {
+      cwd: path.join(__dirname, '..', '..'),
+      env: { ...process.env, API_PORT: apiPort, FRONTEND_PORT: frontendPort }
+    })
   } else {
     console.log('looks local')
-    pyProc = require('child_process').spawn('poetry', ['run', 'python', 'app_main.py', '--apiPort', apiPort, '--frontendPort', frontendPort], {
-      cwd: path.join(__dirname, '..', '..')
+    pyProc = childProcess.spawn('poetry', ['run', 'python', 'app_main.py', '--apiPort', apiPort, '--frontendPort', frontendPort], {
+      cwd: path.join(__dirname, '..', '..'),
+      env: { ...process.env, API_PORT: apiPort, FRONTEND_PORT: frontendPort }
     })
   }
 
   pyProc.stdout.pipe(process.stdout);
   pyProc.stderr.pipe(process.stderr);
+
+  return [apiPort, frontendPort]
 }
 
 
@@ -76,7 +80,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 
 const createWindow = async () => {
-  await createPyProc()
+  const [apiPort, frontendPort] = await createPyProc()
 
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -91,7 +95,7 @@ const createWindow = async () => {
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
   let tries = 0
-  const url = "http://127.0.0.1:5002"
+  const url = `http://127.0.0.1:${frontendPort}/?apiPort=${apiPort}#`
   let ready = false
   while (! ready && tries < 20) {
     await sleep(1000)

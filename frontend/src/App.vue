@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { RouterLink, RouterView } from 'vue-router'
 import { Suspense } from 'vue'
-
-const route = useRoute()
 
 // The python backend dynamically finds ports to serve the api and frontend from
 // The electron app starts the python backend, discovers the ports from the python server processes
 // and exposes the api port via a query string var when it loads the app.
-const apiPort = route.query.apiPort ? route.query.apiPort.toString() : '5001'
+const search = window.location.search
+const params = new URLSearchParams(search)
+const apiPort = params.get('apiPort') || '5001'
 window.localStorage.setItem('apiPort', apiPort)
+console.log('apiPort set to ', apiPort)
 
 </script>
 

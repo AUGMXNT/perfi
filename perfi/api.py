@@ -167,6 +167,13 @@ origins = [
     "http://127.0.0.1",
     "http://127.0.0.1:5002",
 ]
+if os.environ.get("API_PORT"):
+    api_port = os.environ["API_PORT"]
+    origins.append(f"http://127.0.0.1:{api_port}")
+
+if os.environ.get("FRONTEND_PORT"):
+    frontend_port = os.environ["FRONTEND_PORT"]
+    origins.append(f"http://127.0.0.1:{frontend_port}")
 
 frontend_app = FastAPI()
 frontend_app.add_middleware(
