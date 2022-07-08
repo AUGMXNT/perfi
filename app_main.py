@@ -27,7 +27,3 @@ if __name__ == "__main__":
         with frontend_server.run_in_thread():
             while True:
                 sleep(1)
-            # webview.create_window(
-            #     "perfi", f"http://{HOST}:{FRONTEND_PORT}", width=1400, height=1000
-            # )
-            # webview.start()
