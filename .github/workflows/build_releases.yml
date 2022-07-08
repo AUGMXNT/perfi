@@ -37,7 +37,6 @@ jobs:
           - os: ubuntu-latest
             TARGET: linux
             CMD_BUILD: >
-                sudo snap install snapcraft --classic &&
                 pushd frontend && npx vite build && rm -rf node_modules && popd &&
                 poetry run pyinstaller app_main.spec &&
                 mv dist electron/ &&
