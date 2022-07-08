@@ -72,10 +72,10 @@ jobs:
       run: ${{matrix.CMD_BUILD}}
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#    - name: Release to GitHub
-#      env:
-#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#      run: pushd electron && npm run publish && popd
+    - name: Release to GitHub
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: pushd electron && npm run release && popd
 #    - name: Load Release URL File from release job
 #      uses: actions/download-artifact@v1
 #      with:
