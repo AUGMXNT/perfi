@@ -7,6 +7,8 @@ const util = require("util");
 const execFile = util.promisify(cp.execFile);
 const fs = require("fs");
 
+const portfinder = require('portfinder');
+
 const PY_DIST_FOLDER = 'dist'
 const PY_FOLDER = '.'
 const PY_MODULE = 'app_main' // without .py suffix
@@ -26,17 +28,35 @@ const getScriptPath = () => {
   return path.join(__dirname, "..", "dist", "perfi", "perfi")
 }
 
+const getTwoOpenPorts = async () => {
+  const apiPort = await portfinder.getPortPromise({
+    port: 8000,     // minimum port
+    stopPort: 65000 // maximum port
+  })
+  const frontendPort = await portfinder.getPortPromise({
+    port: apiPort + 1,     // minimum port
+    stopPort: 65000        // maximum port
+  })
+
+  return [apiPort, frontendPort]
+}
+
 let pyProc
-const createPyProc = () => {
+const createPyProc = async () => {
+  // Find two open ports we can use for the api and frontend servers
+  const [apiPort, frontendPort] = await getTwoOpenPorts()
+  console.log('Using these ports for api and frontend servers: ', apiPort, frontendPort)
+
+  // Invoke the python process
   let script = getScriptPath()
   console.log('launching ' + script)
 
   if (guessPackaged()) {
     console.log('looks packaged')
-    pyProc = require('child_process').execFile(script, [])
+    pyProc = require('child_process').execFile(script, ['--apiPort', apiPort, '--frontendPort', frontendPort])
   } else {
     console.log('looks local')
-    pyProc = require('child_process').spawn('poetry', ['run', 'python', 'app_main.py'], {
+    pyProc = require('child_process').spawn('poetry', ['run', 'python', 'app_main.py', '--apiPort', apiPort, '--frontendPort', frontendPort], {
       cwd: path.join(__dirname, '..', '..')
     })
   }
@@ -56,6 +76,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 
 const createWindow = async () => {
+  await createPyProc()
+
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 800,
@@ -90,7 +112,6 @@ const createWindow = async () => {
   mainWindow.webContents.openDevTools();
 };
 
-createPyProc()
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
