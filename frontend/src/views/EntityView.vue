@@ -4,16 +4,18 @@
   import type { Entity, Address } from '@/model_types'
   import { ref, watchEffect } from 'vue'
   import axios from 'axios'
+  import { backendUrl } from '@/utils'
   const route = useRoute()
 
   let entity = ref<Entity|null>(null)
+  const BACKEND_URL = backendUrl()
 
   watchEffect(async () => {
-    let url = `${import.meta.env.VITE_BACKEND_URL}/entities/${route.params.entityId}`
+    let url = `${BACKEND_URL}/entities/${route.params.entityId}`
     let response = await axios.get(url, { withCredentials: true })
     entity.value = response.data
 
-    url = `${import.meta.env.VITE_BACKEND_URL}/addresses/`
+    url = `${BACKEND_URL}/addresses/`
     response = await axios.get(url, { withCredentials: true })
     entity.value.addresses = response.data.filter(a => a.entity_id === entity.value.id)
   })

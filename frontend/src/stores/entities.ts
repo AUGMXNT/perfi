@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import type { Entity } from '@/model_types'
 import axios from 'axios'
+import { backendUrl } from '@/utils'
 
-const fetchUrl = `${import.meta.env.VITE_BACKEND_URL}/entities`
+const BACKEND_URL = backendUrl()
+const fetchUrl = `${BACKEND_URL}/entities`
 
 export const useEntityStore = defineStore({
   id: 'entities',

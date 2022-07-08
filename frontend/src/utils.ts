@@ -1,6 +1,10 @@
 import { date } from 'quasar'
 import type { Flag, TxLogical, TxLedger } from '@/model_types.ts'
 
+const backendUrl = () => {
+  return import.meta.env.VITE_BACKEND_URL
+}
+
 const displayTimestamp = (timestamp: number) => date.formatDate(timestamp * 1000, 'YYYY-MM-DD HH:mm:ss')
 
 const displayAddress = (tx: TxLedger, prop: string) => {
@@ -26,5 +30,5 @@ const txIconUrl = (tx: TxLedger) => {
   }
 
 export {
-    displayAddress, displayTimestamp, txIconUrl
+    displayAddress, displayTimestamp, txIconUrl, backendUrl
 }
