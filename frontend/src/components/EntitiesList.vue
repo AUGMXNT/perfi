@@ -8,6 +8,7 @@ import type { Entity } from "@/model_types";
 
 import { useEntityStore } from '@/stores/entities'
 import { storeToRefs } from 'pinia'
+import { backendUrl } from "@/utils";
 
 
 const router = useRouter()
@@ -17,7 +18,7 @@ const entityStore = useEntityStore()
 await entityStore.fetch()
 const allEntities = storeToRefs(entityStore).all
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+const BACKEND_URL = backendUrl()
 
 </script>
 

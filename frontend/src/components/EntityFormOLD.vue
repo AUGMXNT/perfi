@@ -2,6 +2,7 @@
 import { ref, reactive, nextTick, watchEffect, computed } from "vue"
 import axios from "axios";
 import type { Entity } from '@/model_types'
+import { backendUrl } from "@/utils";
 
 const props = defineProps<{
   entity?: Entity
@@ -13,7 +14,7 @@ const emit = defineEmits<{
   (e: 'canceled'): void
 }>()
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+const BACKEND_URL = backendUrl()
 
 const formLabel = computed(() => { return props.entity ? 'Edit Entity' : 'Add Entity' })
 
