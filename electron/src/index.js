@@ -52,7 +52,7 @@ const createPyProc = async () => {
     console.log('looks packaged')
     // pyProc = require('child_process').execFile(script, ['--apiPort', apiPort, '--frontendPort', frontendPort])
     pyProc = childProcess.spawn(script, ['--apiPort', apiPort, '--frontendPort', frontendPort], {
-      cwd: path.join(__dirname, '..', '..'),
+      cwd: path.join(__dirname, '..', '..', '..'),
       env: { ...process.env, API_PORT: apiPort, FRONTEND_PORT: frontendPort }
     })
   } else {
@@ -80,8 +80,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 
 const createWindow = async () => {
-  const [apiPort, frontendPort] = await createPyProc()
-
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 800,
@@ -94,10 +92,13 @@ const createWindow = async () => {
   // and load the index.html of the app.
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
+  // Now try to spawn perfi and load the UI when the server is ready
+  const [apiPort, frontendPort] = await createPyProc()
+
   let tries = 0
   const url = `http://127.0.0.1:${frontendPort}/?apiPort=${apiPort}#`
   let ready = false
-  while (! ready && tries < 20) {
+  while (! ready && tries < 30) {
     await sleep(1000)
     try {
       console.log(`Trying to fetch ${url}`)
