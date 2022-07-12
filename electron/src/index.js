@@ -20,9 +20,9 @@ const getScriptPath = () => {
     return path.join(__dirname, "..", "..", "app_main.py")
   }
   if (process.platform === 'win32') {
-    return path.join(__dirname, process.resourcesPath, "packaged_python", "perfi", "perfi.exe")
+    return path.join(process.resourcesPath, "packaged_python", "perfi", "perfi.exe")
   }
-  return path.join(__dirname, process.resourcesPath, "packaged_python", "perfi", "perfi")
+  return path.join(process.resourcesPath, "packaged_python", "perfi", "perfi")
 }
 
 const getTwoOpenPorts = async () => {
