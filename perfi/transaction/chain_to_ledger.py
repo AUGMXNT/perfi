@@ -1,26 +1,18 @@
-from ..models import TxLedgerStore, TxLedger
-from ..db import db
-from ..ingest.chain import (
-    EtherscanTransactionsFetcher,
-    AvalancheTransactionsFetcher,
-    PolygonTransactionsFetcher,
-    FantomTransactionsFetcher,
-    HarmonyTransactionsFetcher,
-)
-from ..price import price_feed
-from ..cache import cache, web3_db_cache_middleware
-from perfi.constants.assets import CHAIN_FEE_ASSETS
-from web3 import Web3
-
-import arrow
-from decimal import *
-from devtools import debug
 import hashlib
 import json
 import logging
 import lzma
-from pprint import pformat, pprint
+from decimal import *
+from pprint import pprint
+
+import arrow
 from tqdm import tqdm
+from web3 import Web3
+
+from perfi.constants.assets import CHAIN_FEE_ASSETS
+from ..db import db
+from ..models import TxLedgerStore, TxLedger
+from ..price import price_feed
 
 messages = (
     []
@@ -240,6 +232,16 @@ def update_wallet_ledger_transactions(address):
         logger.debug(f"Inserted ledger_tx {tx.id}")
 
 
+# This will look at a Boba transaction hash to determine if its fee was in Boba or ETH
+def get_boba_fee_asset(hash: str):
+    w3 = Web3(Web3.HTTPProvider("https://mainnet.boba.network"))
+    receipt = w3.eth.getTransactionReceipt(hash)
+    if receipt["l2BobaFee"] != "0x0":
+        return "boba"
+    else:
+        return "eth"
+
+
 # This is a helper class that is only used within this sub-module that takes chain data in and creates a proper TxLedger
 # LATER: we may want to rename this to something less confusing like TxLedgerCreator, especially if we access this externally anywhere else (but we don't right now so we're leaving this)
 class LedgerTx:
@@ -419,7 +421,12 @@ class LedgerTx:
             "fantom": "ftm",
             "xdai": "xdai",
         }
-        self.asset_tx_id = CHAIN_FEE_ASSETS[self.chain]
+
+        # Boba does fees in ETH or Boba so we need to inspect the transaction to know
+        if self.chain == "boba":
+            self.asset_tx_id = get_boba_fee_asset(self.hash)
+        else:
+            self.asset_tx_id = CHAIN_FEE_ASSETS[self.chain]
 
         # Assign addresses
         self.from_address = debank_tx_data["from_addr"]
