@@ -1,59 +1,24 @@
-# frontend
+# perfi Frontend
 
-This template should help get you started developing with Vue 3 in Vite.
 
-## Recommended IDE Setup
+## Dependencies
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=johnsoncodehk.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=johnsoncodehk.vscode-typescript-vue-plugin).
+1. Make sure you have `nodejs` and `npm` installed.
+1. Run `npm install` to grab the js dependencies
 
-## Type Support for `.vue` Imports in TS
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=johnsoncodehk.vscode-typescript-vue-plugin) to make the TypeScript language service aware of `.vue` types.
+## Running the dev server
 
-If the standalone TypeScript plugin doesn't feel fast enough to you, Volar has also implemented a [Take Over Mode](https://github.com/johnsoncodehk/volar/discussions/471#discussioncomment-1361669) that is more performant. You can enable it by the following steps:
+1. First, create a `.env` file with the following contents:
+    ```
+    VITE_BACKEND_URL=http://localhost:8001
+    ```
+    **Important note:** The URL above should point to the location and port of where you have perfi's API server running. By default that will be `http://localhost:8001` but you may have changed it inside `../perfi/api.py` so check there if needed.
 
-1. Disable the built-in TypeScript Extension
-    1) Run `Extensions: Show Built-in Extensions` from VSCode's command palette
-    2) Find `TypeScript and JavaScript Language Features`, right click and select `Disable (Workspace)`
-2. Reload the VSCode window by running `Developer: Reload Window` from the command palette.
+2. Next, run the perfi API server. From one directory up (above this README file), run `poetry run python perfi/api.py`.  Note the host/port that the API server is listening on and make sure it matches what you have in your `.env` from above.
 
-## Customize configuration
+3. Once the API server is running, start the frontend dev server with: `npm run dev`. This should start a local frontend dev server on `http://localhost:3000` and pop the window open in your default browser.
 
-See [Vite Configuration Reference](https://vitejs.dev/config/).
+    **Important note:** If for some reason you are running your frontend dev server off a different host/port combination (other than `localhost:3000`), you will need to modify `../perfi/api.py` to add your frontend dev server host/port to the list of allowed origins for the API server's CORS Middleware config. Look for `CORSMiddleware` in `../perfi/api.py` to see where to add your frontend host/port config.
 
-## Project Setup
-
-```sh
-npm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
-npm run dev
-```
-
-### Type-Check, Compile and Minify for Production
-
-```sh
-npm run build
-```
-
-### Run Unit Tests with [Cypress Component Testing](https://docs.cypress.io/guides/component-testing/introduction)
-
-```sh
-npm run test:unit # or `npm run test:unit:ci` for headless testing
-```
-
-### Run End-to-End Tests with [Cypress](https://www.cypress.io/)
-
-```sh
-npm run build
-npm run test:e2e # or `npm run test:e2e:ci` for headless testing
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
-```
+4. You should now be up and running with the browser frontend successfully talking to the python API server.
