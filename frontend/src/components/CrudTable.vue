@@ -2,6 +2,7 @@
 import { ref, watchEffect } from 'vue'
 import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router'
+import { backendUrl } from '@/utils';
 
 
 const props = defineProps<{
@@ -22,7 +23,7 @@ const emit = defineEmits<{
 const router = useRouter()
 const route = useRoute()
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+const BACKEND_URL = backendUrl()
 
 let showForm = ref(false)
 let formRecord = ref({} as any)
@@ -78,6 +79,7 @@ const columns = !props.records || props.records.length == 0 ? [] : Object.keys(p
       :rows="props.records"
       :columns="columns"
       hide-pagination
+      :rows-per-page-options="[0]"
     >
       <template v-slot:top>
         <div class="q-table__title">{{props.title}}</div>

@@ -10,6 +10,7 @@ import AddressForm from '@/components/AddressForm.vue'
 import { useEntityStore } from '@/stores/entities'
 import { useAddressStore } from '@/stores/addresses'
 import { storeToRefs } from 'pinia'
+import { backendUrl } from '@/utils';
 
 const props = defineProps<{
   entity: Entity
@@ -25,7 +26,7 @@ const addressStore = useEntityStore()
 
 const router = useRouter()
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+const BACKEND_URL = backendUrl()
 let entity = ref(props.entity)
 let exchangeImportForm = ref({fileType: '', file: '', accountId: ''})
 let exchangeFileUploadInProgress = ref(false)

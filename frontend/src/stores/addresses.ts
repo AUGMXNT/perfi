@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import type { Address } from '@/model_types'
 import axios from 'axios'
+import { backendUrl } from '@/utils'
 
-const fetchUrl = `${import.meta.env.VITE_BACKEND_URL}/addresses`
+const BACKEND_URL = backendUrl()
+const fetchUrl = `${BACKEND_URL}/addresses`
 
 export const useAddressStore = defineStore({
   id: 'addresses',

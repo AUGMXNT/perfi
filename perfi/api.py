@@ -1,55 +1,37 @@
 # Run this server like this: uvicorn api:app --reload
-import builtins
+import contextlib
+import mimetypes
 import os
 import shutil
+import threading
 import time
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from perfi.constants.paths import DATA_DIR, IS_PYINSTALLER
 from perfi import costbasis
 from perfi.constants.paths import DATA_DIR
 
 from os import listdir
 from os.path import isfile, join
-import pytz
-import json
-
-from devtools import debug
-
-from perfi.transaction.chain_to_ledger import (
-    update_entity_transactions as do_chain_to_ledger,
-)
-
-
-from perfi.db import DB
-from perfi.models import TxLogical, TxLedger, AddressStore, Address, TxLogicalStore
-from starlette.middleware.sessions import SessionMiddleware
-
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import List, Dict
+from typing import Optional
+
+import pytz
+import uvicorn
 from fastapi import (
-    Cookie,
     Depends,
     FastAPI,
-    responses,
-    Response,
-    status,
-    Body,
     Request,
-    File,
     HTTPException,
     UploadFile,
 )
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from siwe import siwe
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import Optional
-
-from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
-from bin.generate_8949 import generate_file as generate_8949_file
-
-from bin.update_coingecko_pricelist import main as update_coingecko_pricelist_main
+from starlette.middleware.sessions import SessionMiddleware
 
 from bin.cli import (
     ledger_update_logical_type,
@@ -61,9 +43,12 @@ from bin.cli import (
     CommandNotPermittedException,
     entity_lock_costbasis_lots,
 )
+from bin.generate_8949 import generate_file as generate_8949_file
 from bin.import_from_exchange import do_import
 from bin.map_assets import generate_constants
+from bin.update_coingecko_pricelist import main as update_coingecko_pricelist_main
 from perfi.asset import update_assets_from_txchain
+from perfi.constants.paths import DATA_DIR, SOURCE_ROOT
 from perfi.costbasis import regenerate_costbasis_lots
 from perfi.db import DB
 from perfi.events import EventStore
@@ -76,15 +61,16 @@ from perfi.models import (
     Entity,
     Address,
     TxLogicalStore,
-    BaseStore,
-    StoreProtocol,
     SettingStore,
     Setting,
     TX_LOGICAL_TYPE,
     TxLedgerStore,
     TX_LOGICAL_FLAG,
 )
-from typing import List, Dict, Type
+from perfi.transaction.chain_to_ledger import (
+    update_entity_transactions as do_chain_to_ledger,
+)
+from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
 
 """
 -------------------------
@@ -96,6 +82,12 @@ TODOs
 
 -------------------------
 """
+
+# On Windows, js files can get mapped to text/plain based on Win registry keys.
+# Let's try overriding manaully
+mimetypes.init()
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("text/css", ".css")
 
 
 def db():
@@ -168,13 +160,39 @@ class EnsureRecord:
         return record[0]
 
 
-app = FastAPI()
-
 origins = [
     "http://localhost",
     "http://localhost:3000",
     "http://localhost:3001",
+    "http://127.0.0.1",
+    "http://127.0.0.1:5002",
 ]
+if os.environ.get("API_PORT"):
+    api_port = os.environ["API_PORT"]
+    origins.append(f"http://127.0.0.1:{api_port}")
+
+if os.environ.get("FRONTEND_PORT"):
+    frontend_port = os.environ["FRONTEND_PORT"]
+    origins.append(f"http://127.0.0.1:{frontend_port}")
+
+frontend_app = FastAPI()
+frontend_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+FRONTEND_FILES_PATH = f"{SOURCE_ROOT}/frontend/dist"
+frontend_app.mount(
+    "/",
+    StaticFiles(directory=FRONTEND_FILES_PATH, html=True),
+    name="frontend_files_static",
+)
+
+
+app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -202,7 +220,7 @@ def read_root():
 
 
 # List  Entities
-@app.get("/entities/")
+@app.get("/entities")
 def list_entities(store: EntityStore = Depends(entity_store)):
     return store.list()
 
@@ -224,7 +242,7 @@ def list_addresses_for_entity(
 
 
 # Create entity
-@app.post("/entities/")
+@app.post("/entities")
 def create_entity(entity: Entity, stores: Stores = Depends(stores)):
     return stores.entity.create(**entity.dict())
 
@@ -243,7 +261,7 @@ def delete_entity(id: int, store: EntityStore = Depends(entity_store)):
 # ADDRESSES =================================================================================
 
 # List Addresses
-@app.get("/addresses/")
+@app.get("/addresses")
 def list_addresses(store: AddressStore = Depends(address_store)):
     return store.list()
 
@@ -542,8 +560,26 @@ def lock_costbasis_lots(entity: str, year: int):
     return {"ok": year}
 
 
+# Server class via https://stackoverflow.com/questions/61577643/python-how-to-use-fastapi-and-uvicorn-run-without-blocking-the-thread
+class Server(uvicorn.Server):
+    def install_signal_handlers(self):
+        pass
+
+    @contextlib.contextmanager
+    def run_in_thread(self):
+        thread = threading.Thread(target=self.run)
+        thread.start()
+        try:
+            while not self.started:
+                time.sleep(1e-3)
+            yield
+        finally:
+            self.should_exit = True
+            thread.join()
+
+
 if __name__ == "__main__":
     # Use this for debugging purposes only
     import uvicorn
 
-    uvicorn.run("api:app", host="0.0.0.0", port=8001, log_level="debug", reload=False)
+    uvicorn.run("api:app", host="0.0.0.0", port=5001, log_level="debug", reload=False)
