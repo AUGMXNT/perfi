@@ -14586,4 +14586,6 @@ CHAIN_FEE_ASSETS = {
     "xdai": "xdai",
     "metis": "metis",
     "binancesc": "bnb",
+    "harmony": "one",
+    "aurora": "eth",
 }
