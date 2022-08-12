@@ -15,13 +15,13 @@ const entity = 'Tetranode'
 
         <div clsss="row">
           <div class="col">
-            <span class="text-h5">{{entity}}</span>
+            <span class="text-h5">Home</span>
           </div>
         </div>
 
         <div class="row">
           <div class="col">
-            <TxLogicalsList entity="tetranode"/>
+            Home
           </div>
         </div>
 

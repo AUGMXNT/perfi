@@ -4,6 +4,7 @@ import axios from "axios";
 import type { Address } from '@/model_types'
 
 const props = defineProps<{
+  context?: any,
   record: Address
 }>()
 
@@ -20,7 +21,18 @@ const formLabel = computed(() => { return props.record ? 'Edit' : 'Add' })
 const submitLabel = computed(() => { return props.record ? 'Update' : 'Submit' })
 
 let form = ref(null)
-let formData = ref(props.record)
+const formDefaults = {
+  type: 'account',
+  source: 'manual',
+  ord: 99,
+  entity_id: props.context?.entity.id,
+}
+let formData = ref({...formDefaults, ...props.record})
+
+const chainOptions = [
+  'ethereum',
+].sort()
+
 
 const handleSubmit = async () => {
   if (props.record.id) {
@@ -63,9 +75,9 @@ const resetForm = ({nextTick=false}={}) => {
           :rules="[val => !!val || 'Label can\'t be empty']"
         />
 
-        <q-input
+        <q-select
           outlined
-          type="text"
+          :options="chainOptions"
           v-model="formData.chain"
           label="Chain"
           :rules="[val => !!val || 'Chain can\'t be empty']"
@@ -79,21 +91,21 @@ const resetForm = ({nextTick=false}={}) => {
           :rules="[val => !!val || 'Address can\'t be empty']"
         />
 
-        <q-input
+        <!-- <q-input
           outlined
           type="text"
           v-model="formData.type"
           label="Type"
           :rules="[val => !!val || 'Type can\'t be empty']"
-        />
+        /> -->
 
-        <q-input
+        <!-- <q-input
           outlined
           type="text"
           v-model="formData.source"
           label="Source"
           :rules="[val => !!val || 'Source can\'t be empty']"
-        />
+        /> -->
 
         <q-input
           outlined
@@ -103,13 +115,13 @@ const resetForm = ({nextTick=false}={}) => {
           :rules="[val => !!val || 'Order can\'t be empty']"
         />
 
-        <q-input
+        <!-- <q-input
           outlined
           type="text"
           v-model="formData.entity_id"
           label="Entity ID"
           :rules="[val => !!val || 'entity_id can\'t be empty']"
-        />
+        /> -->
 
         <q-btn :label="record?.id ? 'Update' : 'Add'" type="submit" color="primary" />
         <q-btn flat label="Cancel" color="black" @click="resetForm(); emit('canceled')" />

@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue'
+import { onUpdated, ref, watchEffect, computed } from 'vue'
 import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router'
 
 
 const props = defineProps<{
   title: string,
+  subtitle?: string,
   records: any[],
   form: any,
+  formContext?: any,
   store: any,
   deleteUrl: (record: any) => string,
+  onlyColumns?: string[],
   hideAddButton?: boolean
 }>()
 
@@ -59,7 +62,7 @@ const handleDelete = async (rowProps: any) => {
   props.store.delete(record.id)
 }
 
-const columns = !props.records || props.records.length == 0 ? [] : Object.keys(props.records[0])
+let columns = (!props.records || props.records.length == 0) ? [] : Object.keys(props.records[0])
   .map(prop => { return {
     name: prop,
     label: prop,
@@ -67,6 +70,7 @@ const columns = !props.records || props.records.length == 0 ? [] : Object.keys(p
     align: 'left',
   }})
   .filter(o => ['id'].indexOf(o.name) == -1)
+  .filter(o => props.onlyColumns == undefined ? true : props.onlyColumns.indexOf(o.name) != -1)
   .concat([{ name: 'actions', label: 'Actions', field: '', align:'left' }])
 
 </script>
@@ -74,23 +78,28 @@ const columns = !props.records || props.records.length == 0 ? [] : Object.keys(p
 <template>
   <div class="q-mb-lg">
     <q-table
-      title="Addresses"
       :rows="props.records"
       :columns="columns"
       hide-pagination
+      :rows-per-page-options="[0]"
     >
       <template v-slot:top>
-        <div class="q-table__title">{{props.title}}</div>
-        <q-space/>
-        <q-btn v-if="!showForm && !props.hideAddButton" data-test="addRecord" outline color="primary" icon="add" label="Add" @click="handleAdd" />
+          <div class="col-10">
+            <div class="q-table__title">{{props.title}}</div>
+            <q-space/>
+            <div v-if="props.subtitle" class="q-table__subtitle text-subtitle">{{props.subtitle}}</div>
+          </div>
 
+          <div class="col-2 text-right">
+            <q-btn v-if="!showForm && !props.hideAddButton" data-test="addRecord" outline color="primary" icon="add" label="Add" @click="handleAdd" />
+          </div>
       </template>
 
       <template v-slot:body-cell-actions="props">
         <q-td :props="props">
           <q-btn dense round flat color="grey" @click="handleEdit(props)" icon="edit"></q-btn>
           <q-btn dense round flat color="grey" @click="handleDelete(props)" icon="delete"></q-btn>
-          <slot name="otherActions" :entityId="props.row.id" />
+          <slot name="otherActions" :row="props.row" />
         </q-td>
       </template>
     </q-table>
@@ -98,7 +107,7 @@ const columns = !props.records || props.records.length == 0 ? [] : Object.keys(p
     <q-dialog full-width v-model="showForm">
       <q-card>
         <q-card-section>
-          <component :is="props.form" :record="formRecord" @canceled="showForm=false" @created="handleCreated" @updated="handleUpdated" />
+          <component :is="props.form" :record="formRecord" :context="formContext" @canceled="showForm=false" @created="handleCreated" @updated="handleUpdated" />
         </q-card-section>
       </q-card>
     </q-dialog>

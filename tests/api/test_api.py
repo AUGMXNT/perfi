@@ -1,16 +1,12 @@
-import datetime
-import time
 import uuid
 from decimal import Decimal
 from typing import List
 
-import jsonpickle
 import pytest
 from _pytest.python_api import approx
 from starlette.testclient import TestClient
 from perfi.api import app, TxLogicalOut
-from perfi.costbasis import regenerate_costbasis_lots
-from perfi.events import EventStore, EVENT_ACTION
+from perfi.events import EventStore
 from perfi.models import (
     AddressStore,
     Chain,
@@ -23,7 +19,7 @@ from perfi.models import (
     SettingStore,
     Setting,
     TxLedgerStore,
-    TX_LOGICAL_FLAG,
+    TX_LOGICAL_FLAG, AssetBalanceCurrentStore, AssetBalance,
 )
 
 from fastapi.encoders import jsonable_encoder
@@ -568,3 +564,48 @@ class TestCostbasisLocking:
         assert len(events) == 1
         assert events[0].data["year"] == year
         assert events[0].data["entity_name"] == entity.name
+def test_get_balances(test_db):
+    entity_store = EntityStore(test_db)
+    entity = entity_store.create(name="Foo")
+
+    address_store = AddressStore(test_db)
+    address = address_store.create("foo", Chain.ethereum, "0x123", entity_id=entity.id)
+
+    asset_balance_store = AssetBalanceCurrentStore(test_db)
+    ab1 = AssetBalance(
+        source="debank",
+        address=address.address,
+        chain=Chain.ethereum.value,
+        symbol="ETH",
+        exposure_symbol="ETH",
+        protocol="wallet",
+        label="foo",
+        price=Decimal(12.34),
+        amount=Decimal(1),
+        usd_value=Decimal(12.34),
+        updated=1,
+        extra="{}",
+    )
+    ab2 = AssetBalance(
+        source="debank",
+        address=address.address,
+        chain=Chain.ethereum.value,
+        symbol="FTM",
+        exposure_symbol="FTM",
+        protocol="wallet",
+        label="bar",
+        price=Decimal(43.21),
+        amount=Decimal(1),
+        usd_value=Decimal(43.21),
+        updated=2,
+        extra="{}",
+    )
+    asset_balance_store.save(ab1)
+    asset_balance_store.save(ab2)
+
+    response = client.get(f"/balances/{entity.id}")
+    assert response.status_code == 200
+    assert response.json() == jsonable_encoder(
+        [ab1, ab2]
+    )
+

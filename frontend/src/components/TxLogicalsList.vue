@@ -19,6 +19,7 @@ let items_per_page = ref(100)
 
 let fetch_url = `${BACKEND_URL}/entities/${props.entity.id}/tx_logicals`
 let tx_logicals = ref<TxLogical[]>([])
+let hiddenLogicalIds = ref([])
 let loading = ref(false)
 let txLogicalTypes = ref<string[]>([])
 
@@ -150,6 +151,10 @@ const moveTxLedger = async (txLedgerId, txLogicalId) => {
   showMoveTransactionForm.value = false
 }
 
+const hideLogical = (id) => {
+  hiddenLogicalIds.value.push(id)
+  tx_logicals.value = tx_logicals.value.filter(txlo => hiddenLogicalIds.value.indexOf(txlo.id) == -1)
+}
 
 </script>
 
@@ -196,7 +201,8 @@ const moveTxLedger = async (txLedgerId, txLogicalId) => {
           </div>
         </q-td>
 
-        <q-td key="transactions" :props="props" style="width: 600px;">
+
+        <q-td key="transactions" :props="props" style="width: 600px">
             <div class="logicalOut row items-center q-pb-sm" v-for="tx_ledger in props.row.outs" :key="tx_ledger.id">
               <img class="txIcon" :src="txIconUrl(tx_ledger)" />
               &nbsp;-
@@ -214,8 +220,8 @@ const moveTxLedger = async (txLedgerId, txLogicalId) => {
               &nbsp;<span v-if="tx_ledger.price_source">
                 via {{tx_ledger.price_source }}
               </span>
-              <q-btn class="hoverEdit on-right q-py-none" flat size="xs" label="Edit Price" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
-              <q-btn class="hoverEdit on-right q-py-none" flat size="xs" label="Move" @click="handleMoveClick(props.row.id, tx_ledger.id)" color="secondary" />
+              <q-btn class="hoverEdit on-right" flat size="xs" label="Edit Price" @click="handleEditClick(props.row.id, tx_ledger.id)" color="secondary" />
+              <q-btn class="hoverEdit on-right" flat size="xs" label="Move" @click="handleMoveClick(props.row.id, tx_ledger.id)" color="secondary" />
             </div>
 
             <div class="logicalIn row items-center q-pb-sm" v-for="tx_ledger in props.row.ins" :key="tx_ledger.id">

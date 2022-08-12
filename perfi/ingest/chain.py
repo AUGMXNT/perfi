@@ -1,3 +1,25 @@
+from ..cache import cache, CacheGet404Exception
+from ..db import db
+from ..models import Chain
+from ..settings import setting
+
+
+import arrow
+from bs4 import BeautifulSoup
+from collections import namedtuple
+from datetime import datetime
+from decimal import Decimal
+import json
+import logging
+from lxml import etree, html
+import lzma
+import os
+from pprint import pprint, pformat
+import re
+import subprocess
+import sys
+from tqdm import tqdm
+
 import json
 import logging
 import lzma
@@ -150,6 +172,7 @@ def normalized_chain_value(chain):
         sbch="smartbch",
         sdn="shiden",
         xdai="xdai",
+        evmos="evmos",
     )
     vals_with_normalized = vals.copy()
     for _, v in vals.items():
@@ -1957,7 +1980,7 @@ class DeBankTransactionsFetcher:
                 "https://api.debank.com/history/list?&page_count=100&start_time=%s&token_id=&user_addr=%s"
                 % (int(start_time), address)
             )
-            c = cache.get(URL, REFRESH_INDEXES)
+            c = cache.get(URL, True)
             j = json.loads(c["value"])
 
             if j["error_code"] != 0:
@@ -2006,15 +2029,19 @@ class DeBankTransactionsFetcher:
 
 
 class TransactionsUnifier:
-    def __init__(self, address):
+    def __init__(self, chain, address):
         self.etherscan = EtherscanTransactionsFetcher()
         self.avalanche = AvalancheTransactionsFetcher()
         self.polygon = PolygonTransactionsFetcher()
         self.fantom = FantomTransactionsFetcher()
         self.debank = DeBankTransactionsFetcher()
+        self.chain = chain
         self.address = address
 
     def all_transactions(self):
+        # TODO: as we support ingesting from more chains, add them in here.
+        if self.chain not in 'ethereum':
+            return []
         txns = [
             # self.etherscan.scrape_transactions(self.address),
             # self.etherscan.scrape_internal_transactions(self.address),
@@ -2200,7 +2227,7 @@ def scrape_entity_transactions(entity_name):
         chain = wallet[1]
         address = wallet[2]
 
-        tu = TransactionsUnifier(address)
+        tu = TransactionsUnifier(chain, address)
         unifieds = tu.unified_transactions()
 
         save_to_db(unifieds)

@@ -58,5 +58,26 @@ type Address = {
   entity_id: number
 }
 
+type AssetBalance = {
+    id: number
+    source: string
+    address: string
+    chain: string
+    symbol: string
+    exposure_symbol: string
+    amount: number
+    protocol?: string
+    label?: string
+    price?: number
+    usd_value?: number
+    updated?: number
+    type?: string
+    locked?: number
+    proxy?: string
+    extra?: string
+    stable?: number
+}
 
-export type { Flag, TxLogical, TxLedger, Entity, Address }
+
+
+export type { Flag, TxLogical, TxLedger, Entity, Address, AssetBalance }

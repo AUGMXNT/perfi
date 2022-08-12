@@ -1,3 +1,11 @@
+import time
+from abc import ABC
+
+from .constants import assets
+from .db import db, DB
+from typing import Optional, List, Dict, Type, Protocol, TypeVar, Generic
+
+import logging
 import logging
 import time
 from abc import ABC
@@ -6,6 +14,11 @@ from decimal import Decimal
 from enum import Enum
 from functools import lru_cache
 from pprint import pformat
+
+import jsonpickle
+from devtools import debug
+from pydantic import BaseModel
+
 from typing import Optional, List, Type, Protocol, TypeVar, Generic
 
 import jsonpickle
@@ -761,6 +774,26 @@ class CostbasisIncome(BaseModel):
     lots: list
 
 
+class AssetBalance(BaseModel):
+    id: Optional[int]
+    symbol: str
+    exposure_symbol: str
+    amount: Decimal
+    protocol: Optional[str]
+    address: Optional[str]
+    chain: Optional[str]
+    source: Optional[str]
+    updated: Optional[int]
+    label: Optional[str]
+    price: Optional[Decimal]
+    usd_value: Optional[Decimal]
+    type: Optional[str]
+    locked: Optional[int]
+    proxy: Optional[str]
+    extra: Optional[str]
+    stable: Optional[int]
+
+
 class RecordNotFoundException(Exception):
     pass
 
@@ -804,7 +837,7 @@ class BaseStore(ABC, Generic[T]):
     def update_or_create(self, record) -> T:
         attrs = self._model_field_names()
         sql = ""
-        if getattr(record, self.primary_key):
+        if getattr(record, self.primary_key, None):
             sql += "REPLACE INTO "
         else:
             sql += "INSERT INTO "
@@ -820,8 +853,14 @@ class BaseStore(ABC, Generic[T]):
                 params.append(mapped)
             else:
                 params.append(record_dict[attr])
-        self.db.execute(sql, params)
-        if not getattr(record, self.primary_key) and self.primary_key == "id":
+        try:
+            self.db.execute(sql, params)
+        except Exception as err:
+            debug(sql)
+            debug(params)
+            raise err
+
+        if not getattr(record, self.primary_key, None) and self.primary_key == "id":
             record.id = db.cur.lastrowid
         return record
 
@@ -905,6 +944,18 @@ class AddressStore(BaseStore[Address]):
 
     def delete(self, address_id):
         return super().delete(address_id)
+
+    def find_all_by_entity_name(self, entity_name, chain=None):
+        chain_filter = "" if not chain else "AND address.chain == :chain"
+        sql = f"""SELECT address.*
+               FROM address, entity
+               WHERE address.entity_id = entity.id
+               AND entity.name = :entity_name
+               {chain_filter}
+               ORDER BY ord, label
+            """
+        params = {"entity_name": entity_name, "chain": chain}
+        return [self.model_class(**r) for r in self.db.query(sql, params)]
 
 
 class TxLogicalStore(BaseStore[TxLogical]):
@@ -1081,3 +1132,29 @@ class CostbasisLotStore:
             lot = CostbasisLot(flags=flags, **r_dict)
             results.append(lot)
         return results
+class AssetBalanceCurrentStore(BaseStore[AssetBalance]):
+    def __init__(self, db):
+        super().__init__(db, "balance_current", AssetBalance)
+
+    def all_for_entity_id(self, id: int):
+        sql = """SELECT bc.*
+                 FROM balance_current bc
+                 JOIN address a on bc.address = a.address
+                 WHERE a.entity_id = ?
+              """
+        params = [id]
+        return self.db.query(sql, params)
+
+
+class AssetBalanceHistoryStore(BaseStore[AssetBalance]):
+    def __init__(self, db):
+        super().__init__(db, "balance_history", AssetBalance)
+
+    def all_for_entity_id(self, id: int):
+        sql = """SELECT bc.*
+                 FROM balance_current bc
+                 JOIN address a on bc.address = a.address
+                 WHERE a.entity_id = ?
+              """
+        params = [id]
+        return self.db.query(sql, params)

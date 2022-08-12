@@ -34,6 +34,7 @@ perfi currently depends on several third party API providers (no configuration i
     * [Paid API plans](https://www.coingecko.com/en/api/pricing) are supported and can be entered in the initial setup
 * [ECB Euro foreign exchange reference rates](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html) daily conversion rates cached for [CurrencyConverter](Euro foreign exchange reference rates)
 
+
 ## Getting Started
 Here's how to install:
 ```

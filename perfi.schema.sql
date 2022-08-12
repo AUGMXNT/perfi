@@ -66,6 +66,28 @@ CREATE TABLE IF NOT EXISTS "balance_current" (
 	"stable"	INTEGER,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
+
+CREATE TABLE IF NOT EXISTS "balance_history" (
+     "id"	INTEGER,
+     "source"	TEXT,
+     "address"	TEXT,
+     "chain"	TEXT,
+     "symbol"	TEXT,
+     "exposure_symbol"	TEXT,
+     "protocol"	TEXT,
+     "label"	TEXT,
+     "price"	DECIMAL,
+     "amount"	DECIMAL,
+     "usd_value"	DECIMAL,
+     "updated"	INTEGER,
+     "type"	TEXT,
+     "locked"	INTEGER,
+     "proxy"	TEXT,
+     "extra"	TEXT,
+     "stable"	INTEGER,
+     PRIMARY KEY("id" AUTOINCREMENT)
+);
+
 CREATE TABLE IF NOT EXISTS "cache" (
 	"key"	TEXT,
 	"value"	BLOB,

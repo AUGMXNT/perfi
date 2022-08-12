@@ -14,11 +14,13 @@
   },
   "dependencies": {
     "@quasar/extras": "^1.13.5",
+    "apexcharts": "^3.35.3",
     "pinia": "^2.0.13",
     "quasar": "^2.6.6",
     "siwe": "^1.1.6",
     "vue": "^3.2.33",
-    "vue-router": "^4.0.14"
+    "vue-router": "^4.0.14",
+    "vue3-apexcharts": "^1.4.1"
   },
   "devDependencies": {
     "@cypress/vite-dev-server": "^2.2.2",

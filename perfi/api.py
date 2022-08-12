@@ -6,8 +6,10 @@ import time
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from perfi.balance.updating import update_entity_balances
 from perfi import costbasis
 from perfi.constants.paths import DATA_DIR
+from perfi.farming.farm_helper import get_claimable
 
 from os import listdir
 from os.path import isfile, join
@@ -22,6 +24,8 @@ from perfi.transaction.chain_to_ledger import (
 
 
 from perfi.db import DB
+from perfi.models import TxLogical, TxLedger, AddressStore, Address, TxLogicalStore, AssetBalanceCurrentStore, \
+    AssetBalance, AssetBalanceHistoryStore
 from perfi.models import TxLogical, TxLedger, AddressStore, Address, TxLogicalStore
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -84,6 +88,7 @@ from perfi.models import (
     TxLedgerStore,
     TX_LOGICAL_FLAG,
 )
+from perfi.balance.exposure import calculate as calculate_exposure
 from typing import List, Dict, Type
 
 """
@@ -129,6 +134,8 @@ class Stores:
         self.setting: SettingStore = SettingStore(db)
         self.tx_logical: TxLogicalStore = TxLogicalStore(db)
         self.tx_ledger: TxLedgerStore = TxLedgerStore(db)
+        self.asset_balance_current: AssetBalanceCurrentStore = AssetBalanceCurrentStore(db)
+        self.asset_balance_history: AssetBalanceHistoryStore = AssetBalanceHistoryStore(db)
         self.event_store: EventStore = event_store(db)
 
 
@@ -155,16 +162,17 @@ class TxLogicalOut(BaseModel):
 
 
 class EnsureRecord:
-    def __init__(self, store_name: str, primary_key: str = "id"):
+    def __init__(self, store_name: str, path_param: str = "id"):
         self.store_name = store_name
-        self.primary_key = primary_key
+        self.path_param = path_param
 
     def __call__(self, request: Request, stores: Stores = Depends(stores)):
+        key_val = request.path_params[self.path_param]
         record = getattr(stores, self.store_name).find_by_primary_key(
-            request.path_params[self.primary_key]
+            key_val
         )
         if not record:
-            raise HTTPException(status_code=404, detail=f"No record found for id {id}")
+            raise HTTPException(status_code=404, detail=f"No record found for {self.path_param} {key_val}")
         return record[0]
 
 
@@ -240,6 +248,28 @@ def delete_entity(id: int, store: EntityStore = Depends(entity_store)):
     return store.delete(id)
 
 
+# Entity Balances and Exposure ------------------------
+@app.get("/entities/{id}/balances")
+def get_balances(id: int, stores: Stores = Depends(stores), entity: Entity = Depends(EnsureRecord('entity'))):
+    return stores.asset_balance_current.all_for_entity_id(entity.id)
+
+
+@app.post("/entities/{id}/balances/refresh")
+def refresh_balances(id: int, stores: Stores = Depends(stores), entity: Entity = Depends(EnsureRecord('entity'))):
+    update_entity_balances(entity.name)
+    return stores.asset_balance_current.all_for_entity_id(entity.id)
+
+
+@app.get("/entities/{id}/exposure")
+def get_exposure(id: int, stores: Stores = Depends(stores), entity: Entity = Depends(EnsureRecord('entity'))):
+    results = calculate_exposure(entity.name)
+    results["assets"] = [a._asdict() for a in results["assets"]]
+    results["loans"] = [l._asdict() for l in results["loans"]]
+    return results
+
+
+
+
 # ADDRESSES =================================================================================
 
 # List Addresses
@@ -253,6 +283,10 @@ def list_addresses(store: AddressStore = Depends(address_store)):
 def create_address(address: Address, store: AddressStore = Depends(address_store)):
     return store.create(**address.dict())
 
+@app.get("/addresses/{id}")
+def get_address(address: Address = Depends(EnsureRecord("address")), store: AddressStore = Depends(address_store)):
+    return address
+
 
 # Edit Address
 @app.put("/addresses/{id}", dependencies=[Depends(EnsureRecord("address"))])
@@ -264,6 +298,56 @@ def update_address(address: Address, store: AddressStore = Depends(address_store
 @app.delete("/addresses/{id}", dependencies=[Depends(EnsureRecord("address"))])
 def delete_address(id: int, store: AddressStore = Depends(address_store)):
     return store.delete(id)
+
+
+
+@app.get("/addresses/{id}/manual_balances")
+def get_address_manual_balances(stores: Stores = Depends(stores), address: Address = Depends(EnsureRecord("address"))):
+    return stores.asset_balance_current.find(source="manual")
+
+@app.post("/addresses/{id}/manual_balances")
+def create_address_manual_balance(asset_balance: AssetBalance, stores: Stores = Depends(stores), address: Address = Depends(EnsureRecord("address"))):
+    new_record = asset_balance.copy(update={
+        "updated": int(time.time()),
+        "source": "manual",
+        "chain": address.chain.value,
+        "address": address.address,
+        "protocol": "wallet",
+    })
+
+    # Stuck this new record in both the current and history stores
+    stores.asset_balance_current.update_or_create(new_record)
+    return stores.asset_balance_history.update_or_create(new_record)
+
+@app.put("/addresses/{id}/manual_balances/{balance_id}")
+def update_address_manual_balance(id: int, balance_id: int, asset_balance: AssetBalance, stores: Stores = Depends(stores), address: Address = Depends(EnsureRecord("address"))):
+    # Update this record in the current store
+    updated_record = asset_balance.copy(update={
+        "updated": int(time.time()),
+    })
+    stores.asset_balance_current.save(updated_record)
+
+    # Stick a copy of it in the history store
+    new_record = updated_record.copy(exclude={'id'})
+    stores.asset_balance_history.update_or_create(new_record)
+
+
+@app.delete("/addresses/{id}/manual_balances/{balance_id}")
+def delete_address_manual_balance(id: int, balance_id: int, stores: Stores = Depends(stores), asset_balance: AssetBalance = Depends(EnsureRecord("asset_balance_current", "balance_id")), address: Address = Depends(EnsureRecord("address"))):
+    # Remove this record in the current store
+    stores.asset_balance_current.delete(str(balance_id))
+
+    # Write an entry to balance_history with an amount of 0 at this timestamp
+    new_record = asset_balance.copy(exclude={'id'}, update={"updated": int(time.time()), "amount": 0})
+    stores.asset_balance_history.update_or_create(new_record)
+
+
+# FARMING =================================================================================
+@app.get("/entities/{id}/farm_helper")
+def get_farm_helper(entity: Entity = Depends(EnsureRecord("entity"))):
+    return get_claimable(entity.name, False)
+
+
 
 
 # SETTINGS =================================================================================
@@ -283,7 +367,7 @@ def create_setting(setting: Setting, stores: Stores = Depends(stores)):
 # Update Setting
 @app.put(
     "/settings/{key}",
-    dependencies=[Depends(EnsureRecord("setting", primary_key="key"))],
+    dependencies=[Depends(EnsureRecord("setting", path_param="key"))],
 )
 def update_setting(setting: Setting, stores: Stores = Depends(stores)):
     return stores.setting.save(setting)
@@ -292,7 +376,7 @@ def update_setting(setting: Setting, stores: Stores = Depends(stores)):
 # Delete Setting
 @app.delete(
     "/settings/{key}",
-    dependencies=[Depends(EnsureRecord("setting", primary_key="key"))],
+    dependencies=[Depends(EnsureRecord("setting", path_param="key"))],
 )
 def delete_setting(key: str, stores: Stores = Depends(stores)):
     return stores.setting.delete(key)
@@ -522,16 +606,6 @@ def generate_tax_report(
     output = f"{dir}/{filename}"
     generate_8949_file(entity.name, int(year), output)
     return {"path": f"/static/{entity.id}/{filename}"}
-
-    # tmp_dir = None
-    # try:
-    #     tmp_dir = TemporaryDirectory(prefix=f"8949_{entity.name}_{year}")
-    #     output = f"{tmp_dir}/8949_{entity.name}_{year}.xlsx"
-    #     generate_8949_file(entity.name, int(year), output)
-    #     return FileResponse(output)
-    # finally:
-    #     tmp_dir.cleanup()
-    #
 
 
 # Costbasis Lots

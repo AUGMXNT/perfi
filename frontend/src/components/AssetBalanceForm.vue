@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { ref, reactive, nextTick, watchEffect, computed } from "vue"
 import axios from "axios";
-import type { Entity } from '@/model_types'
+import type { AssetBalance } from '@/model_types'
 
 const props = defineProps<{
-  record: Entity
+  context: any,
+  record: AssetBalance
 }>()
 
 const emit = defineEmits<{
-  (e: 'updated', record: Entity): void
-  (e: 'created', record: Entity): void
+  (e: 'updated', record: AssetBalance): void
+  (e: 'created', record: AssetBalance): void
   (e: 'canceled'): void
 }>()
 
@@ -24,16 +25,16 @@ let formData = ref(props.record)
 
 const handleSubmit = async () => {
   if (props.record.id) {
-    const updateUrl = `${BACKEND_URL}/entities/${props.record.id}`
+    const updateUrl = `${BACKEND_URL}/addresses/${props.context.address.id}/manual_balances/${props.record.id}`
     const result = await axios.put(updateUrl, { ...formData.value }, { withCredentials: true })
-    emit('updated', Object.assign({}, formData.value))
+    emit('updated', formData.value)
   }
   else {
-    const createUrl = `${BACKEND_URL}/entities`
+    const createUrl = `${BACKEND_URL}/addresses/${props.context.address.id}/manual_balances`
     const result = await axios.post(createUrl, { ...formData.value }, { withCredentials: true })
     emit('created', result.data)
     resetForm({nextTick: true})
-    // formData.value = {} as Entity
+    // formData.value = {} as Address
 
     // // Need to wait until next tick to reset the form validation due to the submit
     // setTimeout(()=>(form.value as any).resetValidation(), 0)
@@ -41,7 +42,7 @@ const handleSubmit = async () => {
 }
 
 const resetForm = ({nextTick=false}={}) => {
-  formData.value = {} as Entity
+  formData.value = {} as AssetBalance
   if (nextTick) {
     setTimeout(()=>(form.value as any).resetValidation(), 0)
   }
@@ -58,16 +59,32 @@ const resetForm = ({nextTick=false}={}) => {
         <q-input
           outlined
           type="text"
-          v-model="formData.name"
-          label="Label"
-          :rules="[val => !!val || 'Name can\'t be empty']"
+          v-model="formData.symbol"
+          label="Symbol"
+          :rules="[val => !!val || 'Symbol can\'t be empty']"
         />
 
         <q-input
           outlined
           type="text"
-          v-model="formData.note"
-          label="Notes"
+          v-model="formData.exposure_symbol"
+          label="Exposure Symbol"
+          :rules="[val => !!val || 'Exposure Symbol can\'t be empty']"
+        />
+
+        <q-input
+          outlined
+          type="text"
+          v-model="formData.price"
+          label="Price"
+        />
+
+        <q-input
+          outlined
+          type="text"
+          v-model="formData.amount"
+          label="Amount"
+          :rules="[val => !!val || 'Amount can\'t be empty']"
         />
 
         <q-btn :label="record?.id ? 'Update' : 'Add'" type="submit" color="primary" />
