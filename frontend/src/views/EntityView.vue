@@ -6,11 +6,6 @@ import { ref, watchEffect } from 'vue'
 import axios from 'axios'
 import { useNavigationContextStore } from '@/stores/navigation_context'
 import { storeToRefs } from 'pinia'
-import EntityDetails from '@/components/EntityDetails.vue'
-import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
-import type { Entity, Address } from '@/model_types'
-import { ref, watchEffect } from 'vue'
-import axios from 'axios'
 import { backendUrl } from '@/utils'
 
 const route = useRoute()
