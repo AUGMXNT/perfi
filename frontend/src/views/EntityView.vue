@@ -6,31 +6,38 @@ import { ref, watchEffect } from 'vue'
 import axios from 'axios'
 import { useNavigationContextStore } from '@/stores/navigation_context'
 import { storeToRefs } from 'pinia'
+import EntityDetails from '@/components/EntityDetails.vue'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
+import type { Entity, Address } from '@/model_types'
+import { ref, watchEffect } from 'vue'
+import axios from 'axios'
+import { backendUrl } from '@/utils'
 
 const route = useRoute()
 
 let entity = ref<Entity|null>(null)
 const navContextStore = useNavigationContextStore()
+const BACKEND_URL = backendUrl()
 
 const loadEntity = async () => {
   if (route.params.entityId === undefined) return
 
-  let url = `${import.meta.env.VITE_BACKEND_URL}/entities/${route.params.entityId}`
+  let url = `${BACKEND_URL}/entities/${route.params.entityId}`
   let response = await axios.get(url, { withCredentials: true })
   entity.value = response.data
 
-  url = `${import.meta.env.VITE_BACKEND_URL}/addresses/`
+  url = `${BACKEND_URL}/addresses/`
   response = await axios.get(url, { withCredentials: true })
   entity.value.addresses = response.data.filter(a => a.entity_id === entity.value.id)
   navContextStore.setEntity(entity.value)
 
   if (route.params.addressId) {
-    response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/addresses/${route.params.addressId}`)
+    response = await axios.get(`${BACKEND_URL}/addresses/${route.params.addressId}`)
     navContextStore.setAddress(response.data)
   }
 }
 
-loadEntity()
+await loadEntity()
 </script>
 
 <template>

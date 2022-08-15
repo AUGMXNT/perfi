@@ -49,6 +49,7 @@ pre-commit = "^2.18.1"
 devtools = "^0.8.0"
 sttable = "^0.0.1"
 ipdb = "^0.13.9"
+pyinstaller = {git = "https://github.com/pyinstaller/pyinstaller.git", rev = "develop"}
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

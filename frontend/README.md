@@ -1,5 +1,9 @@
 # perfi Frontend
 
+These are instructions to get the perfi Frontend dev server up and running and talking to a locally-running instance of the backend API server.
+
+For more information, especially on how the perfi app is built, and how the frontend and backend interact, see `../README.md`
+
 
 ## Dependencies
 

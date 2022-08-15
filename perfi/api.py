@@ -1,18 +1,23 @@
 # Run this server like this: uvicorn api:app --reload
-import builtins
+import contextlib
+import mimetypes
 import os
 import shutil
+import threading
 import time
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from perfi.balance.updating import update_entity_balances
+from perfi.constants.paths import DATA_DIR, IS_PYINSTALLER
 from perfi import costbasis
 from perfi.constants.paths import DATA_DIR
 from perfi.farming.farm_helper import get_claimable
 
 from os import listdir
 from os.path import isfile, join
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 import pytz
 import json
 
@@ -24,36 +29,35 @@ from perfi.transaction.chain_to_ledger import (
 
 
 from perfi.db import DB
-from perfi.models import TxLogical, TxLedger, AddressStore, Address, TxLogicalStore, AssetBalanceCurrentStore, \
-    AssetBalance, AssetBalanceHistoryStore
+from perfi.models import (
+    TxLogical,
+    TxLedger,
+    AddressStore,
+    Address,
+    TxLogicalStore,
+    AssetBalanceCurrentStore,
+    AssetBalance,
+    AssetBalanceHistoryStore,
+)
 from perfi.models import TxLogical, TxLedger, AddressStore, Address, TxLogicalStore
 from starlette.middleware.sessions import SessionMiddleware
 
 from typing import List, Dict
+from typing import Optional
+
+import pytz
+import uvicorn
 from fastapi import (
-    Cookie,
     Depends,
     FastAPI,
-    responses,
-    Response,
-    status,
-    Body,
     Request,
-    File,
     HTTPException,
     UploadFile,
 )
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from siwe import siwe
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import Optional
-
-from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
-from bin.generate_8949 import generate_file as generate_8949_file
-
-from bin.update_coingecko_pricelist import main as update_coingecko_pricelist_main
+from starlette.middleware.sessions import SessionMiddleware
 
 from bin.cli import (
     ledger_update_logical_type,
@@ -65,9 +69,12 @@ from bin.cli import (
     CommandNotPermittedException,
     entity_lock_costbasis_lots,
 )
+from bin.generate_8949 import generate_file as generate_8949_file
 from bin.import_from_exchange import do_import
 from bin.map_assets import generate_constants
+from bin.update_coingecko_pricelist import main as update_coingecko_pricelist_main
 from perfi.asset import update_assets_from_txchain
+from perfi.constants.paths import DATA_DIR, SOURCE_ROOT
 from perfi.costbasis import regenerate_costbasis_lots
 from perfi.db import DB
 from perfi.events import EventStore
@@ -80,14 +87,16 @@ from perfi.models import (
     Entity,
     Address,
     TxLogicalStore,
-    BaseStore,
-    StoreProtocol,
     SettingStore,
     Setting,
     TX_LOGICAL_TYPE,
     TxLedgerStore,
     TX_LOGICAL_FLAG,
 )
+from perfi.transaction.chain_to_ledger import (
+    update_entity_transactions as do_chain_to_ledger,
+)
+from perfi.transaction.ledger_to_logical import TransactionLogicalGrouper
 from perfi.balance.exposure import calculate as calculate_exposure
 from typing import List, Dict, Type
 
@@ -101,6 +110,12 @@ TODOs
 
 -------------------------
 """
+
+# On Windows, js files can get mapped to text/plain based on Win registry keys.
+# Let's try overriding manaully
+mimetypes.init()
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("text/css", ".css")
 
 
 def db():
@@ -134,8 +149,12 @@ class Stores:
         self.setting: SettingStore = SettingStore(db)
         self.tx_logical: TxLogicalStore = TxLogicalStore(db)
         self.tx_ledger: TxLedgerStore = TxLedgerStore(db)
-        self.asset_balance_current: AssetBalanceCurrentStore = AssetBalanceCurrentStore(db)
-        self.asset_balance_history: AssetBalanceHistoryStore = AssetBalanceHistoryStore(db)
+        self.asset_balance_current: AssetBalanceCurrentStore = AssetBalanceCurrentStore(
+            db
+        )
+        self.asset_balance_history: AssetBalanceHistoryStore = AssetBalanceHistoryStore(
+            db
+        )
         self.event_store: EventStore = event_store(db)
 
 
@@ -168,21 +187,48 @@ class EnsureRecord:
 
     def __call__(self, request: Request, stores: Stores = Depends(stores)):
         key_val = request.path_params[self.path_param]
-        record = getattr(stores, self.store_name).find_by_primary_key(
-            key_val
-        )
+        record = getattr(stores, self.store_name).find_by_primary_key(key_val)
         if not record:
-            raise HTTPException(status_code=404, detail=f"No record found for {self.path_param} {key_val}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No record found for {self.path_param} {key_val}",
+            )
         return record[0]
 
-
-app = FastAPI()
 
 origins = [
     "http://localhost",
     "http://localhost:3000",
     "http://localhost:3001",
+    "http://127.0.0.1",
+    "http://127.0.0.1:5002",
 ]
+if os.environ.get("API_PORT"):
+    api_port = os.environ["API_PORT"]
+    origins.append(f"http://127.0.0.1:{api_port}")
+
+if os.environ.get("FRONTEND_PORT"):
+    frontend_port = os.environ["FRONTEND_PORT"]
+    origins.append(f"http://127.0.0.1:{frontend_port}")
+
+frontend_app = FastAPI()
+frontend_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+FRONTEND_FILES_PATH = f"{SOURCE_ROOT}/frontend/dist"
+frontend_app.mount(
+    "/",
+    StaticFiles(directory=FRONTEND_FILES_PATH, html=True),
+    name="frontend_files_static",
+)
+
+
+app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -210,7 +256,7 @@ def read_root():
 
 
 # List  Entities
-@app.get("/entities/")
+@app.get("/entities")
 def list_entities(store: EntityStore = Depends(entity_store)):
     return store.list()
 
@@ -232,7 +278,7 @@ def list_addresses_for_entity(
 
 
 # Create entity
-@app.post("/entities/")
+@app.post("/entities")
 def create_entity(entity: Entity, stores: Stores = Depends(stores)):
     return stores.entity.create(**entity.dict())
 
@@ -250,30 +296,40 @@ def delete_entity(id: int, store: EntityStore = Depends(entity_store)):
 
 # Entity Balances and Exposure ------------------------
 @app.get("/entities/{id}/balances")
-def get_balances(id: int, stores: Stores = Depends(stores), entity: Entity = Depends(EnsureRecord('entity'))):
+def get_balances(
+    id: int,
+    stores: Stores = Depends(stores),
+    entity: Entity = Depends(EnsureRecord("entity")),
+):
     return stores.asset_balance_current.all_for_entity_id(entity.id)
 
 
 @app.post("/entities/{id}/balances/refresh")
-def refresh_balances(id: int, stores: Stores = Depends(stores), entity: Entity = Depends(EnsureRecord('entity'))):
+def refresh_balances(
+    id: int,
+    stores: Stores = Depends(stores),
+    entity: Entity = Depends(EnsureRecord("entity")),
+):
     update_entity_balances(entity.name)
     return stores.asset_balance_current.all_for_entity_id(entity.id)
 
 
 @app.get("/entities/{id}/exposure")
-def get_exposure(id: int, stores: Stores = Depends(stores), entity: Entity = Depends(EnsureRecord('entity'))):
+def get_exposure(
+    id: int,
+    stores: Stores = Depends(stores),
+    entity: Entity = Depends(EnsureRecord("entity")),
+):
     results = calculate_exposure(entity.name)
     results["assets"] = [a._asdict() for a in results["assets"]]
     results["loans"] = [l._asdict() for l in results["loans"]]
     return results
 
 
-
-
 # ADDRESSES =================================================================================
 
 # List Addresses
-@app.get("/addresses/")
+@app.get("/addresses")
 def list_addresses(store: AddressStore = Depends(address_store)):
     return store.list()
 
@@ -283,8 +339,12 @@ def list_addresses(store: AddressStore = Depends(address_store)):
 def create_address(address: Address, store: AddressStore = Depends(address_store)):
     return store.create(**address.dict())
 
+
 @app.get("/addresses/{id}")
-def get_address(address: Address = Depends(EnsureRecord("address")), store: AddressStore = Depends(address_store)):
+def get_address(
+    address: Address = Depends(EnsureRecord("address")),
+    store: AddressStore = Depends(address_store),
+):
     return address
 
 
@@ -300,45 +360,73 @@ def delete_address(id: int, store: AddressStore = Depends(address_store)):
     return store.delete(id)
 
 
-
 @app.get("/addresses/{id}/manual_balances")
-def get_address_manual_balances(stores: Stores = Depends(stores), address: Address = Depends(EnsureRecord("address"))):
+def get_address_manual_balances(
+    stores: Stores = Depends(stores),
+    address: Address = Depends(EnsureRecord("address")),
+):
     return stores.asset_balance_current.find(source="manual")
 
+
 @app.post("/addresses/{id}/manual_balances")
-def create_address_manual_balance(asset_balance: AssetBalance, stores: Stores = Depends(stores), address: Address = Depends(EnsureRecord("address"))):
-    new_record = asset_balance.copy(update={
-        "updated": int(time.time()),
-        "source": "manual",
-        "chain": address.chain.value,
-        "address": address.address,
-        "protocol": "wallet",
-    })
+def create_address_manual_balance(
+    asset_balance: AssetBalance,
+    stores: Stores = Depends(stores),
+    address: Address = Depends(EnsureRecord("address")),
+):
+    new_record = asset_balance.copy(
+        update={
+            "updated": int(time.time()),
+            "source": "manual",
+            "chain": address.chain.value,
+            "address": address.address,
+            "protocol": "wallet",
+        }
+    )
 
     # Stuck this new record in both the current and history stores
     stores.asset_balance_current.update_or_create(new_record)
     return stores.asset_balance_history.update_or_create(new_record)
 
+
 @app.put("/addresses/{id}/manual_balances/{balance_id}")
-def update_address_manual_balance(id: int, balance_id: int, asset_balance: AssetBalance, stores: Stores = Depends(stores), address: Address = Depends(EnsureRecord("address"))):
+def update_address_manual_balance(
+    id: int,
+    balance_id: int,
+    asset_balance: AssetBalance,
+    stores: Stores = Depends(stores),
+    address: Address = Depends(EnsureRecord("address")),
+):
     # Update this record in the current store
-    updated_record = asset_balance.copy(update={
-        "updated": int(time.time()),
-    })
+    updated_record = asset_balance.copy(
+        update={
+            "updated": int(time.time()),
+        }
+    )
     stores.asset_balance_current.save(updated_record)
 
     # Stick a copy of it in the history store
-    new_record = updated_record.copy(exclude={'id'})
+    new_record = updated_record.copy(exclude={"id"})
     stores.asset_balance_history.update_or_create(new_record)
 
 
 @app.delete("/addresses/{id}/manual_balances/{balance_id}")
-def delete_address_manual_balance(id: int, balance_id: int, stores: Stores = Depends(stores), asset_balance: AssetBalance = Depends(EnsureRecord("asset_balance_current", "balance_id")), address: Address = Depends(EnsureRecord("address"))):
+def delete_address_manual_balance(
+    id: int,
+    balance_id: int,
+    stores: Stores = Depends(stores),
+    asset_balance: AssetBalance = Depends(
+        EnsureRecord("asset_balance_current", "balance_id")
+    ),
+    address: Address = Depends(EnsureRecord("address")),
+):
     # Remove this record in the current store
     stores.asset_balance_current.delete(str(balance_id))
 
     # Write an entry to balance_history with an amount of 0 at this timestamp
-    new_record = asset_balance.copy(exclude={'id'}, update={"updated": int(time.time()), "amount": 0})
+    new_record = asset_balance.copy(
+        exclude={"id"}, update={"updated": int(time.time()), "amount": 0}
+    )
     stores.asset_balance_history.update_or_create(new_record)
 
 
@@ -346,8 +434,6 @@ def delete_address_manual_balance(id: int, balance_id: int, stores: Stores = Dep
 @app.get("/entities/{id}/farm_helper")
 def get_farm_helper(entity: Entity = Depends(EnsureRecord("entity"))):
     return get_claimable(entity.name, False)
-
-
 
 
 # SETTINGS =================================================================================
@@ -616,8 +702,26 @@ def lock_costbasis_lots(entity: str, year: int):
     return {"ok": year}
 
 
+# Server class via https://stackoverflow.com/questions/61577643/python-how-to-use-fastapi-and-uvicorn-run-without-blocking-the-thread
+class Server(uvicorn.Server):
+    def install_signal_handlers(self):
+        pass
+
+    @contextlib.contextmanager
+    def run_in_thread(self):
+        thread = threading.Thread(target=self.run)
+        thread.start()
+        try:
+            while not self.started:
+                time.sleep(1e-3)
+            yield
+        finally:
+            self.should_exit = True
+            thread.join()
+
+
 if __name__ == "__main__":
     # Use this for debugging purposes only
     import uvicorn
 
-    uvicorn.run("api:app", host="0.0.0.0", port=8001, log_level="debug", reload=False)
+    uvicorn.run("api:app", host="0.0.0.0", port=5001, log_level="debug", reload=False)

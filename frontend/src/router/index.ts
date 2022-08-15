@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory, isNavigationFailure, RouterView } from 'vue-router'
+import { createRouter, createWebHashHistory, isNavigationFailure, RouterView } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import EntityView from '@/views/EntityView.vue'
@@ -11,7 +11,7 @@ import EntitiesListVue from '@/components/EntitiesList.vue'
 import PassThroughView from '@/views/PassthroughView.vue'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHashHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',

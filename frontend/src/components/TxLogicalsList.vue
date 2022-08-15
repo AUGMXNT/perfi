@@ -6,12 +6,13 @@ import { displayAddress, displayTimestamp, txIconUrl } from '@/utils.ts'
 import type { Entity } from "@/model_types";
 import { useQuasar } from 'quasar'
 import { copyToClipboard } from 'quasar'
+import { backendUrl } from "@/utils";
 
 const props = defineProps<{
   entity: Entity
 }>()
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+const BACKEND_URL = backendUrl()
 const quasar = useQuasar()
 
 let page_num = ref(0)

@@ -11,6 +11,7 @@ import { useEntityStore } from '@/stores/entities'
 import { useAddressStore } from '@/stores/addresses'
 import { useNavigationContextStore } from '@/stores/navigation_context'
 import { storeToRefs } from 'pinia'
+import { backendUrl } from '@/utils';
 
 const emit = defineEmits<{
   (e: 'updated', record: Entity): void
@@ -30,9 +31,10 @@ const usdFormatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2,
 });
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+const BACKEND_URL = backendUrl()
+// let entity = ref(props.entity)
 let entity = storeToRefs(navContextStore).entity
-let exchangeImportForm = ref({fileType: '', file: null, accountId: ''})
+let exchangeImportForm = ref({fileType: '', file: '', accountId: ''})
 let exchangeFileUploadInProgress = ref(false)
 let calculateTaxInfoForm = ref({year: ''})
 let taxCalculationInProgress = ref(false)
@@ -162,16 +164,16 @@ const handleCalculateTaxes = async () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody> 
+                <tbody>
                   <tr v-for="protocol of Object.keys(farmHelperClaimables[address_label].data[chain])" :key="protocol">
-                    <td 
-                      class="text-left" 
-                      :class="{ should_claim: farmHelperClaimables[address_label].data[chain][protocol].should_claim }" 
+                    <td
+                      class="text-left"
+                      :class="{ should_claim: farmHelperClaimables[address_label].data[chain][protocol].should_claim }"
                       style="max-width: 200px">
                         <img class="logo float-left q-mr-sm" :src="farmHelperClaimables[address_label].data[chain][protocol].logo_url" />
                         <a :href="farmHelperClaimables[address_label].data[chain][protocol].site_url">{{protocol}}</a>
                     </td>
-                    <td 
+                    <td
                       class="text-right"
                       :class="{ should_claim: farmHelperClaimables[address_label].data[chain][protocol].should_claim }">
                       {{ usdFormatter.format(farmHelperClaimables[address_label].data[chain][protocol].reward_usd_value) }}
