@@ -1,25 +1,3 @@
-from ..cache import cache, CacheGet404Exception
-from ..db import db
-from ..models import Chain
-from ..settings import setting
-
-
-import arrow
-from bs4 import BeautifulSoup
-from collections import namedtuple
-from datetime import datetime
-from decimal import Decimal
-import json
-import logging
-from lxml import etree, html
-import lzma
-import os
-from pprint import pprint, pformat
-import re
-import subprocess
-import sys
-from tqdm import tqdm
-
 import json
 import logging
 import lzma
@@ -30,8 +8,11 @@ from decimal import Decimal
 from pprint import pprint, pformat
 
 import arrow
+import chromedriver_binary  # noqa
 from bs4 import BeautifulSoup
 from lxml import etree, html
+from seleniumwire import webdriver
+from seleniumwire.utils import decode
 from tqdm import tqdm
 
 from ..cache import cache, CacheGet404Exception
@@ -2028,19 +2009,100 @@ class DeBankTransactionsFetcher:
         return transactions
 
 
+class DeBankBrowserTransactionsFetcher:
+    def __init__(self, db=None):
+        self.db = db
+        self.driver = webdriver.Chrome()
+        self.driver.implicitly_wait(20)
+
+    def scrape_all_history_responses(self, address):
+        url = f"https://debank.com/profile/{address}/history"
+        xpath = """//button[normalize-space()="Load More"]"""
+
+        self.driver.get(url)
+        button = self.driver.find_element("xpath", xpath)
+
+        while button:
+            print("Fetching more...")
+            button.click()
+            try:
+                button = self.driver.find_element("xpath", xpath)
+            except:
+                button = None
+
+        url_to_capture = "https://api.debank.com/history/list"
+        requests = [r for r in self.driver.requests if r.url.startswith(url_to_capture)]
+        responses = [
+            decode(
+                r.response.body, r.response.headers.get("Content-Encoding", "identity")
+            )
+            for r in requests
+        ]
+        self.driver.close()
+
+        # Responses now contains a list of all the JSON API responses
+        return responses
+
+    def scrape_history(self, address):
+        transactions = []
+        projects = {}
+        tokens = {}
+
+        for history_response in self.scrape_all_history_responses(address):
+            j = json.loads(history_response)
+
+            if j["error_code"] != 0:
+                raise Exception(
+                    f"Got error from DeBank History Scraping via browser. RESPONSE: `{j}`"
+                )
+            else:
+                j = j["data"]
+
+            for id in j["project_dict"]:
+                projects[id] = j["project_dict"][id]
+
+            for id in j["token_dict"]:
+                tokens[id] = j["token_dict"][id]
+
+            for tx in j["history_list"]:
+                if "project_id" in tx and tx["project_id"] in projects:
+                    tx["_project"] = projects[tx["project_id"]]
+
+                for r in tx["receives"]:
+                    if "token_id" in r and r["token_id"] in tokens:
+                        r["_token"] = tokens[r["token_id"]]
+
+                for r in tx["sends"]:
+                    if "token_id" in r and r["token_id"] in tokens:
+                        r["_token"] = tokens[r["token_id"]]
+
+                if tx["cate_id"] == "approve":
+                    tx["_token"] = tokens[tx["token_approve"]["token_id"]]
+
+                transactions.append(tx)
+
+        for t in transactions:
+            t["_source"] = "debank"
+            t["_epoch_timestamp"] = int(t["time_at"])
+            t["_id"] = t["id"].strip()
+            t["_chain"] = normalized_chain_value(t["chain"])
+
+        return transactions
+
+
 class TransactionsUnifier:
     def __init__(self, chain, address):
         self.etherscan = EtherscanTransactionsFetcher()
         self.avalanche = AvalancheTransactionsFetcher()
         self.polygon = PolygonTransactionsFetcher()
         self.fantom = FantomTransactionsFetcher()
-        self.debank = DeBankTransactionsFetcher()
+        self.debank = DeBankBrowserTransactionsFetcher()
         self.chain = chain
         self.address = address
 
     def all_transactions(self):
         # TODO: as we support ingesting from more chains, add them in here.
-        if self.chain not in 'ethereum':
+        if self.chain not in "ethereum":
             return []
         txns = [
             # self.etherscan.scrape_transactions(self.address),
