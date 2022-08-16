@@ -244,7 +244,7 @@ SETUP NOTE: in order for `npm version` to work correctly, it needs to think that
 To trigger the build, you will need to push the tag to Github:
 
 ```
-git push && git push --tags
+git push --tags
 ```
 
 ### GitHub Actions
