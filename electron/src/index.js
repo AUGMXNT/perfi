@@ -114,7 +114,7 @@ const createWindow = async () => {
   mainWindow.loadURL(url);
 
   // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools();
 };
 
 
