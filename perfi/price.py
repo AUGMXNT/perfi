@@ -1,10 +1,10 @@
 import json
 import pathlib
 import time
-import urllib.request
 from collections import namedtuple, defaultdict
 from datetime import datetime
 
+import httpx
 from currency_converter import CurrencyConverter
 
 from .cache import cache
@@ -109,9 +109,11 @@ def get_coingecko_price_for_day(coin_id, epoch):
 
 # The Currency Converter lib uses the European Central Bank's fx rates file to give day rate conversions for currency pairs.
 def download_latest_ecb_price_file(destination_file):
-    urllib.request.urlretrieve(
-        "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip", destination_file
-    )
+    with open(destination_file, "wb") as download_file:
+        url = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip"
+        response = httpx.get(url)
+        download_file.write(response.content)
+    print(f"Updated {destination_file} with latest ECB price file")
 
 
 class PriceFeed:
