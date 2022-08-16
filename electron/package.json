@@ -1,7 +1,7 @@
 {
   "name": "perfi",
   "productName": "perfi",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "perfi",
   "main": "src/index.js",
   "scripts": {
