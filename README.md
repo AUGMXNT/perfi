@@ -236,9 +236,24 @@ Sometimes, it can be useful to know if Python code is executing inside a PyInsta
 
 An important detail about PyInstaller is that it is not a cross-compiler; it can only successfully package up python for the OS that you run the command inside. So, we use GitHub Actions to build out our final application, since we can run build steps on Windows, Ubuntu, and Mac hosts there.
 
+### Versioning
+The packaged app's version comes from `electron/package.json`. The best way to update the version for new releases (that will trigger the Github Actions) is to use `npm version <major|minor|patch>` in the `electron` folder. This will bump the package.json version AND it create a commit with that version update, AND it will create a new git tag.
+
+SETUP NOTE: in order for `npm version` to work correctly, it needs to think that it's in a git repo. You will need to create an empty `.git` folder inside `electron` on your local repo. git will ignore this.
+
+To trigger the build, you will need to push the tag to Github:
+
+```
+git push && git push --tags
+```
+
 ### GitHub Actions
 
-Inside `.github/workflows/build_releases.yml` you’ll find the GitHub Actions workflow file that controls how our app is built.  The workflow runs whenever a new tag matching the pattern `v*` is pushed to GitHub (e.g. `v1.0.0' or 'vFoo'). The workflow will build out the app and put the final product into a new GitHub release named after the `version` value inside `electron/package.json` (not the tag name you use). So, make sure you bump that version number in the `electron/package.json` before you push a new tag, or the build may fail at the publishing step because a release could already exist for the configured current version number. Also note that all releases are created in Draft form and must be manually changed to Public before people can view them at https://github.com/AUGMXNT/perfi/releases
+Inside `.github/workflows/build_releases.yml` you’ll find the GitHub Actions workflow file that controls how our app is built.  The workflow runs whenever a new tag matching the pattern `v*` is pushed to GitHub (e.g. `v1.0.0' or 'vFoo').
+
+The workflow will build out the app and put the final product into a new GitHub release named after the `version` value inside `electron/package.json` (not the tag name you use).
+
+If your build fails at the publishing step, it could be because a release already exists for the configured current version number. Also note that all releases are created in Draft form and must be manually changed to Public before people can view them at https://github.com/AUGMXNT/perfi/releases
 
 
 
