@@ -1076,7 +1076,7 @@ class TestGeminiImporter:
             to_address="Gemini:SomeGeminiAccountId",
             asset_tx_id="dai",
             symbol="DAI",
-            amount=Decimal("3595.150506"),
+            amount=Decimal("3595.1505059999999503"),
             timestamp=int(arrow.get("2021-12-08 03:47:23.014").timestamp()),
             direction="IN",
             tx_ledger_type="Gemini.Buy",
@@ -1180,7 +1180,7 @@ class TestGeminiImporter:
             to_address="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",  # If we have the withdrawal destination we show it
             asset_tx_id="dai",
             symbol="DAI",
-            amount=Decimal("3584.150506"),
+            amount=Decimal("3584.1505059999999503"),
             timestamp=int(arrow.get("2021-12-08 04:00:30.911").timestamp()),
             direction="OUT",
             tx_ledger_type="Gemini.Debit",

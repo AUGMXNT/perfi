@@ -1,12 +1,13 @@
-from .chain import save_to_db
-from ..constants.assets import FIAT_SYMBOLS
-
-from decimal import Decimal
-import arrow
 import csv
 import io
-import openpyxl
 import re
+from decimal import Decimal
+
+import arrow
+import openpyxl
+
+from .chain import save_to_db
+from ..constants.assets import FIAT_SYMBOLS
 from ..price import PriceFeed
 
 price_feed = PriceFeed()
@@ -416,8 +417,8 @@ class GeminiImporter:
             str = str.replace("(", "")
             str = str.replace(")", "")
             str = re.sub("[^0-9.]", "", str)
-            # 3. Tries to float the result and returns sign correctly in case we had a negative representation with parens above
-            return Decimal(str) * multiplier
+            # 3. Tries to float the result (in case we have scientific notation in parsed excel file) and returns sign correctly in case we had a negative representation with parens above
+            return Decimal(float(str)) * multiplier
 
         csv_file = self.xls_to_csv(xls_file)
         reader = csv.DictReader(io.StringIO(csv_file))
