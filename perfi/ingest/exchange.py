@@ -408,17 +408,22 @@ class GeminiImporter:
             if not str:
                 return None
             # 0. Detects if this is representing a negative amount from Gemini e.g. (1,234.567 DAI) represents negative.
-            multiplier = -1 if "(" in str else 1
-            # 1. Removes anything after the first space character
+            sign = -1 if "(" in str else 1
+            # 1. Locate any scientific notation exponent like 3.1e-06
+            exponent = 0
+            parts = str.split("e", 2)
+            if len(parts) == 2:
+                exponent = Decimal(parts[1])
+                str = parts[0]
+            # 2. Removes anything after the first space character
             str = str.split(" ")[0]
-            # 2. Removes all " and , and () characters
+            # 3. Removes all " and , and () characters
             str = str.replace(",", "")
             str = str.replace('"', "")
             str = str.replace("(", "")
             str = str.replace(")", "")
             str = re.sub("[^0-9.]", "", str)
-            # 3. Tries to float the result (in case we have scientific notation in parsed excel file) and returns sign correctly in case we had a negative representation with parens above
-            return Decimal(float(str)) * multiplier
+            return Decimal(str) * sign * (Decimal(10) ** exponent)
 
         csv_file = self.xls_to_csv(xls_file)
         reader = csv.DictReader(io.StringIO(csv_file))
