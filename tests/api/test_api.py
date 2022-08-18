@@ -1,12 +1,17 @@
+import datetime
+import time
 import uuid
 from decimal import Decimal
 from typing import List
 
 import pytest
 from _pytest.python_api import approx
+from fastapi.encoders import jsonable_encoder
 from starlette.testclient import TestClient
+
 from perfi.api import app, TxLogicalOut
-from perfi.events import EventStore
+from perfi.costbasis import regenerate_costbasis_lots
+from perfi.events import EventStore, EVENT_ACTION
 from perfi.models import (
     AddressStore,
     Chain,
@@ -19,11 +24,10 @@ from perfi.models import (
     SettingStore,
     Setting,
     TxLedgerStore,
-    TX_LOGICAL_FLAG, AssetBalanceCurrentStore, AssetBalance,
+    TX_LOGICAL_FLAG,
+    AssetBalanceCurrentStore,
+    AssetBalance,
 )
-
-from fastapi.encoders import jsonable_encoder
-from tests.helpers import *
 
 
 def without(d, key):
@@ -92,7 +96,7 @@ def test_get_entity(test_db):
 
 def test_create_entity(test_db):
     entity_store = EntityStore(test_db)
-    response = client.post(f"/entities/", json=dict(name="my name", note="some note"))
+    response = client.post(f"/entities", json=dict(name="my name", note="some note"))
     assert response.status_code == 200
     results = entity_store.find(name="my name")
     assert len(results) == 1
@@ -564,6 +568,8 @@ class TestCostbasisLocking:
         assert len(events) == 1
         assert events[0].data["year"] == year
         assert events[0].data["entity_name"] == entity.name
+
+
 def test_get_balances(test_db):
     entity_store = EntityStore(test_db)
     entity = entity_store.create(name="Foo")
@@ -603,9 +609,6 @@ def test_get_balances(test_db):
     asset_balance_store.save(ab1)
     asset_balance_store.save(ab2)
 
-    response = client.get(f"/balances/{entity.id}")
+    response = client.get(f"/entities/{entity.id}/balances/")
     assert response.status_code == 200
-    assert response.json() == jsonable_encoder(
-        [ab1, ab2]
-    )
-
+    assert response.json() == jsonable_encoder([ab1, ab2])
