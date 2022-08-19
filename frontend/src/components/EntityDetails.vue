@@ -20,7 +20,9 @@ const emit = defineEmits<{
 
 const entityStore = useEntityStore()
 const addressStore = useAddressStore()
+await addressStore.fetch()
 const navContextStore = useNavigationContextStore()
+
 
 const router = useRouter()
 
@@ -39,6 +41,13 @@ let exchangeFileUploadInProgress = ref(false)
 let calculateTaxInfoForm = ref({year: ''})
 let taxCalculationInProgress = ref(false)
 let farmHelperClaimables = ref({})
+
+// we need the entity to get addresses for it
+let entity_id = entity.value.id
+const allAddresses = storeToRefs(addressStore).all
+const predicate = (record) => {
+  return record.entity_id == entity_id
+}
 
 let generatedTaxFiles = ref([])
 const fetchListOfGeneratedTaxFiles = async () => {
@@ -128,9 +137,10 @@ const handleCalculateTaxes = async () => {
   </CrudTable>
 
   <CrudTable
-    v-if="entity.addresses"
+    v-if="allAddresses && entity_id"
     title="Addresses"
-    :records="entity.addresses"
+    :records="allAddresses"
+    :filter="predicate"
     :only-columns="['label', 'chain', 'address', 'ord']"
     :form="AddressForm"
     :formContext="{entity}"

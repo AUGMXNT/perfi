@@ -9,6 +9,7 @@ const props = defineProps<{
   title: string,
   subtitle?: string,
   records: any[],
+  filter?: () => boolean,
   form: any,
   formContext?: any,
   store: any,
@@ -31,6 +32,9 @@ const BACKEND_URL = backendUrl()
 let showForm = ref(false)
 let formRecord = ref({} as any)
 let records = ref(props.records)
+if (props.filter) {
+  records.value = records.value.filter(props.filter)
+}
 
 const handleAdd = () => {
  showForm.value = true
@@ -79,7 +83,7 @@ let columns = (!props.records || props.records.length == 0) ? [] : Object.keys(p
 <template>
   <div class="q-mb-lg">
     <q-table
-      :rows="props.records"
+      :rows="records"
       :columns="columns"
       hide-pagination
       :rows-per-page-options="[0]"
