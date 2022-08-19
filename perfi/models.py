@@ -861,7 +861,7 @@ class BaseStore(ABC, Generic[T]):
             raise err
 
         if not getattr(record, self.primary_key, None) and self.primary_key == "id":
-            record.id = db.cur.lastrowid
+            record.id = self.db.cur.lastrowid
         return record
 
     def list(self, order_by: str = None) -> List[T]:
@@ -1132,6 +1132,8 @@ class CostbasisLotStore:
             lot = CostbasisLot(flags=flags, **r_dict)
             results.append(lot)
         return results
+
+
 class AssetBalanceCurrentStore(BaseStore[AssetBalance]):
     def __init__(self, db):
         super().__init__(db, "balance_current", AssetBalance)
