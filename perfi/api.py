@@ -211,20 +211,22 @@ if os.environ.get("FRONTEND_PORT"):
     frontend_port = os.environ["FRONTEND_PORT"]
     origins.append(f"http://127.0.0.1:{frontend_port}")
 
-frontend_app = FastAPI()
-frontend_app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-FRONTEND_FILES_PATH = f"{SOURCE_ROOT}/frontend/dist"
-frontend_app.mount(
-    "/",
-    StaticFiles(directory=FRONTEND_FILES_PATH, html=True),
-    name="frontend_files_static",
-)
+# We will serve what vite usually serves if we're in the packaged app
+if IS_PYINSTALLER:
+    frontend_app = FastAPI()
+    frontend_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    FRONTEND_FILES_PATH = f"{SOURCE_ROOT}/frontend/dist"
+    frontend_app.mount(
+        "/",
+        StaticFiles(directory=FRONTEND_FILES_PATH, html=True),
+        name="frontend_files_static",
+    )
 
 
 app = FastAPI()
@@ -724,4 +726,9 @@ if __name__ == "__main__":
     # Use this for debugging purposes only
     import uvicorn
 
-    uvicorn.run("api:app", host="0.0.0.0", port=5001, log_level="debug", reload=False)
+    if IS_PYINSTALLER:
+        reload = False
+    else:
+        reload = True
+
+    uvicorn.run("api:app", host="0.0.0.0", port=5001, log_level="debug", reload=reload)
