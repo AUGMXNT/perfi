@@ -46,6 +46,7 @@ const handleUpdated = (record:any) => {
   console.log('updating store', record)
   emit('updated', record)
   props.store.update(record)
+  window.location.reload();
 }
 
 const handleCreated = (record: any) => {
@@ -65,6 +66,7 @@ const handleDelete = async (rowProps: any) => {
   let response = await axios.delete(props.deleteUrl(record), { withCredentials: true })
   emit('deleted', record)
   props.store.delete(record.id)
+  window.location.reload();
 }
 
 let columns = (!props.records || props.records.length == 0) ? [] : Object.keys(props.records[0])
