@@ -2,6 +2,8 @@ import json
 import logging
 import lzma
 import re
+import sys
+import time
 from collections import namedtuple
 from datetime import datetime
 from decimal import Decimal
@@ -1945,9 +1947,25 @@ class HarmonyTransactionsFetcher(TransactionsFetcher):
         return get_harmony_tx(hash.strip())
 
 
+"""
+As of Sep 15 2022 (https://twitter.com/DeBankCloud/status/1570383634812801026) the free OpenAPI has discontinued.
+The API has shifted to become a part of "DeBank Cloud" which has a pay/tx model.
+
+As of 2022-12, you pay 200 USDC for 1M "compute units" ($0.0002/unit) with each API call costing an arbitrary # of units. https://cloud.debank.com/#section-openapi
+* Tx History = 20 items for 5 units ($0.00005/tx, $0.05/1000txs)
+
+As a stopgap, we are defaulting to the DeBankBrowserTransactionsFetcher for pulling transaction history.
+"""
+
+
 class DeBankTransactionsFetcher:
     def __init__(self, db=None):
         self.db = db
+        self.DEBANK_KEY = setting(self.db).get("DEBANK_KEY")
+        self.headers = {
+            "accept": "application/json",
+            "AccessKey": self.DEBANK_KEY,
+        }
 
     def scrape_history(self, address):
         fetch_more = True
@@ -1956,12 +1974,17 @@ class DeBankTransactionsFetcher:
         tokens = {}
         start_time = 0
 
+        if not self.DEBANK_KEY:
+            raise Exception(
+                "No DEBANK_KEY in settings. You can't use the DeBank OpenAPI without paid compute units"
+            )
+
         while fetch_more:
             URL = (
-                "https://api.debank.com/history/list?&page_count=100&start_time=%s&token_id=&user_addr=%s"
+                "https://pro-openapi.debank.com/v1/user/all_history_list?start_time=%s&id=%s"
                 % (int(start_time), address)
             )
-            c = cache.get(URL, True)
+            c = cache.get(URL, True, headers=self.headers)
             j = json.loads(c["value"])
 
             if j["error_code"] != 0:
@@ -2015,41 +2038,32 @@ class DeBankBrowserTransactionsFetcher:
         self.driver = webdriver.Chrome()
         self.driver.implicitly_wait(20)
 
-    def scrape_all_history_responses(self, address):
-        url = f"https://debank.com/profile/{address}/history"
-        xpath = """//button[normalize-space()="Load More"]"""
-
-        self.driver.get(url)
-        button = self.driver.find_element("xpath", xpath)
-
-        while button:
-            print("Fetching more...")
-            button.click()
-            try:
-                button = self.driver.find_element("xpath", xpath)
-            except:
-                button = None
-
-        url_to_capture = "https://api.debank.com/history/list"
-        requests = [r for r in self.driver.requests if r.url.startswith(url_to_capture)]
-        responses = [
-            decode(
-                r.response.body, r.response.headers.get("Content-Encoding", "identity")
-            )
-            for r in requests
-        ]
-        self.driver.close()
-
-        # Responses now contains a list of all the JSON API responses
-        return responses
-
-    def scrape_history(self, address):
+    def scrape_history(self, address, until_date=None):
         transactions = []
         projects = {}
         tokens = {}
 
-        for history_response in self.scrape_all_history_responses(address):
-            j = json.loads(history_response)
+        # Stop scraping at this string date...
+        # until_date = '2022'
+        # until_date = '2022-09-01'
+        try:
+            until_epoch = arrow.get(until_date).timestamp()
+        except:
+            until_epoch = 0
+
+        for history_response in self.scrape_all_history_responses(address, until_epoch):
+            if not history_response:
+                print("Empty Response, moving on...")
+                # DeBank Browser Scraping API can just decide to stop...
+                break
+
+            # Skip invlid JSON responses...
+            try:
+                j = json.loads(history_response)
+            except:
+                print("JSON Decode Error, skipping...")
+                pprint(history_response)
+                continue
 
             if j["error_code"] != 0:
                 raise Exception(
@@ -2088,6 +2102,55 @@ class DeBankBrowserTransactionsFetcher:
             t["_chain"] = normalized_chain_value(t["chain"])
 
         return transactions
+
+    def scrape_all_history_responses(self, address, until_epoch=0):
+        url = f"https://debank.com/profile/{address}/history"
+        xpath = """//button[normalize-space()="Load More"]"""
+
+        print("Getting History...")
+        self.driver.get(url)
+        button = self.driver.find_element("xpath", xpath)
+        url_to_capture = "https://api.debank.com/history/list"
+
+        while button:
+            try:
+                button = self.driver.find_element("xpath", xpath)
+            except:
+                button = None
+
+            # Look at the last history_list request to see if we should stop at until_epoch
+            requests = [
+                r for r in self.driver.requests if r.url.startswith(url_to_capture)
+            ]
+            r = requests[-1]
+            history_response = decode(
+                r.response.body, r.response.headers.get("Content-Encoding", "identity")
+            )
+            j = json.loads(history_response)
+            for tx in j["data"]["history_list"]:
+                if tx["time_at"] <= until_epoch:
+                    print("Stopping at until_epoch")
+                    button = None
+                    break
+
+            # OK, let's click
+            if button:
+                print("Fetching more...")
+                button.click()
+            time.sleep(2)
+
+        # Sat to do this again, but that's life...
+        requests = [r for r in self.driver.requests if r.url.startswith(url_to_capture)]
+        responses = [
+            decode(
+                r.response.body, r.response.headers.get("Content-Encoding", "identity")
+            )
+            for r in requests
+        ]
+        self.driver.close()
+
+        # Responses now contains a list of all the JSON API responses
+        return responses
 
 
 class TransactionsUnifier:
