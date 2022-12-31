@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import lzma
+import sys
 from decimal import *
 from pprint import pprint
 
@@ -212,7 +213,13 @@ def update_wallet_ledger_transactions(address):
                 tx.direction = "APPROVE"
                 tx.amount = debank_tx["token_approve"]["value"]
                 tx.isfee = 0
-                tx.asset_tx_id = debank_tx["_token"]["id"]
+                try:
+                    tx.asset_tx_id = debank_tx["_token"]["id"]
+                except:
+                    try:
+                        tx.asset_tx_id = debank_tx["token_approve"]["token_id"]
+                    except:
+                        tx_asset_tx_id = None
                 [_, tx.symbol, tx.asset_price_id] = tx.normalize_asset(
                     tx.chain, tx.asset_tx_id
                 )
