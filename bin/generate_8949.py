@@ -17,6 +17,8 @@ args = None
 
 
 def generate_file(entity_name: str, year: int = None, output_path: str = None):
+    if year:
+        year = int(year)
     entity = entity_name
     logging.basicConfig(
         level=logging.WARN,
