@@ -153,7 +153,7 @@ class Cache:
             print("Setting cookie -- %s | %s : %s" % (hostname, k, v))
             self.hostname_cookies_map[hostname][k] = v
 
-    def get(self, url, refresh=False, refresh_if=False):
+    def get(self, url, refresh=False, refresh_if=False, headers={}):
         client = self._client()
 
         result = {}
@@ -168,7 +168,8 @@ class Cache:
             return r
         else:
             # Get
-            self.headers["Referer"] = f"https://{urlparse(url).hostname}/"
+            headers.update(self.headers)
+            headers["Referer"] = f"https://{urlparse(url).hostname}/"
             retry_count = 1
             got_response = False
             req = None
@@ -179,7 +180,7 @@ class Cache:
                     req = client.get(
                         url,
                         cookies=self.hostname_cookies_map[urlparse(url).hostname],
-                        headers=self.headers,
+                        headers=headers,
                         timeout=10.0,
                     )
                     t = int(time.time())
@@ -209,11 +210,11 @@ class Cache:
                         % (req.status_code, url, 10 * retry_count)
                     )
                     time.sleep(10 * retry_count)
-                    self.headers["Referer"] = f"https://{urlparse(url).hostname}/"
+                    headers["Referer"] = f"https://{urlparse(url).hostname}/"
                     req = client.get(
                         url,
                         cookies=self.hostname_cookies_map[urlparse(url).hostname],
-                        headers=self.headers,
+                        headers=headers,
                         timeout=10.0,
                     )
                     t = int(time.time())
