@@ -1,11 +1,3 @@
-import time
-from abc import ABC
-
-from .constants import assets
-from .db import db, DB
-from typing import Optional, List, Dict, Type, Protocol, TypeVar, Generic
-
-import logging
 import logging
 import time
 from abc import ABC
@@ -14,14 +6,10 @@ from decimal import Decimal
 from enum import Enum
 from functools import lru_cache
 from pprint import pformat
-
-import jsonpickle
-from devtools import debug
-from pydantic import BaseModel
-
 from typing import Optional, List, Type, Protocol, TypeVar, Generic
 
 import jsonpickle
+from devtools import debug
 from pydantic import BaseModel
 
 from .constants import assets
@@ -389,7 +377,7 @@ class TxLogical(BaseModel):
             [
                 datestamp,
                 tx_logical_type,
-                "OUTs " + ", ".join(outs_strs),
+                "OUTs: " + ", ".join(outs_strs),
                 "INs: " + ", ".join(ins_strs),
                 chain,
                 hash,
