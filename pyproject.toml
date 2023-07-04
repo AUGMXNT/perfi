@@ -42,8 +42,9 @@ colorama = "^0.4.4"
 numpy = "^1.22.4"
 scipy = "^1.8.1"
 CurrencyConverter = "^0.16.12"
-selenium-wire = "^4.6.5"
+selenium-wire = "^5.1.0"
 chromedriver-binary-auto = "^0.2.3"
+codecov = "^2.1.13"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.1"
