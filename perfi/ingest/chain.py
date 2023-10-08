@@ -2202,8 +2202,12 @@ class TransactionsUnifier:
         self.avalanche = AvalancheTransactionsFetcher(db)
         self.polygon = PolygonTransactionsFetcher(db)
         self.fantom = FantomTransactionsFetcher(db)
-        self.debank = DeBankTransactionsFetcher(db)
-        # self.debank = DeBankBrowserTransactionsFetcher()
+
+        if setting(db).get("DEBANK_KEY"):
+            self.debank = DeBankTransactionsFetcher(db)
+        else:
+            self.debank = DeBankBrowserTransactionsFetcher()
+
         self.chain = chain
         self.address = address
 
