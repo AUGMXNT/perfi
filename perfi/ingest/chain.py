@@ -2400,6 +2400,7 @@ def scrape_entity_transactions(entity_name):
         chain = wallet[1]
         address = wallet[2]
 
+        print(f"Processsing {label} ({chain}: {address} )")
         tu = TransactionsUnifier(chain, address)
         unifieds = tu.unified_transactions()
 
