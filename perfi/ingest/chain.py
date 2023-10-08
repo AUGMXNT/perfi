@@ -2198,11 +2198,12 @@ class DeBankBrowserTransactionsFetcher:
 
 class TransactionsUnifier:
     def __init__(self, chain, address):
-        self.etherscan = EtherscanTransactionsFetcher()
-        self.avalanche = AvalancheTransactionsFetcher()
-        self.polygon = PolygonTransactionsFetcher()
-        self.fantom = FantomTransactionsFetcher()
-        self.debank = DeBankBrowserTransactionsFetcher()
+        self.etherscan = EtherscanTransactionsFetcher(db)
+        self.avalanche = AvalancheTransactionsFetcher(db)
+        self.polygon = PolygonTransactionsFetcher(db)
+        self.fantom = FantomTransactionsFetcher(db)
+        self.debank = DeBankTransactionsFetcher(db)
+        # self.debank = DeBankBrowserTransactionsFetcher()
         self.chain = chain
         self.address = address
 
