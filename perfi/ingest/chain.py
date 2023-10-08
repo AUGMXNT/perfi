@@ -2030,18 +2030,18 @@ class DeBankTransactionsFetcher:
             c = cache.get(URL, True, headers=self.headers)
             j = json.loads(c["value"])
 
-            if j["error_code"] != 0:
+            if "error_code" in j:
                 raise Exception(
                     "Got error from DeBank API. URL:`%s` RESPONSE: `%s`" % (URL, j)
                 )
-            else:
-                j = j["data"]
 
-            for id in j["project_dict"]:
-                projects[id] = j["project_dict"][id]
+            if "project_dict" in j:
+                for id in j["project_dict"]:
+                    projects[id] = j["project_dict"][id]
 
-            for id in j["token_dict"]:
-                tokens[id] = j["token_dict"][id]
+            if "token_dict" in j:
+                for id in j["token_dict"]:
+                    tokens[id] = j["token_dict"][id]
 
             for tx in j["history_list"]:
                 # Update start_time which we use for paginating full history from DeBank API
