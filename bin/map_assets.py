@@ -249,6 +249,10 @@ CHAIN_FEE_ASSETS = {
     "binancesc": "bnb",
     "harmony": "one",
     "aurora": "eth",
+    "zksync-era": "eth",
+    "polygon-zkevm": "eth",
+    "evmos": "evmos",
+    "base": "eth",
 }
 
 
