@@ -130,6 +130,7 @@ COINGECKO_LIKEKIND_MAP = {
     # AAVE
     "ethereum:0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9": "aave",
     "avalanche:0x63a72806098bd3d9520cc43356dd78afe5d386d9": "aave",
+    "avalanche-bridged-dai-avalanche": "dai",  # DAI.e
 }
 
 ### MAPPINGS TO OUTPUT
@@ -234,8 +235,9 @@ COSTBASIS_LIKEKIND = {
     "fantom:0x328a7b4d538a2b3942653a9983fda3c12c571141": "usd-coin",  # crUSDC
     # PolyFRAX
     "polygon:0x104592a158490a9228070e0a8e5343b499e125d0": "frax",
+    # DAI
+    "avalanche:0xd586e7f844cea2f87f50152665bcbc2c279d8d70": "dai",  # Avalanche DAI
 }
-
 
 CHAIN_FEE_ASSETS = {
     "ethereum": "eth",
