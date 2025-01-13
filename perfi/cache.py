@@ -110,7 +110,11 @@ class Cache:
         if self.client:
             return self.client
         else:
-            self.client = httpx.Client(proxies=self.proxy)
+            if self.proxy:
+                proxies = {"http://": self.proxy, "https://": self.proxy}
+                self.client = httpx.Client(proxies=proxies)
+            else:
+                self.client = httpx.Client()
             return self.client
 
     def _get_val(self, key, refresh_if=None):
