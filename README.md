@@ -26,16 +26,17 @@ ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
 ```
 
 ## Requirements
-You should be familiar with and have [Python](https://www.python.org/) (3.9-3.12 tested). We have now switched to [PEP 621](https://peps.python.org/pep-0621/) for dependency management and recommend using `uv` for management:
+You should be familiar with and have [Python](https://www.python.org/) (3.9-3.11). We have now switched to [PEP 621](https://peps.python.org/pep-0621/) for dependency management and recommend using `uv` for management:
+
+*NOTE*: Python 3.12+ is not compatible due to a known issue with selenium-wire
 
 We won't be providing any support for setting up your software environment, but recommend using an advanced LLM like Claude Sonnet 3.5 with grounding (loading files, search) for support.
 
 perfi currently depends on several third party API providers (no configuration is required by default):
-* [DeBank OpenAPI](https://open.debank.com/) - provides a helpful list of transaction history per chain
-* [CoinGecko API](https://www.coingecko.com/en/api) - provides day-resolution coin prices. No API key is required for but requests will be rate-limited. perfi caches and retries so your initial fetches will be slow, but it should eventually work
-    * [Paid API plans](https://www.coingecko.com/en/api/pricing) are supported and can be entered in the initial setup
-* [ECB Euro foreign exchange reference rates](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html) daily conversion rates cached for [CurrencyConverter](Euro foreign exchange reference rates)
-
+- [DeBank OpenAPI](https://open.debank.com/) - provides a helpful list of transaction history per chain
+- [CoinGecko API](https://www.coingecko.com/en/api) - provides day-resolution coin prices. No API key is required for but requests will be rate-limited. perfi caches and retries so your initial fetches will be slow, but it should eventually work
+  - [Paid API plans](https://www.coingecko.com/en/api/pricing) are supported and can be entered in the initial setup
+- [ECB Euro foreign exchange reference rates](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html) daily conversion rates cached for [CurrencyConverter](Euro foreign exchange reference rates)
 
 ## Getting Started
 Here's how to install:
