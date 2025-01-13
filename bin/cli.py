@@ -391,7 +391,7 @@ def setup_perfi():
     )
     if choice.lower() == "y" or choice.lower() == "yes":
         key = typer.prompt(f"Enter your CoinGecko API Key:")
-        save_setting("COINCECKO_KEY", key)
+        save_setting("COINGECKO_KEY", key)
     print("OK. You're done configuring perfi!")
 
 
