@@ -3,7 +3,7 @@ name = "perfi"
 version = "0.1.0"
 description = "defi portfolio analytics"
 authors = [{ name = "Your Name", email = "you@example.com" }]
-requires-python = ">=3.9,<3.13"
+requires-python = ">=3.9,<3.12"
 license = "AGPL-3.0-or-later"
 dependencies = [
     "cytoolz>=1.0.1,<2",
@@ -57,6 +57,7 @@ dependencies = [
     "devtools>=0.12.2,<0.13",
     "asttokens>=2.0.0,<3.0.0",
     "executing>=2.1.0,<3",
+    "blinker==1.7.0",  # required by selenium-wire
 ]
 
 [dependency-groups]
