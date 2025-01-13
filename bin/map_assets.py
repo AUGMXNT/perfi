@@ -323,7 +323,11 @@ def generate_constants():
 
     f.write("COSTBASIS_LIKEKIND = {\n")
     for k in COSTBASIS_LIKEKIND:
-        f.write(f'    "{k}": "{COSTBASIS_LIKEKIND[k]}",\n')
+        # Split the key if it contains a description in parentheses
+        key_parts = k.split(" (", 1)
+        key = key_parts[0]
+        description = f"  # {key_parts[1][:-1]}" if len(key_parts) > 1 else ""
+        f.write(f'    "{key}": "{COSTBASIS_LIKEKIND[k]}",{description}\n')
     f.write("}\n")
 
     f.write("\n")
