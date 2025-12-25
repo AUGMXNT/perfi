@@ -10,7 +10,7 @@ from typing import Optional, List, Type, Protocol, TypeVar, Generic
 
 import jsonpickle
 from devtools import debug
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from .constants import assets
 from .db import db, DB
@@ -64,13 +64,13 @@ class Chain(Enum):
 
 
 class Flag(BaseModel):
-    id: Optional[int]
-    target_type: Optional[str]
-    target_id: Optional[str]
+    id: Optional[int] = None
+    target_type: Optional[str] = None
+    target_id: Optional[str] = None
     source: str
-    created_at: Optional[int]
+    created_at: Optional[int] = None
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
 
 
 def load_flags(target_type: str, target_id: str) -> List[Flag]:
@@ -138,6 +138,8 @@ Entity.update_forward_refs()
 
 
 class TxLedger(BaseModel):
+    model_config = ConfigDict(json_encoders={Decimal: float})
+
     id: Optional[str] = None
     chain: str  # Consider migrating to Chain enum
     address: str
@@ -157,6 +159,13 @@ class TxLedger(BaseModel):
     price_usd: Optional[Decimal] = None
     price_source: Optional[str] = None
     tx_logical_id: Optional[int] = None
+
+    @field_validator("timestamp", mode="before")
+    @classmethod
+    def _coerce_timestamp_to_int(cls, value):
+        if isinstance(value, float):
+            return int(value)
+        return value
 
     def __eq__(self, other):
         if not isinstance(other, TxLedger):
@@ -709,7 +718,7 @@ class AssetPrice(BaseModel):
     symbol: str
     name: str
     raw_data: str
-    market_cap: Optional[int]
+    market_cap: Optional[int] = None
 
 
 class CostbasisLot(BaseModel):
@@ -729,14 +738,14 @@ class CostbasisLot(BaseModel):
     receipt: int
     price_source: str
     chain: str
-    locked_for_year: Optional[int]
+    locked_for_year: Optional[int] = None
 
 
 class CostbasisDisposal(BaseModel):
     id: Optional[int] = None
     entity: str
     address: str
-    asset_price_id: Optional[str]
+    asset_price_id: Optional[str] = None
     symbol: str
     amount: Decimal
     timestamp: int
@@ -757,29 +766,31 @@ class CostbasisIncome(BaseModel):
     symbol: str
     timestamp: int
     tx_ledger_id: str
-    price: Optional[Decimal]  # TODO: should this be allowed to be None?
+    price: Optional[Decimal] = None  # TODO: should this be allowed to be None?
     amount: Decimal
     lots: list
 
 
 class AssetBalance(BaseModel):
-    id: Optional[int]
+    model_config = ConfigDict(json_encoders={Decimal: float})
+
+    id: Optional[int] = None
     symbol: str
     exposure_symbol: str
     amount: Decimal
-    protocol: Optional[str]
-    address: Optional[str]
-    chain: Optional[str]
-    source: Optional[str]
-    updated: Optional[int]
-    label: Optional[str]
-    price: Optional[Decimal]
-    usd_value: Optional[Decimal]
-    type: Optional[str]
-    locked: Optional[int]
-    proxy: Optional[str]
-    extra: Optional[str]
-    stable: Optional[int]
+    protocol: Optional[str] = None
+    address: Optional[str] = None
+    chain: Optional[str] = None
+    source: Optional[str] = None
+    updated: Optional[int] = None
+    label: Optional[str] = None
+    price: Optional[Decimal] = None
+    usd_value: Optional[Decimal] = None
+    type: Optional[str] = None
+    locked: Optional[int] = None
+    proxy: Optional[str] = None
+    extra: Optional[str] = None
+    stable: Optional[int] = None
 
 
 class RecordNotFoundException(Exception):

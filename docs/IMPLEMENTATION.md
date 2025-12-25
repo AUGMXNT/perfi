@@ -86,3 +86,18 @@ This is the shared implementation log per `AGENTS.md`. For the 2025 migration ro
 ### Notes
 
 - `frontend` still fails `npm run build` due to existing `vue-tsc` type errors; release workflow uses `npx vite build`, which passes.
+
+## 2025-12-25 — Security: clear high Dependabot alerts
+
+### Done
+
+- Python: upgraded to `starlette>=0.49.1` (via `starlette==0.50.0`) to address the high-severity Range-header DoS advisory; this required upgrading to Pydantic v2 (`pydantic==2.12.5`) and updating `siwe` to v3 (`siwe==3.0.0`); updated `perfi/models.py` for Pydantic v2 compatibility (optional defaults, Decimal JSON serialization, TxLedger timestamp coercion).
+- Frontend: bumped `vite` to `2.9.18` (fixes multiple high Vite dev-server advisories) and upgraded `start-server-and-test` to `2.1.3` (removes `wait-on`/`axios` high advisory chain); added npm `overrides` to force patched `rollup`/`semver`/`cross-spawn`/`braces`.
+- Electron: ran `npm audit fix` to clear remaining high advisories (leaving only low-severity `tmp` advisory without `--force`).
+
+### Test/validation notes
+
+- `uv sync --frozen --all-groups`
+- `uv run pytest` (66 passed)
+- `pushd frontend && npm audit --audit-level=high && npx vite build && popd`
+- `pushd electron && npm audit --audit-level=high && popd`
