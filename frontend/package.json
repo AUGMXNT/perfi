@@ -15,9 +15,10 @@
   "dependencies": {
     "@quasar/extras": "^1.13.5",
     "apexcharts": "^3.35.3",
+    "ethers": "^6.16.0",
     "pinia": "^2.0.13",
     "quasar": "^2.6.6",
-    "siwe": "^1.1.6",
+    "siwe": "^3.0.0",
     "vue": "^3.2.33",
     "vue-router": "^4.0.14",
     "vue3-apexcharts": "^1.4.1"
@@ -41,7 +42,10 @@
     "start-server-and-test": "^1.14.0",
     "typescript": "~4.6.3",
     "vite": "^2.9.5",
-    "vue-cli-plugin-svg": "~0.2.1",
     "vue-tsc": "^0.34.7"
+  },
+  "overrides": {
+    "@cypress/request": "^3.0.9",
+    "form-data": "^2.5.5"
   }
 }

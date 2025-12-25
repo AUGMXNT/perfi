@@ -67,3 +67,22 @@ This is the shared implementation log per `AGENTS.md`. For the 2025 migration ro
 ### Notes
 
 - Playwright requires installing browser binaries once (example): `uv run playwright install chromium`
+
+## 2025-12-25 — Security: clear critical Dependabot alerts
+
+### Done
+
+- Python: bumped `h11` (and `httpcore`) to address the Dependabot alert; updated `uv.lock`
+- Frontend: upgraded `siwe` to v3 and removed stale webpack-era deps; added npm `overrides` to clear remaining criticals; updated `frontend/package-lock.json`
+- Electron: upgraded `electron`, `electron-builder`, and `axios`; upgraded Electron Forge deps to eliminate the `request` chain; updated `electron/package-lock.json`
+
+### Test/validation notes
+
+- `uv run pytest --verbose`
+- `pushd frontend && npx vite build && popd`
+- `pushd frontend && npm audit` (0 critical)
+- `pushd electron && npm audit` (0 critical)
+
+### Notes
+
+- `frontend` still fails `npm run build` due to existing `vue-tsc` type errors; release workflow uses `npx vite build`, which passes.

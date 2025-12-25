@@ -1,14 +1,22 @@
 <script setup lang="ts">
-    import { ethers } from 'ethers';
+    import { BrowserProvider } from 'ethers';
     import { SiweMessage } from 'siwe';
 
     const domain = window.location.host;
     const origin = window.location.origin;
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
-    const signer = provider.getSigner();
 
     const BACKEND_ADDR = "http://localhost:8001";
-    async function createSiweMessage(address, statement) {
+
+    async function getSigner() {
+        const ethereum = (window as any).ethereum;
+        if (!ethereum) {
+            throw new Error("No window.ethereum found");
+        }
+        const provider = new BrowserProvider(ethereum);
+        return await provider.getSigner();
+    }
+
+    async function createSiweMessage(address: string, statement: string) {
         const res = await fetch(`${BACKEND_ADDR}/siwe/nonce`, {
             credentials: 'include',
         });
@@ -18,18 +26,27 @@
             statement,
             uri: origin,
             version: '1',
-            chainId: '1',
+            chainId: 1,
             nonce: await res.text()
         });
         return message.prepareMessage();
     }
 
-    function connectWallet() {
-        provider.send('eth_requestAccounts', [])
-            .catch(() => console.log('user rejected request'));
+    async function connectWallet() {
+        try {
+            const ethereum = (window as any).ethereum;
+            if (!ethereum) {
+                console.log('No window.ethereum found');
+                return;
+            }
+            await ethereum.request({ method: 'eth_requestAccounts' });
+        } catch {
+            console.log('user rejected request');
+        }
     }
 
     async function signInWithEthereum() {
+        const signer = await getSigner();
         const message = await createSiweMessage(
             await signer.getAddress(),
             'Sign in with Ethereum to the app.'
