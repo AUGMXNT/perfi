@@ -104,5 +104,8 @@
     "@electron-forge/publisher-github": "^7.10.2",
     "electron": "39.2.7",
     "electron-builder": "^26.0.12"
+  },
+  "overrides": {
+    "tmp": "^0.2.5"
   }
 }

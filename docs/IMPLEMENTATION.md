@@ -119,3 +119,20 @@ This is the shared implementation log per `AGENTS.md`. For the 2025 migration ro
 ### Notes
 
 - Older wiki notes are still kept, but docs now start with a “Status (2025)” section where relevant to prevent stale guidance.
+
+## 2025-12-25 — Security: clear remaining npm low/medium advisories
+
+### Done
+
+- Frontend: upgraded build tooling to clear moderate Vite advisories:
+  - `vite==7.3.0`, `@vitejs/plugin-vue==6.0.3`
+  - `@quasar/vite-plugin==1.10.0` required bumping `quasar==2.18.6` (+ `@quasar/extras==1.17.0`)
+  - `@types/node==24.10.4` to satisfy Vite’s peer requirements
+  - `frontend/vite.config.ts` now aliases `src` so Quasar’s `sassVariables: 'src/quasar-variables.sass'` resolves
+- Electron: added npm `overrides` to force `tmp@^0.2.5` (clears the remaining `tmp` advisory path via `external-editor`).
+
+### Test/validation notes
+
+- `uv run pytest` (66 passed)
+- `pushd frontend && npm ci && npm audit --audit-level=low && npx vite build && popd` (0 vulnerabilities)
+- `pushd electron && npm ci && npm audit --audit-level=low && popd` (0 vulnerabilities)
