@@ -28,7 +28,7 @@ ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
 ## Requirements
 You should be familiar with and have [Python](https://www.python.org/) (3.11-3.14). We have now switched to [PEP 621](https://peps.python.org/pep-0621/) for dependency management and recommend using `uv` for management:
 
-We won't be providing any support for setting up your software environment, but recommend using an advanced LLM like Claude Sonnet 3.5 with grounding (loading files, search) for support.
+We won't be providing any support for setting up your software environment, but recommend using an advance coding agent (Claude Code, OpenAI Codex, etc) with strong coding capabilities and grounding (it should be able to read git commits, our docs folder, run tests, and read the codebase as least) for support.
 
 perfi currently depends on several third party API providers (no configuration is required by default):
 - [DeBank OpenAPI](https://open.debank.com/) - provides a helpful list of transaction history per chain
