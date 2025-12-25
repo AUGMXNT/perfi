@@ -1,6 +1,33 @@
 # Transactions
 
-## TODOs
+## Current pipeline (2025)
+
+This is how transaction data flows through the system today:
+
+1. Ingest chain data into `tx_chain` (`perfi/ingest/chain.py`).
+   - For EVM chains, we currently rely primarily on DeBank history (`DEBANK_KEY` OpenAPI when configured, otherwise a Playwright fallback).
+2. Generate `tx_ledger` from `tx_chain` (`perfi/transaction/chain_to_ledger.py`).
+   - Per address we delete and rebuild `tx_ledger` (and `tx_rel_ledger_logical`) from `tx_chain`.
+   - `tx_ledger.id` is deterministic (`sha256(chain+address+hash+from+to+asset_tx_id+isfee+amount)`) via `LedgerTx.generate_id()`.
+   - Fees are represented as separate OUT ledger rows with `isfee=1` and `tx_ledger_type="fee"`.
+3. Group `tx_ledger` into `tx_logical` (`perfi/transaction/ledger_to_logical.py`).
+   - First pass creates a `tx_logical` per `tx_ledger` (id == tx_ledger.id) for idempotency.
+   - Second pass groups by chain tx `hash` via `tx_ledger_moved` events and reassigns ledgers into a single logical tx.
+   - `TxLogical.refresh_type()` derives `tx_logical_type` (swap/trade/send/receive/...) and may set review flags.
+4. Manual overrides are event-sourced (`perfi/events.py`) and survive regeneration.
+   - CLI/API can move ledger rows between logical txs, override ledger/logical types, set prices, add/remove flags, and lock costbasis lots.
+5. Cost basis is derived from `tx_logical` (`perfi/costbasis.py`) and covered by `tests/e2e/test_e2e_costbasis.py`.
+
+## Notes on regeneration and manual edits
+
+- `tx_chain` is the durable raw ingest store; downstream tables (`tx_ledger`, `tx_logical`, costbasis tables) are designed to be regenerable.
+- Manual edits should be expressed as events rather than direct DB mutations; rerunning grouping / costbasis should re-apply them.
+
+---
+
+## Historical notes (2021–2022, may be outdated)
+
+### TODOs
 
 - [x]  Pull coingecko token list into `asset_price`
     - [x]  Pull prices
@@ -10,25 +37,23 @@
 - [x]  Investigate why raw_data doesn't exist for some txns in updateledger script run
     - [x]  put LedgerTxs() into tx_ledger
 
----
-
 we should always be able to replay the 
 
 - regenerate chain reimport
 - chain impmort
 
-# How to update Transactions
+### How to update Transactions
 
 t**x_chain** is going to be UNIQUE(”chain”, “address”, “hash”) so we can regenerate or update that at  will
 
-**tx_ledger** and **tx_logical** have auto increment ids that are arbitrary so we have to be careful about regeneration because a **tx_logical** can be manually updated and then can no longer be automatically regenerated, and neither can the **tx_ledger** transactions referenced by that **tx_logical**
+In code today, `tx_ledger.id` is deterministic (see `LedgerTx.generate_id()` in `perfi/transaction/chain_to_ledger.py`) and `tx_logical` rows are regenerated from `tx_ledger` and then grouped via event-sourced “move” events. Manual changes should be persisted as events so regeneration remains safe.
 
 **tx_ledger** can be manually
 
 - Before a **tx_ledger** record is inserted, we look to see if we have an existing record for chain, address, hash, direction, amount, perfi_asset_id (make an asset id for fee?)
     - If found, we write this record to a queue for review/editing and then another script processes that queue to do any needed updates (e.g. bug fixes for mis-categorized things or whatever)
 
-# Notes from 2021-02-16 call
+### Notes from 2021-02-16 call
 
 1. Why do we want to see the internal transactions (which have parent_hash) as a top level item inside the transactions list? Why not just see them as nested inside their associated parent transaction?
 Our current thinking was to store tx_chain records keyed on (chain, hash, address) which means we would conflict when we insert the internal transaction and use its parent_hash as the 'hash' value for it.
@@ -42,9 +67,7 @@ Our current thinking was to store tx_chain records keyed on (chain, hash, addres
     1. Yes we care. Scraping is done for Etherscan.
     2. **Can we find an example from snowscan?**
 
-### 
-
-## Interesting examples for scraper tests in future
+### Interesting examples for scraper tests in future
 
 Etherscan - ERC-1155 minting - `https://etherscan.io/tx/0xEXAMPLE_TX_HASH`
 
@@ -60,7 +83,7 @@ Snowtrace - Mint and burn of tokens in same transaction - `https://snowtrace.io/
 
  
 
-# 2022-02-14 Review
+### 2022-02-14 Review
 
 - tx_chain
     - store by **UNIQUE(chain, hash, address)**
@@ -96,7 +119,7 @@ Generate from tx_chain(address) ordered by time
     - approvals or multistep tx_chain or tx_ledger can be a single logical transaction
     - does tx_ledger.ids in tx_logical need to be relational? TBD
 
-# How to Get Transactions
+### How to Get Transactions
 
 Account: [https://etherscan.io/address/0xEXAMPLE_ADDRESS](https://etherscan.io/address/0xEXAMPLE_ADDRESS)
 
@@ -192,7 +215,7 @@ CREATE TABLE IF NOT EXISTS "tx_ledger" (
 COMMIT;
 ```
 
-# tx_chain refactor
+### tx_chain refactor
 
 This table should store everything we need to regenerate tx_ledger...
 
@@ -255,7 +278,7 @@ covalent
     - method
 - fee_cost
 
-## tx_chain_raw
+### tx_chain_raw
 
 This m:n table should include the raw parsed data that we can look at if we ever need to extract more data
 

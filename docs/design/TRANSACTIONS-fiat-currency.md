@@ -1,16 +1,16 @@
 # Fiat Currency Handling
 
-2022-03-20: This documentation is incomplete and needs verification
+Status (2025): implemented and covered by tests.
 
 Fiat currencies:
 
-- have an `asset_tx_id` of `FIAT:[CUR]` were `CUR` is a currency code like USD, SGD
-- the PriceFeed will intelligently recognize and return the proper conversion
-- we do the output in the final 8949
+- have an `asset_tx_id` of `FIAT:[CUR]` where `CUR` is a currency code like USD, SGD
+- are emitted by exchange importers (see `perfi/ingest/exchange.py`)
+- are priced/converted during ledger generation for imported transactions (see `perfi/transaction/chain_to_ledger.py`)
 
-## Fiat Currency Discussion
+## Swap vs trade (why we care)
 
-For tracking buys/sells on exchanges, we’ll want to support tracking costbasis lots for fiats.
+For tracking buys/sells on exchanges, we need to model FIAT legs explicitly; however, perfi does not currently create costbasis lots for FIAT assets (it treats FIAT as a settlement/pricing currency).
 
 QUESTION: Do we track them the same way (mechanically) that we track all assets (e.g. asset_tx_id / asset_price_id — probably with a special leading character like ‘FIAT_SGD’ or ‘FIAT_RMB’ etc to let us know it’s not a token but is actually a fiat currency symbol?
 
@@ -18,12 +18,26 @@ IMPORTANT: We definitely want to make a distinction between a “swap” (token 
 
 We actually want this because in many tax regimes, the former is not necessarily taxed, but the latter is
 
-QUESTION:  When should we convert from foreign FIAT_* to FIAT_USD prices? During costbasis somewhere?
+In code today:
 
-**TODOs**
+- `TxLogical.refresh_type()` marks 1-in/1-out transactions as `trade` if either side is `FIAT:*`, otherwise `swap`.
+- Costbasis treats `trade` as a disposal when you are selling crypto for FIAT (OUT is not FIAT), but not a disposal when you are buying crypto with FIAT (OUT is FIAT).
 
-- In Importers, use FIAT:SYM for all symbols that represent fiat currencies
-- In TxLogical typer, in swap, teach it to type it as `trade` if any of the ins/outs startswith `FIAT:`
-- Update our PriceFeed.get_price  to understand that `Fiat:*`  coin_ids should actually use the CurrencyRate class to do a price lookup to USD instead.
-- Treat the new tx_logical_type `trade` as a disposal in `costbasis.py` by adding a new if clause for `trade`
-- LATER: costbasis 8949 script can do final conversion to local currency from our USD values if we ever want that
+## Pricing / FX
+
+- For imported transactions, `chain_to_ledger` converts FIAT amounts to USD using `price_feed.convert_fiat(...)`.
+- Costbasis does not create/track lots for FIAT assets (it skips them).
+
+## Tests
+
+- `tests/integration/test_imports_from_exchanges.py` covers FIAT imports (Gemini USD/SGD, etc).
+- `tests/e2e/test_e2e_costbasis.py` exercises disposal logic for swaps/trades.
+
+**Implementation checklist (now done):**
+
+- [x] Importers emit `FIAT:*` assets
+- [x] `TxLogical.refresh_type()` marks FIAT-involved swaps as `trade`
+- [x] `chain_to_ledger` converts FIAT to USD for pricing
+- [x] Costbasis includes `trade` handling (buy vs sell behavior)
+
+LATER: 8949 output could optionally convert USD values into a local currency at report time.

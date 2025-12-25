@@ -1,5 +1,10 @@
 # Disposal Review
 
+## Status (2025)
+
+- The current costbasis implementation lives in `perfi/costbasis.py` and uses a `receipt` flag (`costbasis_lot.receipt`) rather than the older `no_disposal` naming used in these notes.
+- Line numbers and some details below refer to older versions of the code; treat this doc as historical context and debugging rationale.
+
 # Pre Mar 21 Behavior
 
 This is a review of our INCORRECT pre-Mar 21 “disposal” handling and how to fix it.

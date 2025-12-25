@@ -1,5 +1,12 @@
 # 2022-03-02 Cost Basis Review
 
+## Status (2025)
+
+- Implemented in `perfi/costbasis.py` and exercised by `tests/e2e/test_e2e_costbasis.py`.
+- Lots are keyed by `asset_tx_id` (fiat assets use `FIAT:*` and are treated specially).
+- Receipt-style assets are tracked via `costbasis_lot.receipt=1` and optional `history` for unwind logic.
+- Tax-year “locking” exists at the costbasis lot level (`costbasis_lot.locked_for_year`), but broader “freeze submitted years” semantics are still evolving.
+
 We are using `asset_tx_id` to uniquely identify what asset a cost basis lot is tracking
 
 # Cost Basis Price Generation
@@ -10,7 +17,7 @@ We will generate the costbasis price based on a combination
 - inheriting the price from a previous cost basis lot (eg, AVAX to avAVAX)
 - maybe tx_logical_type or some other algorithm, mapping, etc at some point
 
-**TODO:** implement this part below (not yet done as of this discussion; add an is_swap mapping)
+**Historical TODO (2022):** implement swap-aware price derivation (this is now implemented in `perfi/costbasis.py`; keep the notes below as design context).
 
 NOTE: based on this discussion: [COST-BASIS-accounting.md](COST-BASIS-accounting.md)
 
@@ -23,12 +30,12 @@ We will need to think about how to calculate these differently if we don’t hav
 
 # Transaction Types
 
-We are as a **HACK** using `debank_name` as the `tx_logical.tx_perfi_type` and the `tx_ledger.tx_perfi_type`  — we currently also do some mappings for `tx_ledger.tx_perfi_type` to normalize from debank but not much yet.
+We currently seed `tx_ledger.tx_ledger_type` from DeBank’s `tx.name` (with a small mapping layer) and then derive `tx_logical.tx_logical_type` from grouped ledger entries (`TxLogical.refresh_type()`).
 
 But, we need **TODO** create logic for using are appropriate [Ledger Entry Types](TRANSACTIONS-ledger-entry-types.md) 
 
 - We have a list of `tx_ledger_type` already
-    - eg swap_in, swap_out
+    - currently mostly DeBank-derived values (plus `fee`); future work could normalize into more explicit values like swap_in/swap_out
 - We need to derive a list of `tx_logical_type`
     - eg swap
 
@@ -38,7 +45,7 @@ We have a number of operations that depend on interactions at the TxLogical leve
 
 # Disposal
 
-We use `is_disposal` **HACK** for disposal mapping. This needs to be replaced by personal/tax regime rules and we should map it against our standardized `tx_ledger_type`
+We currently decide disposals based on `tx_logical_type` heuristics in `perfi/costbasis.py`. Long-term this should be ruleset-driven (per entity / tax regime) and mapped to a standardized vocabulary.
 
 # Original Cost Basis Tracking for Multiple Inputs
 

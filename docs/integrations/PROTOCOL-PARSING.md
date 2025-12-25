@@ -1,5 +1,9 @@
 # Protocol Parsing
 
+Status (2025): perfi does not yet have a full protocol-specific parsing/plugin system.
+Most current typing comes from DeBank `tx.name` heuristics and exchange import labels.
+This document captures future-looking ideas/examples.
+
 Future Extension: Specific Protocol, Parsing
 
 Example CowSwap transaction: `https://gnosis-protocol.io/tx/0xEXAMPLE_TX_HASH`

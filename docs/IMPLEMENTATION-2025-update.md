@@ -15,6 +15,7 @@ It started as a checklist of what needed doing next; “Round 2” work items be
 - ✅ Added `uv.lock` and switched CI to `uv sync --frozen` + `uv run`
 - ✅ Removed Poetry references from CI and core scripts/docs (electron dev spawn, setup script, CLI messages, frontend README)
 - ✅ Aligned supported Python to `>=3.11,<3.15` (CI runs 3.11 + 3.14)
+- ✅ Cleared critical + high Dependabot alerts (Python + frontend + electron); see `docs/IMPLEMENTATION.md`
 
 ## Current State (what we found)
 

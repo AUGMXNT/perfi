@@ -1,5 +1,17 @@
 # Ledger Entry Types
 
+## Status (2025)
+
+- `tx_ledger_type` is currently derived from:
+  - DeBank `tx.name` (with a small mapping layer) or the raw value, plus a special `fee` ledger entry
+  - Exchange importers setting explicit `tx_ledger_type` values
+  - Code: `perfi/transaction/chain_to_ledger.py::TxTyper.get_transaction_type`
+- `tx_logical_type` is derived from grouped ledger entries:
+  - Code: `perfi/models.py::TxLogical.refresh_type`
+  - Vocabulary: `perfi/models.py::TX_LOGICAL_TYPE` (ledger-level also uses `fee`)
+
+The rest of this document is historical design exploration and a proposed taxonomy for future normalization.
+
 [https://github.com/AUGMXNT/perfi-poc/blob/2bed1398bb1152e8af4486f58630524c4043a8a2/_old/poc/txtypes.txt](https://github.com/AUGMXNT/perfi-poc/blob/2bed1398bb1152e8af4486f58630524c4043a8a2/_old/poc/txtypes.txt)
 
 ## Transaction Types
@@ -39,7 +51,7 @@ tx_logical_type
 - name - english version
 - tx_ledger_type_map
 
-tx_perfi_type→tx_ledger_type
+Historical: `tx_perfi_type` (old name) → `tx_ledger_type`
 
 - id - slug version
 - direction
@@ -158,7 +170,7 @@ Might be simple order:
 * contract address overrides
 * to/from address
 
-QUESTION: will we ever want to change a tx_ledger.tx_perfi_type based on the tx_logicial that it belongs to?
+QUESTION: will we ever want to change a tx_ledger.tx_ledger_type based on the tx_logical that it belongs to?
 * maybe for a bridge transaction?
 * but a bridge tx send will always be either a send to an EOA bridge address or a contract interaction with a bridge address
 * the matching receive will sometimes be from a contract, sometimes generated from null by a contract, sometimes from an account... j

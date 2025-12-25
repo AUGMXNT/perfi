@@ -101,3 +101,21 @@ This is the shared implementation log per `AGENTS.md`. For the 2025 migration ro
 - `uv run pytest` (66 passed)
 - `pushd frontend && npm audit --audit-level=high && npx vite build && popd`
 - `pushd electron && npm audit --audit-level=high && popd`
+
+## 2025-12-25 — Docs refresh pass (accuracy vs code/tests)
+
+### Done
+
+- Added `docs/PLAN.md` and turned `docs/README.md` into a docs index
+- Updated integration/architecture docs:
+  - `docs/integrations/APIS-debank.md`
+  - `docs/architecture/GUI-PACKAGING.md`
+- Updated design docs to reflect current implementation, while preserving historical reasoning:
+  - `docs/design/TRANSACTIONS-processing.md`
+  - `docs/design/TRANSACTIONS-ledger-entry-types.md`
+  - `docs/design/TRANSACTIONS-fiat-currency.md`
+  - `docs/design/COST-BASIS-*.md`
+
+### Notes
+
+- Older wiki notes are still kept, but docs now start with a “Status (2025)” section where relevant to prevent stale guidance.

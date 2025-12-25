@@ -1,5 +1,11 @@
 # Cost Basis Accounting
 
+## Status (2025)
+
+- The current costbasis implementation lives in `perfi/costbasis.py`.
+- The regression suite lives in `tests/e2e/test_e2e_costbasis.py`.
+- The notes below are mostly historical design reasoning; keep them, but prefer the code/tests as the source of truth.
+
 - Cost Basis Accounting
     - [Beancount - Proposal - Inventory Booking Improvements](https://docs.google.com/document/d/1F8IJ_7fMHZ75XFPocMokLxVZczAhrBRBVN9uMhQFCZ4/edit#heading=h.slkego4axqdp)
     - [https://github.com/simonmichael/hledger/issues/1022](https://github.com/simonmichael/hledger/issues/1022)

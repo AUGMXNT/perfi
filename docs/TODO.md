@@ -1,22 +1,24 @@
-# 2025-12-25 Update
-Our goal is to make sure first that our codebase is in a working state
+# TODO (legacy scratchpad)
 
-[x] poetry -> uv
-[x] does everything run on latest python (3.14)?
-[x] swap out non-working libs like selenium for playwright 
-[ ] Make sure our docs are up-to-date
+Prefer `docs/PLAN.md` for the curated roadmap. This file is a quick capture list.
 
-Our next priority is to make sure that our 2021 Taxes are migrated and are "locked"
+## Done (2025-12-25)
 
-[ ] This probably requires us to create an IMPLEMENTATION-taxyear-locking.md that let's us lockdown our cost-basis, etc for previous  years
+- [x] Poetry -> uv
+- [x] Python 3.14 support
+- [x] Selenium -> Playwright (DeBank browser fallback)
 
-We have to do 2022-2025 Transations...
+## Next
 
-[ ] Make sure we handle GMX and escrow transactions - consistent handling
-[ ] Think about how we're calculating our interest?
+- [ ] Docs pass: validate `docs/` against code + tests
+- [ ] Tax-year locking plan doc (e.g. `docs/IMPLEMENTATION-taxyear-locking.md`)
 
-Nice to have:
-[ ] Track tax prepayments
+## Coverage / rules
 
-Next Big Functionality
-[ ] Daily Yield Tracking (see Spreadsheet)
+- [ ] 2021 taxes migration + lock-down
+- [ ] 2022–2025 transactions: GMX, escrow, interest/yield rules
+
+## Ideas
+
+- [ ] Track tax prepayments
+- [ ] Daily yield tracking
