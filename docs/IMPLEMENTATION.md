@@ -30,7 +30,7 @@ This is the shared implementation log per `AGENTS.md`. For the 2025 migration ro
 ### Follow-ups
 
 - Consider replacing/removing unmaintained runtime deps (`delegator.py`, `rootpath`, `sttable`) per the 2025 audit doc.
-- Decide whether to keep Selenium-wire or migrate the DeBank browser scraper to Playwright.
+- (Done) Migrated the DeBank browser scraper to Playwright (see below).
 
 ## 2025-12-25 — Python 3.14 upgrade
 
@@ -56,3 +56,14 @@ This is the shared implementation log per `AGENTS.md`. For the 2025 migration ro
 ### Follow-ups
 
 - Address new/visible warnings on 3.14 (invalid escape sequences, `datetime.utcfromtimestamp()` deprecation, `pkg_resources` deprecation from transitive deps).
+
+## 2025-12-25 — DeBank browser scraper: Selenium-wire -> Playwright
+
+### Done
+
+- Replaced selenium-wire-based DeBank history scraping with Playwright (`perfi/ingest/chain.py`)
+- Removed `selenium-wire` / `chromedriver-binary-auto` deps; added `playwright` (`pyproject.toml`, `uv.lock`)
+
+### Notes
+
+- Playwright requires installing browser binaries once (example): `uv run playwright install chromium`

@@ -70,21 +70,20 @@ Evidence below is from PyPI “last upload” timestamps.
 | `rootpath` | Yes (`perfi/constants/paths.py`) | 2019-03-10 | Abandoned | Replace with `pathlib.Path(__file__).resolve()` patterns or `importlib.resources` |
 | `sttable` | Tests (`tests/integration/test_imports_from_exchanges.py`) | 2019-11-23 | Abandoned | Replace with a small local parser or a maintained table parser |
 
-#### 2) Selenium stack risk (recommend re-evaluating)
+#### 2) Browser automation stack (now Playwright)
 
-| Package | Used? | Last PyPI release | Notes |
-|---|---:|---:|---|
-| `selenium-wire` | Yes (`perfi/ingest/chain.py`) | 2022-10-15 | Appears unmaintained; also pins older transitive deps (e.g. `blinker==1.7.0`) |
-| `chromedriver-binary-auto` | Yes (via `import chromedriver_binary`) | 2023-07-25 | Driver-management fragility; may not keep pace with Chrome/Selenium changes |
+- `perfi/ingest/chain.py` now uses **Playwright** to scrape DeBank history (when no `DEBANK_KEY` is configured).
+- This removes selenium-wire + chromedriver management + pinned transitive deps.
+- Playwright requires installing browser binaries on first use (example): `uv run playwright install chromium`
 
 #### 3) “Transitive pins” increasing upgrade friction
 
-`pyproject.toml` lists several packages that are commonly transitive dependencies (examples: `httpcore`, `h11`, `anyio`, `starlette`, `click`, `asttokens`, `executing`, `blinker`).
+`pyproject.toml` lists several packages that are commonly transitive dependencies (examples: `httpcore`, `h11`, `anyio`, `starlette`, `click`, `asttokens`, `executing`).
 
 This is not inherently wrong, but it tends to:
 - increase the chance of resolver conflicts,
 - make upgrades harder (more pins to coordinate),
-- lock you into old transitive versions (e.g. `blinker==1.7.0` due to selenium-wire).
+- lock you into old transitive versions.
 
 **Follow-up task:** Decide which of these can be removed from direct dependencies safely.
 
@@ -99,40 +98,36 @@ If not imported at runtime, move it to a dev/test group or remove and use a GitH
 
 - `requires-python = ">=3.11,<3.15"` (Python 3.11–3.14)
 - ✅ `uv sync --frozen --all-groups --python 3.14` + `pytest` pass on Python 3.14.2
-- ⚠️ `selenium-wire` still appears unmaintained and remains a long-term risk
+- ✅ DeBank browser scraping now uses Playwright (no selenium-wire stack)
 
 Note: Python 3.14 required bumping `lxml` to `>=6.0.2` to avoid source builds (no `cp314` wheels in `lxml<6`).
 
-## Browser Automation: Selenium -> Playwright / Stagehand / Vibium
+## Browser Automation: Playwright / Stagehand / Vibium
 
-### What Selenium is doing today
+### What browser scraping is doing today
 
-Only one major usage was found:
+Only one major usage is present:
 
-- `perfi/ingest/chain.py` uses `selenium-wire` to open `https://debank.com/profile/{address}/history`, repeatedly click “Load More”, and capture XHR responses from `https://api.debank.com/history/list`.
+- `perfi/ingest/chain.py` uses **Playwright** to open `https://debank.com/profile/{address}/history`, click “Load More”, and capture XHR responses from `https://api.debank.com/history/list`.
 
 This exists because DeBank’s free OpenAPI was discontinued (see the in-file comment), and the paid API requires `DEBANK_KEY`.
 
 ### Options (tradeoffs)
 
-1. **Keep Selenium-wire (short term)**
-   - Pros: no rewrite
-   - Cons: unmaintained package, fragile driver story, pins old deps, Python-version constraints
-
-2. **Switch to Playwright (recommended if browser scraping remains needed)**
+1. **Playwright (current)**
    - Pros: actively maintained; better headless reliability; built-in network capture; avoids chromedriver management
-   - Cons: requires installing browser binaries (`playwright install`); some refactor effort
+   - Cons: requires installing browser binaries (`playwright install`)
 
-3. **Stagehand**
+2. **Stagehand**
    - Stagehand (Python SDK) is actively updated, but it pulls in **LLM + Browserbase** dependencies (`openai`, `anthropic`, `browserbase`, etc).
    - Likely overkill unless we explicitly want AI-driven browsing and are OK with that dependency surface.
 
-4. **Vibium**
+3. **Vibium**
    - Exists on PyPI but appears extremely early-stage (`0.0.1`). Risky as a foundation dependency right now.
 
 ### Recommendation for Round 2
 
-- If we still need the DeBank “browser scrape fallback”, implement it with **Playwright** (keep the logic the same: click “Load More”, capture responses).
+- ✅ DeBank “browser scrape fallback” is implemented with **Playwright** (click “Load More”, capture XHR responses).
 - If we can accept requiring `DEBANK_KEY`, consider **removing browser scraping entirely** and treating DeBank as a configured integration.
 
 ## Proposed Round 2 Execution Plan (actual changes)
@@ -171,9 +166,8 @@ Recommended order:
 
 ### D) Selenium replacement decision
 
-- Choose one:
-  - **Playwright-based DeBank browser scraper**, or
-  - **Require `DEBANK_KEY`**, remove browser scraping and associated dependencies.
+- ✅ Playwright-based DeBank browser scraper (selenium-wire removed).
+- Optional: require `DEBANK_KEY` and remove browser scraping entirely.
 
 ## Notes / Open Questions
 

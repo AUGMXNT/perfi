@@ -57,6 +57,9 @@ cd perfi
 # Install (creates/updates .venv from uv.lock)
 uv sync --all-groups
 
+# If you plan to scrape DeBank via the browser (no DEBANK_KEY), install Playwright's browser binaries:
+uv run playwright install chromium
+
 # To update dependencies to latest compatible versions (updates uv.lock)
 uv lock --upgrade
 uv sync --all-groups

@@ -3,7 +3,7 @@ Our goal is to make sure first that our codebase is in a working state
 
 [x] poetry -> uv
 [x] does everything run on latest python (3.14)?
-[ ] swap out non-working libs like selenium for playwright 
+[x] swap out non-working libs like selenium for playwright 
 [ ] Make sure our docs are up-to-date
 
 Our next priority is to make sure that our 2021 Taxes are migrated and are "locked"

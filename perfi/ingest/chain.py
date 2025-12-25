@@ -10,11 +10,9 @@ from decimal import Decimal
 from pprint import pprint, pformat
 
 import arrow
-import chromedriver_binary  # noqa
 from bs4 import BeautifulSoup
 from lxml import etree, html
-from seleniumwire import webdriver
-from seleniumwire.utils import decode
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from tqdm import tqdm
 
 from ..cache import cache, CacheGet404Exception
@@ -2076,10 +2074,9 @@ class DeBankTransactionsFetcher:
 
 
 class DeBankBrowserTransactionsFetcher:
-    def __init__(self, db=None):
+    def __init__(self, db=None, headless: bool = True):
         self.db = db
-        self.driver = webdriver.Chrome()
-        self.driver.implicitly_wait(20)
+        self.headless = headless
 
     def scrape_history(self, address, until_date=None):
         transactions = []
@@ -2148,51 +2145,56 @@ class DeBankBrowserTransactionsFetcher:
 
     def scrape_all_history_responses(self, address, until_epoch=0):
         url = f"https://debank.com/profile/{address}/history"
-        xpath = """//button[normalize-space()="Load More"]"""
-
-        print("Getting History...")
-        self.driver.get(url)
-        button = self.driver.find_element("xpath", xpath)
         url_to_capture = "https://api.debank.com/history/list"
+        responses: list[str] = []
 
-        while button:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=self.headless)
+            context = browser.new_context()
+            page = context.new_page()
+
+            print("Getting History...")
             try:
-                button = self.driver.find_element("xpath", xpath)
-            except:
-                button = None
+                with page.expect_response(
+                    lambda r: r.url.startswith(url_to_capture), timeout=30000
+                ) as resp_info:
+                    page.goto(url, wait_until="domcontentloaded")
+                responses.append(resp_info.value.text())
+            except PlaywrightTimeoutError:
+                page.goto(url, wait_until="domcontentloaded")
 
-            # Look at the last history_list request to see if we should stop at until_epoch
-            requests = [
-                r for r in self.driver.requests if r.url.startswith(url_to_capture)
-            ]
-            r = requests[-1]
-            history_response = decode(
-                r.response.body, r.response.headers.get("Content-Encoding", "identity")
-            )
-            j = json.loads(history_response)
-            for tx in j["data"]["history_list"]:
-                if tx["time_at"] <= until_epoch:
-                    print("Stopping at until_epoch")
-                    button = None
+            while True:
+                if until_epoch and responses:
+                    try:
+                        j = json.loads(responses[-1])
+                        for tx in j.get("data", {}).get("history_list", []):
+                            if tx.get("time_at", 0) <= until_epoch:
+                                print("Stopping at until_epoch")
+                                context.close()
+                                browser.close()
+                                return responses
+                    except Exception:
+                        pass
+
+                button = page.query_selector("button:has-text('Load More')")
+                if not button:
                     break
 
-            # OK, let's click
-            if button:
                 print("Fetching more...")
-                button.click()
-            time.sleep(2)
+                try:
+                    with page.expect_response(
+                        lambda r: r.url.startswith(url_to_capture), timeout=30000
+                    ) as resp_info:
+                        button.click()
+                    responses.append(resp_info.value.text())
+                except PlaywrightTimeoutError:
+                    break
 
-        # Sat to do this again, but that's life...
-        requests = [r for r in self.driver.requests if r.url.startswith(url_to_capture)]
-        responses = [
-            decode(
-                r.response.body, r.response.headers.get("Content-Encoding", "identity")
-            )
-            for r in requests
-        ]
-        self.driver.close()
+                page.wait_for_timeout(2000)
 
-        # Responses now contains a list of all the JSON API responses
+            context.close()
+            browser.close()
+
         return responses
 
 
