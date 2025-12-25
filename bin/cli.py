@@ -170,7 +170,7 @@ def setting_set_reporting_timezone(name: str):
     if name not in pytz.all_timezones_set:
         print(f"ERROR - {name} is not a time zone name that perfi knows how to handle.")
         print(
-            f"Try running `poetry run bin/cli.py setting get_timezone_names` to see all the valid time zone names."
+            f"Try running `uv run python bin/cli.py setting get_timezone_names` to see all the valid time zone names."
         )
     else:
         save_setting("REPORTING_TIMEZONE_NAME", name)
@@ -376,10 +376,10 @@ def setup_perfi():
             num_addresses_added += 1
     print("Done!")
     print(
-        "If you want to create more Entities later, run `poetry run bin/cli.py entity create`"
+        "If you want to create more Entities later, run `uv run python bin/cli.py entity create`"
     )
     print(
-        "If you want to create more Addresses later, run `poetry run bin/cli.py entity add_address`"
+        "If you want to create more Addresses later, run `uv run python bin/cli.py entity add_address`"
     )
 
     # Add Settings

@@ -3,6 +3,7 @@
 *.db
 XX*
 
+docs/_old/
 reference/
 
 # This is auto-generated

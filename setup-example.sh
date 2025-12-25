@@ -2,7 +2,7 @@
 set -e
 set -x
 
-pr="poetry run python"
+pr="uv run python"
 
 # This is an example script that you can modify to do your initial setup
 

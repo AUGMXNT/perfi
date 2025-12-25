@@ -9,6 +9,9 @@ from _pytest.monkeypatch import MonkeyPatch
 
 from perfi.models import TxLogical, TxLedger
 from perfi.events import EventStore
+import perfi.price as price_module
+import arrow
+from decimal import Decimal
 
 
 @pytest.fixture(scope="session")
@@ -19,7 +22,7 @@ def monkeysession(request):
 
 
 @pytest.fixture(scope="function", autouse=True)
-def test_db():
+def test_db(monkeypatch):
     test_db_file = ":memory:"
     tdb = DB(db_file=test_db_file, same_thread=False)
 
@@ -29,6 +32,24 @@ def test_db():
     seq_line = "CREATE TABLE sqlite_sequence(name,seq);"
     db_schema = db_schema.replace(seq_line, "")
     tdb.cur.executescript(db_schema)
+
+    # Ensure tests don't depend on any on-disk DB state or external price APIs.
+    monkeypatch.setattr(price_module, "db", tdb)
+
+    stubbed_daily_prices_usd = {
+        # Used by exchange-import tests (e.g. Kraken fee pricing); the code fetches daily prices.
+        ("bitcoin", "2016-10-29"): Decimal("715.4103243232162868"),
+    }
+
+    def _stubbed_pricefeed_get(self, coin_id, desired_epoch):
+        date_key = arrow.get(desired_epoch).format("YYYY-MM-DD")
+        price = stubbed_daily_prices_usd.get((coin_id, date_key))
+        if price is None:
+            return None
+        return price_module.CoinPrice("stubbed", coin_id, int(desired_epoch), price)
+
+    monkeypatch.setattr(price_module.PriceFeed, "get", _stubbed_pricefeed_get)
+
     yield tdb
 
     # keep the last test run's db around in case we want to inspect the db after tests finish

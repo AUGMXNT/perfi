@@ -19,7 +19,7 @@ For more information, especially on how the perfi app is built, and how the fron
     ```
     **Important note:** The URL above should point to the location and port of where you have perfi's API server running. By default that will be `http://localhost:8001` but you may have changed it inside `../perfi/api.py` so check there if needed.
 
-2. Next, run the perfi API server. From one directory up (above this README file), run `poetry run python perfi/api.py`.  Note the host/port that the API server is listening on and make sure it matches what you have in your `.env` from above.
+2. Next, run the perfi API server. From one directory up (above this README file), run `uv run python perfi/api.py`. Note the host/port that the API server is listening on and make sure it matches what you have in your `.env` from above.
 
 3. Once the API server is running, start the frontend dev server with: `npm run dev`. This should start a local frontend dev server on `http://localhost:3000` and pop the window open in your default browser.
 

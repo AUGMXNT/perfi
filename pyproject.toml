@@ -3,7 +3,7 @@ name = "perfi"
 version = "0.1.0"
 description = "defi portfolio analytics"
 authors = [{ name = "Your Name", email = "you@example.com" }]
-requires-python = ">=3.9,<3.12"
+requires-python = ">=3.10,<3.12"
 license = "AGPL-3.0-or-later"
 dependencies = [
     "cytoolz>=1.0.1,<2",

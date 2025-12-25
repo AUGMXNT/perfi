@@ -26,9 +26,9 @@ ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
 ```
 
 ## Requirements
-You should be familiar with and have [Python](https://www.python.org/) (3.9-3.11). We have now switched to [PEP 621](https://peps.python.org/pep-0621/) for dependency management and recommend using `uv` for management:
+You should be familiar with and have [Python](https://www.python.org/) (3.10-3.11). We have now switched to [PEP 621](https://peps.python.org/pep-0621/) for dependency management and recommend using `uv` for management:
 
-*NOTE*: Python 3.12+ is not compatible due to a known issue with selenium-wire
+*NOTE*: Python 3.12+ is not supported while we still depend on selenium-wire
 
 We won't be providing any support for setting up your software environment, but recommend using an advanced LLM like Claude Sonnet 3.5 with grounding (loading files, search) for support.
 
@@ -43,11 +43,11 @@ Here's how to install:
 ```bash
 # It is up to you to handle your Python environment. I recommend either:
 # mamba: https://github.com/conda-forge/miniforge?tab=readme-ov-file#requirements-and-installers
-#   mamba create -n perfi python=3.12
+#   mamba create -n perfi python=3.11
 #   mamba activate perfi
 # pyenv: https://github.com/pyenv/pyenv-installer
-#   pyenv install 3.12.8
-#   pyenv local 3.12.8 # in the perfi folder
+#   pyenv install 3.11.9 # pick the latest 3.11.x
+#   pyenv local 3.11.9 # in the perfi folder
 
 # You want uv
 pip install uv
@@ -56,17 +56,18 @@ pip install uv
 git clone https://github.com/AUGMXNT/perfi
 cd perfi
 
-# Install in development mode with all dependencies
-uv pip install -e .
+# Install (creates/updates .venv from uv.lock)
+uv sync --all-groups
 
-# To update dependencies to latest compatible versions
-uv pip install --upgrade -e .
+# To update dependencies to latest compatible versions (updates uv.lock)
+uv lock --upgrade
+uv sync --all-groups
 ```
 
 And how to run:
 ```
 # Interactive initial perfi setup (entity, accounts, API keys)
-python bin/cli.py setup
+uv run python bin/cli.py setup
 
 # NOTE: Many commands below require an entity name to operate on.
 # For the rest of these examples, we assume you have an entity named 'peepo'
@@ -74,43 +75,43 @@ python bin/cli.py setup
 # OPTIONAL: You can also add entities or addresses manually
 
 # Add an entity 'peepo'
-python bin/cli.py entity create peepo
+uv run python bin/cli.py entity create peepo
 
 # Add an ethereum-style account named 'degen wallet'
-python bin/cli.py entity add_address peepo 'degen wallet' 'ethereum' '0x0000000000000000000000000000000000000000'
+uv run python bin/cli.py entity add_address peepo 'degen wallet' 'ethereum' '0x0000000000000000000000000000000000000000'
 
 # You add as many wallets as you want to an entity
 
 # Update the Coingecko price token list
-python bin/update_coingecko_pricelist.py
+uv run python bin/update_coingecko_pricelist.py
 
 # OPTIONAL: Import data from exchanges (more docs below)
 # If you have data from Coinbase, Coinbase Pro, Kraken, Gemini, or Bitcoin.tax you can import this into perfi as well
-python bin/import_from_exchange.py --entity_name peepo --file peepo-coinbase-2021-rawtx.csv --exchange coinbase --exchange_account_id peepo
+uv run python bin/import_from_exchange.py --entity_name peepo --file peepo-coinbase-2021-rawtx.csv --exchange coinbase --exchange_account_id peepo
 
 # Import on-chain transactions
-python bin/import_chain_txs.py peepo
+uv run python bin/import_chain_txs.py peepo
 
 # Generate tx/price asset mappings - this step is key for matching like-kind assets and making sensical output
-python bin/map_assets.py
+uv run python bin/map_assets.py
 
 # Turn raw exchange/onchain txs into grouped logical/ledger txs
-python bin/group_transactions.py peepo
+uv run python bin/group_transactions.py peepo
 
 ### Generally you should not need to re-run anything above this line again ###
 
 # OPTIONAL: Set the timezone used for reporting (defaults to US/Pacific)
 # Get a list of valid time zone names with:
-python bin/cli.py setting get_timezone_names
+uv run python bin/cli.py setting get_timezone_names
 
 # And set your reporting timezone with:
-python bin/cli.py setting set_reporting_timezone 'Europe/Lisbon'
+uv run python bin/cli.py setting set_reporting_timezone 'Europe/Lisbon'
 
 # Calculate costbasis lots, disposals, and income
-python bin/calculate_costbasis.py peepo
+uv run python bin/calculate_costbasis.py peepo
 
 # Generate 8949 xlsx file
-python bin/generate_8949.py peepo
+uv run python bin/generate_8949.py peepo
 ```
 
 ### Importing data from exchanges
@@ -118,7 +119,7 @@ Today, perfi supports importing trade data from Bitcoin.tax, Coinbase, Coinbase 
 
 To import data from an exchange you run the command:
 ```
-python bin/import_from_exchange.py --entity_name <peepo> --file <path/to/export/file> --exchange <coinbase|coinbasepro|gemini|kraken|bitcointax> --exchange_account_id <anything_eg_default>
+uv run python bin/import_from_exchange.py --entity_name <peepo> --file <path/to/export/file> --exchange <coinbase|coinbasepro|gemini|kraken|bitcointax> --exchange_account_id <anything_eg_default>
 ```
 
 - use anything you want for the `--exchange-account-id` parameter; it's just used to help potentially differentiate multiple accounts from the same exchange

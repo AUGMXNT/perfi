@@ -22,7 +22,7 @@ import numpy as np
 import scipy.optimize as opt
 
 """
-poetry run python farm-helper.py | less -r
+uv run python farm-helper.py | less -r
 hacky paging: https://stackoverflow.com/questions/6728661/paging-output-from-python
 https://github.com/prompt-toolkit/pypager
 * would work but requires yielding all output also in an array? a bit weird

@@ -16,36 +16,36 @@ jobs:
             TARGET: linux
             CMD_BUILD: >
                 pushd frontend && npx vite build && rm -rf node_modules && popd &&
-                poetry run pyinstaller app_main.spec &&
+                uv run pyinstaller app_main.spec &&
                 mv dist electron/packaged_python &&
-                pushd electron && npm install && npm run dist
+                pushd electron && npm ci && npm run dist
           - os: macos-latest
             TARGET: macos
             CMD_BUILD: >
                 pushd frontend && npx vite build && rm -rf node_modules && popd &&
-                poetry run pyinstaller app_main.spec &&
+                uv run pyinstaller app_main.spec &&
                 mv dist electron/packaged_python &&
-                pushd electron && npm install && npm run dist
+                pushd electron && npm ci && npm run dist
           - os: windows-latest
             TARGET: windows
             CMD_BUILD: >
                 pushd frontend && npx vite build && rm node_modules -r -fo && popd &&
-                poetry run pyinstaller app_main.spec &&
+                uv run pyinstaller app_main.spec &&
                 mv dist electron/packaged_python &&
-                pushd electron && npm install && npm run dist
+                pushd electron && npm ci && npm run dist
     steps:
-    - uses: actions/setup-node@v3
-    - uses: actions/checkout@v1
-    - name: Set up Python 3.8
-      uses: actions/setup-python@v2
+    - uses: actions/setup-node@v4
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
       with:
-        python-version: 3.8
+        python-version: "3.11"
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install poetry
-        poetry install
-        pushd frontend && npm install && popd
+        pip install uv
+        uv sync --frozen --all-groups
+        pushd frontend && npm ci && popd
     - name: Build for ${{matrix.TARGET}}
       run: ${{matrix.CMD_BUILD}}
       env:

@@ -57,7 +57,7 @@ const createPyProc = async () => {
     })
   } else {
     console.log('looks local')
-    pyProc = childProcess.spawn('poetry', ['run', 'python', 'app_main.py', '--apiPort', apiPort, '--frontendPort', frontendPort], {
+    pyProc = childProcess.spawn('uv', ['run', 'python', 'app_main.py', '--apiPort', apiPort, '--frontendPort', frontendPort], {
       cwd: path.join(__dirname, '..', '..'),
       env: { ...process.env, API_PORT: apiPort, FRONTEND_PORT: frontendPort }
     })

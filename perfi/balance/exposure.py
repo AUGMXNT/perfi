@@ -232,7 +232,7 @@ def get_exposure(entity_name):
     exposure = defaultdict(lambda : dict(amount=Decimal(0), price=Decimal(0)))
 
     # Update from DB
-    c = delegator.run(f"poetry run python balance-debank-updatedb.py {entity_name}")
+    c = delegator.run(f"uv run python balance-debank-updatedb.py {entity_name}")
 
     # Now let's get our exposure...
     sql = '''SELECT exposure_symbol, amount, price

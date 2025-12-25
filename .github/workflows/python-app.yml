@@ -18,19 +18,18 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v3
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
       with:
-        python-version: "3.9"
+        python-version: "3.11"
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install uv 
-        uv pip install -e .
-        python bin/update_coingecko_pricelist.py
-        python bin/map_assets.py
+        pip install uv
+        uv sync --frozen --all-groups
+        uv run python bin/update_coingecko_pricelist.py
+        uv run python bin/map_assets.py
     - name: Test with pytest
       run: |
-        uv pip install pytest
-        poetry run pytest --verbose
+        uv run pytest --verbose
