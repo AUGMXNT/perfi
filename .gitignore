@@ -3,6 +3,8 @@
 *.db
 XX*
 
+reference/
+
 # This is auto-generated
 perfi/constants/assets.py
 
