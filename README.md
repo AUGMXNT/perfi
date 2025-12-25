@@ -26,9 +26,7 @@ ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
 ```
 
 ## Requirements
-You should be familiar with and have [Python](https://www.python.org/) (3.10-3.11). We have now switched to [PEP 621](https://peps.python.org/pep-0621/) for dependency management and recommend using `uv` for management:
-
-*NOTE*: Python 3.12+ is not supported while we still depend on selenium-wire
+You should be familiar with and have [Python](https://www.python.org/) (3.11-3.14). We have now switched to [PEP 621](https://peps.python.org/pep-0621/) for dependency management and recommend using `uv` for management:
 
 We won't be providing any support for setting up your software environment, but recommend using an advanced LLM like Claude Sonnet 3.5 with grounding (loading files, search) for support.
 
@@ -43,11 +41,11 @@ Here's how to install:
 ```bash
 # It is up to you to handle your Python environment. I recommend either:
 # mamba: https://github.com/conda-forge/miniforge?tab=readme-ov-file#requirements-and-installers
-#   mamba create -n perfi python=3.11
+#   mamba create -n perfi python=3.14
 #   mamba activate perfi
 # pyenv: https://github.com/pyenv/pyenv-installer
-#   pyenv install 3.11.9 # pick the latest 3.11.x
-#   pyenv local 3.11.9 # in the perfi folder
+#   pyenv install 3.14.2 # pick the latest 3.14.x
+#   pyenv local 3.14.2 # in the perfi folder
 
 # You want uv
 pip install uv

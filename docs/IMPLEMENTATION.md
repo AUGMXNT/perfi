@@ -19,6 +19,7 @@ This is the shared implementation log per `AGENTS.md`. For the 2025 migration ro
   - `perfi/farming/farm_helper.py` comment updated
 - Aligned Python support to `>=3.10,<3.12`:
   - Updated `pyproject.toml` and corresponding `README.md` instructions
+  - (Superseded by the Python 3.14 upgrade below)
 
 ### Test/validation notes
 
@@ -31,3 +32,27 @@ This is the shared implementation log per `AGENTS.md`. For the 2025 migration ro
 - Consider replacing/removing unmaintained runtime deps (`delegator.py`, `rootpath`, `sttable`) per the 2025 audit doc.
 - Decide whether to keep Selenium-wire or migrate the DeBank browser scraper to Playwright.
 
+## 2025-12-25 — Python 3.14 upgrade
+
+### Done
+
+- Updated `pyproject.toml` `requires-python` to `>=3.11,<3.15`
+- Bumped `lxml` to `>=6.0.2,<7` (required for CPython 3.14 wheels)
+- Regenerated lockfile with `uv lock --python 3.14`
+- Updated GitHub Actions:
+  - `.github/workflows/python-app.yml` runs a Python 3.11 + 3.14 test matrix (no Coingecko network step)
+  - `.github/workflows/build_releases.yml` builds with Python 3.14
+- Fixed test side-effects: `pytest` no longer rewrites `perfi/constants/assets.py` via `bin/map_assets.py`
+
+### Test/validation notes
+
+- `uv sync --frozen --all-groups --python 3.14`
+- `uv run pytest --verbose` (66 passed on Python 3.14.2)
+
+### Local env notes
+
+- `mamba install -n perfi python=3.14 -y` (conda env `perfi` now Python 3.14.2)
+
+### Follow-ups
+
+- Address new/visible warnings on 3.14 (invalid escape sequences, `datetime.utcfromtimestamp()` deprecation, `pkg_resources` deprecation from transitive deps).

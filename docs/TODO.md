@@ -2,7 +2,7 @@
 Our goal is to make sure first that our codebase is in a working state
 
 [x] poetry -> uv
-[ ] does everything run on latest python (3.14)?
+[x] does everything run on latest python (3.14)?
 [ ] swap out non-working libs like selenium for playwright 
 [ ] Make sure our docs are up-to-date
 

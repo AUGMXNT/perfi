@@ -14,7 +14,7 @@ It started as a checklist of what needed doing next; “Round 2” work items be
 
 - ✅ Added `uv.lock` and switched CI to `uv sync --frozen` + `uv run`
 - ✅ Removed Poetry references from CI and core scripts/docs (electron dev spawn, setup script, CLI messages, frontend README)
-- ✅ Aligned supported Python to `>=3.10,<3.12` (CI uses 3.11)
+- ✅ Aligned supported Python to `>=3.11,<3.15` (CI runs 3.11 + 3.14)
 
 ## Current State (what we found)
 
@@ -25,24 +25,22 @@ It started as a checklist of what needed doing next; “Round 2” work items be
 - ✅ `uv.lock` is now present, enabling reproducible installs with `uv sync --frozen`.
 - ✅ Poetry is no longer required for CI or the primary developer workflows in this repo.
 
-### Python version mismatch (important)
+### Python version support (important)
 
-`pyproject.toml` currently declares:
+`pyproject.toml` now declares:
 
-- `requires-python = ">=3.10,<3.12"`
-
-However, the pinned dependency floor includes packages that **do not support Python 3.9** (example: `matplotlib>=3.10.0` requires Python `>=3.10`).
+- `requires-python = ">=3.11,<3.15"`
 
 Practical implication:
-- The project **cannot** be installed for “Python 3.9+”; the effective minimum is Python 3.10.
-- ✅ CI now targets Python 3.11.
+- The project targets Python **3.11–3.14**
+- ✅ CI runs tests on Python 3.11 + 3.14
 
 ### CI/workflows are now `uv`-only
 
 ✅ CI/workflows are now `uv`-only:
 
 - `.github/workflows/python-app.yml` uses `uv sync --frozen --all-groups` and `uv run pytest`.
-- `.github/workflows/build_releases.yml` uses `uv sync --frozen --all-groups` and `uv run pyinstaller` (Python 3.11).
+- `.github/workflows/build_releases.yml` uses `uv sync --frozen --all-groups` and `uv run pyinstaller` (Python 3.14).
 
 ### Where Poetry used to be referenced (now removed)
 
@@ -95,15 +93,15 @@ This is not inherently wrong, but it tends to:
 `codecov` is in `[project.dependencies]` but is typically CI-only.
 If not imported at runtime, move it to a dev/test group or remove and use a GitHub Action instead.
 
-### Python version decision (required before locking)
+### Python version decision (resolved)
 
-Before we create `uv.lock`, we should pick an explicit supported Python range:
+- Supported Python range is now:
 
-- Current floor dependencies effectively imply **Python >= 3.10**
-- Selenium-wire history suggests **Python 3.12+ is risky**
+- `requires-python = ">=3.11,<3.15"` (Python 3.11–3.14)
+- ✅ `uv sync --frozen --all-groups --python 3.14` + `pytest` pass on Python 3.14.2
+- ⚠️ `selenium-wire` still appears unmaintained and remains a long-term risk
 
-Candidate “safe default” target for Round 2:
-- **Python 3.11** (set `requires-python` to `>=3.11,<3.12`, or `>=3.10,<3.12` depending on desired support)
+Note: Python 3.14 required bumping `lxml` to `>=6.0.2` to avoid source builds (no `cp314` wheels in `lxml<6`).
 
 ## Browser Automation: Selenium -> Playwright / Stagehand / Vibium
 
@@ -151,12 +149,12 @@ This exists because DeBank’s free OpenAPI was discontinued (see the in-file co
 
 ### B) Fix Python version policy
 
-- Decide supported Python range (likely 3.11 if Selenium-wire remains).
+- ✅ Set supported Python range to `>=3.11,<3.15` (Python 3.11–3.14).
 - Update:
   - `pyproject.toml` `requires-python`
-  - `.github/workflows/python-app.yml` Python version
-  - `.github/workflows/build_releases.yml` Python version (currently 3.8)
-  - README snippets that mention 3.12 (currently contradictory)
+  - `.github/workflows/python-app.yml` Python versions (matrix)
+  - `.github/workflows/build_releases.yml` Python version
+  - `README.md` Python environment snippets
 
 ### C) Dependency modernization (incremental)
 

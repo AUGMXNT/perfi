@@ -21,10 +21,10 @@ if sys.stdout.isatty():
     logger.setLevel(logging.DEBUG)
 
 
-def main():
+def main(write_constants_file: bool = True):
     update_assets_from_txchain()
     print("Generating Constants...")
-    generate_constants()
+    generate_constants(write_file=write_constants_file)
 
 
 """
@@ -258,7 +258,7 @@ CHAIN_FEE_ASSETS = {
 }
 
 
-def generate_constants():
+def generate_constants(write_file: bool = True):
     # ORDER market_cap ASC: in case we missed some mapping, try to overwrite with canonical using (fixes some solana wormhole mappings)
     sql = """SELECT id, symbol, name, raw_data
              FROM asset_price
@@ -291,6 +291,9 @@ def generate_constants():
             if platform and raw_data["platforms"][p]:
                 key = f"{platform}:{raw_data['platforms'][p]}"
                 COSTBASIS_LIKEKIND[key] = mapped_id
+
+    if not write_file:
+        return
 
     # Let's output this to the file...
     # NOTE: we can't use pformat because it changes our dict ordering

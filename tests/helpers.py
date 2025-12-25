@@ -237,4 +237,4 @@ class TxFactory:
 
 
 def map_assets():
-    map_assets_main()
+    map_assets_main(write_constants_file=False)

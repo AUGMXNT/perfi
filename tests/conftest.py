@@ -35,6 +35,11 @@ def test_db(monkeypatch):
 
     # Ensure tests don't depend on any on-disk DB state or external price APIs.
     monkeypatch.setattr(price_module, "db", tdb)
+    import perfi.asset as asset_module
+    import bin.map_assets as map_assets_module
+
+    monkeypatch.setattr(asset_module, "db", tdb)
+    monkeypatch.setattr(map_assets_module, "db", tdb)
 
     stubbed_daily_prices_usd = {
         # Used by exchange-import tests (e.g. Kraken fee pricing); the code fetches daily prices.
